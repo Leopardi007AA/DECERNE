@@ -1490,6 +1490,12 @@ $("#offerForm").onsubmit = async (e) => {
     if (new Date(dataFine) < new Date(dataInizio)) {
       return toast.error("La data di fine non può essere precedente alla data di inizio.");
     }
+    if (imgUrl) {
+      const imgCheck = await validateImageUrl(imgUrl);
+      if (!imgCheck.valid) {
+        return toast.error("L'URL immagine inserito non è valido o non è sicuro.");
+      }
+    }
 
     submitBtn.disabled = true;
     submitBtn.innerText = "Salvataggio in corso...";
@@ -1693,7 +1699,7 @@ function deleteAccount() {
       const accessToken = sessionData?.session?.access_token;
       if (!accessToken) throw new Error("Sessione non valida.");
 
-      const response = await fetch("http://localhost:3001/api/delete-account", {
+      const response = await fetch("https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/delete-account", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2652,21 +2658,19 @@ async function fetchAddress(lat, lon) {
       const a = data.address;
       const city = a.city || a.town || a.village || a.suburb || "";
       const cap = a.postcode || "";
-      // CORRETTO: `${city}` invece di city fisso
       const finalAddr = `${cap} ${city}`.trim();
       locInput.value = finalAddr || "Posizione rilevata";
       if (DEV_MODE) console.log("Posizione aggiornata:", finalAddr);
       state.currentPage = 1; 
       renderOffers();
     } else {
-      locInput.value = "Milano"; 
+      locInput.value = "Posizione non riconosciuta";
+      toast.error("Non siamo riusciti a riconoscere il tuo indirizzo. Inseriscilo manualmente.");
     }
   } catch (e) {
     console.warn("Errore localizzazione:", e);
-    // Se fallisce l'indirizzo ma abbiamo le coordinate, non resettare tutto a Milano
-    if (!locInput.value || locInput.value.includes("corso")) {
-        locInput.value = "Posizione impostata (Milano)"; 
-    }
+    locInput.value = "Posizione non disponibile";
+    toast.error("Errore nel rilevamento della posizione. Riprova o inserisci la città manualmente.");
   }
 }
 
@@ -3711,37 +3715,6 @@ async function updatePartnerSubscription(partnerId, subscriptionObj) {
   logAuditAction(partnerId, "SUBSCRIPTION_UPDATED", JSON.stringify(subscriptionObj));
   return true;
 }
-
-// IMPORTANTE: Aggiorna la funzione init() per chiamare updateDrawerUI all'avvio
-const originalInit = init;
-init = function() {
-  originalInit();
-  updateDrawerUI();
-};
-
-// 2. Aggiorna la funzione loginUser esistente per includere updateDrawerUI
-const originalLoginUser = loginUser;
-loginUser = function(email, password) {
-  const success = originalLoginUser(email, password);
-  if (success) updateDrawerUI();
-  return success;
-};
-
-// 3. Aggiorna la funzione logoutUser esistente
-const originalLogoutUser = logoutUser;
-logoutUser = function() {
-  originalLogoutUser();
-  updateDrawerUI();
-};
-
-// 4. Aggiorna la funzione updateProfile esistente
-const originalUpdateProfile = updateProfile;
-updateProfile = function(updatedData) {
-  const success = originalUpdateProfile(updatedData);
-  if (success) updateDrawerUI();
-  return success;
-};
-
 
 function showToast(message, type) {
   if (type === "error") toast.error(message);
