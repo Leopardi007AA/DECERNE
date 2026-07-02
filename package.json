@@ -1,0 +1,23 @@
+{
+  "name": "decerne",
+  "version": "1.0.0",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Leopardi007AA/DECERNE.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Leopardi007AA/DECERNE/issues"
+  },
+  "homepage": "https://github.com/Leopardi007AA/DECERNE#readme",
+  "description": ""
+}

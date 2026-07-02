@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- Content Security Policy -->
+  <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
+  <title>Decerne — Trova le migliori offerte vicino a te</title>
+  <meta name="referrer" content="no-referrer-when-downgrade">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+  <!-- SPINNER GLOBALE -->
+<div id="globalLoader" class="spinner-overlay">
+  <div class="spinner-global"></div>
+</div>
+
+  <!-- NAVBAR SUPERIORE -->
+  <header class="navbar">
+    <div class="logo">DECERNE<span class="logo-dot">•</span></div>
+  
+    <div class="nav-icons">
+      <button class="icon-btn" id="searchBtn" title="Cerca" aria-label="Cerca prodotti">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </button>
+      <button class="icon-btn" id="profileBtn" title="Profilo" aria-label="Accedi al profilo utente">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+      </button>
+      <button class="icon-btn" id="cartBtn" title="Carrello" style="position: relative;" aria-label="Visualizza lista della spesa">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+        <!-- Pallino rosso notifica -->
+        <span id="cartBadge" class="cart-badge hidden">!</span>
+      </button>
+      <button class="icon-btn hamburger-btn" id="menuBtn" title="Menu" aria-label="Apri menu laterale">
+        <div class="hamburger-icon">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </button>
+    </div>
+  </header>
+
+  <!-- POPUP A TUTTO SCHERMO -->
+  <div id="fullPagePopup" class="full-page-modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">Titolo</h2>
+      <button id="closeModal" class="close-btn" aria-label="Chiudi finestra">&times;</button>
+    </div>
+    <div class="modal-content" id="modalContent">
+      <!-- Contenuto dinamico -->
+    </div>
+  </div>
+
+  <main id="app" class="container">
+    <!-- SEARCH BAR / FILTERS (Visibili solo in modalità utente) -->
+    <section class="controls" id="controls">
+      <input id="searchInput" type="search" placeholder="Cerca prodotto..." />
+      
+      <select id="categorySelect">
+        <option value="">Ordina per: in evidenza</option>
+        <option value="best">Migliori offerte</option>
+        <option value="price-asc">Prezzo: dal più basso</option>
+        <option value="price-desc">Prezzo: dal più alto</option>
+      </select>
+    
+      <div class="location-wrapper">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="loc-icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+        <input id="locationInput" type="text" placeholder="Posizione non impostata" readonly />
+      </div>
+    </section>
+
+    <!-- VIEWS -->
+    
+<section id="user-view" class="view">
+  <h2 style="margin-bottom: 20px; color: var(--blue-900);">Offerte vicine</h2>
+  <div id="offersGrid" class="offers-list-container"></div>
+
+  <div id="paginationContainer" style="margin-top: 30px; text-align: center; display: none;">
+    <button id="loadMoreBtn" class="btn outline" style="padding: 12px 40px;">Carica altre offerte</button>
+  </div>
+
+  <div id="emptyMsg" class="empty" style="display:none;">Nessuna offerta trovata.</div>
+</section>
+
+<section id="store-view" class="view hidden">
+  <!-- Contenitore dinamico gestito da JS -->
+  <div id="store-app-container">
+    <!-- Qui verrà iniettato l'onboarding o la dashboard -->
+  </div>
+</section>
+
+<!-- Template per il Modal delle Offerte -->
+<div id="offerModal" class="full-page-modal" style="display:none; z-index: 3000;">
+  <div class="modal-header">
+    <h2 id="offerModalTitle">Gestione Offerta</h2>
+    <div id="offerError" class="error-msg hidden" style="margin-bottom: 15px;"></div>
+    <button type="button" onclick="closeOfferModal()" class="close-btn" style="cursor:pointer; padding: 10px;">&times;</button>
+  </div>
+
+  <div class="modal-content">
+    <form id="offerForm" class="auth-form" style="max-width: 600px; margin: 0 auto; text-align: left;">
+      <input type="hidden" id="offerId">
+      <div class="input-group"><label>Prodotto</label><input type="text" id="offNome" required placeholder="Es: Mele Melinda 1kg"></div>
+      <div class="form-row">
+        <div class="input-group"><label>Prezzo Originale (€)</label><input type="number" step="0.01" id="offPrezzoOrig" required></div>
+        <div class="input-group"><label>Prezzo Scontato (€)</label><input type="number" step="0.01" id="offPrezzoSconto" required></div>
+      </div>
+      <div class="input-group">
+        <label>Punto vendita / Sede</label>
+        <select id="offLocation" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;"></select>
+        <small style="color: #64748b; font-size: 0.7rem;">Seleziona la sede specifica per questa offerta.</small>
+      </div>
+        <div class="input-group">
+          <label>Categoria</label>
+          <select id="offCat">
+            <option value="Ortofrutta">Ortofrutta</option>
+            <option value="Macelleria">Macelleria</option>
+            <option value="Dispensa">Dispensa</option>
+            <option value="Surgelati">Surgelati</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="input-group">
+            <label>Data Inizio</label>
+            <input type="date" id="offStartDate" required>
+          </div>
+          <div class="input-group">
+            <label>Data Fine (Scadenza)</label>
+            <input type="date" id="offEndDate" required>
+          </div>
+        </div>
+      
+      <div class="input-group"><label>URL Immagine Prodotto</label><input type="url" id="offImg" 
+        placeholder="https://immagine.it/prodotto.jpg" 
+        aria-label="URL immagine prodotto" 
+        aria-invalid="false">
+      <small id="imgHint" style="color: #64748b; font-size: 0.75rem;">Verifica automatica dell'immagine al salvataggio.</small></div>
+      <div class="input-group" style="flex-direction: row; align-items: center; gap: 10px; margin-top: 10px;">
+        <input type="checkbox" id="offLimited" style="width: auto;"> <label>Quantità Limitata</label>
+      </div>
+      <div class="input-group">
+        <label>Descrizione / Note Prodotto</label>
+        <textarea id="offDesc" rows="3" placeholder="Es: Mele fresche di stagione, ideali per torte. Origine: Trentino." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-family: inherit;"></textarea>
+      </div>
+      
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <button type="button" id="previewBtn" class="btn outline" style="flex: 1;">👁️ Anteprima</button>
+        <button type="submit" class="btn" style="flex: 2;">Salva Offerta</button>
+      </div>
+      
+    
+<div id="previewOverlay" class="hidden">
+  <div class="preview-modal-container">
+    <button type="button" onclick="closePreview()" class="preview-close-x">&times;</button>
+    
+    <div class="preview-header-actions">
+      <h3>Anteprima Offerta</h3>
+      <!-- Switcher Dispositivi -->
+      <div class="device-switcher">
+        <button type="button" class="device-btn active" id="btnPrevDesktop" onclick="setPreviewDevice('desktop')" aria-label="Visualizzazione Desktop">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Desktop
+        </button>
+        <button type="button" class="device-btn" id="btnPrevMobile" onclick="setPreviewDevice('mobile')" aria-label="Visualizzazione Mobile">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/></svg>
+          Mobile
+        </button>
+        <button type="button" onclick="closePreview()" class="preview-close-x" aria-label="Chiudi anteprima">&times;</button>
+      </div>
+    </div>
+
+    <!-- Wrapper simulatore -->
+    <div id="previewSimulationWrapper" class="mode-desktop">
+      <div id="previewCardContainer">
+        <!-- La card viene iniettata qui -->
+      </div>
+    </div>
+
+    <p class="preview-footer-note">L'aspetto potrebbe variare leggermente in base al browser del cliente.</p>
+  </div>
+</div>
+      
+      
+        <div class="input-group">
+            <label>Stato Pubblicazione</label>
+         <select id="offStatus">
+           <option value="active">Attiva (Visibile a tutti)</option>
+           <option value="draft">Bozza (Solo tu puoi vederla)</option>
+           <option value="paused">In Pausa (Nascondi temporaneamente)</option>
+           <option value="expired" disabled>Scaduta (Automatico)</option>
+         </select>
+        </div>
+
+    </form>
+    
+    <!-- Sezione Cronologia Modifiche (Visibile solo in Edit) -->
+    <div id="historySection" class="hidden" style="margin-top: 30px; padding-top: 20px; border-top: 2px dashed #eee; text-align: left;">
+      <h4 style="color: #64748b; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+        🕒 Cronologia Modifiche
+      </h4>
+      <div id="historyList" style="display: flex; flex-direction: column; gap: 10px; font-size: 0.85rem;">
+        <!-- Log inseriti dinamicamente -->
+      </div>
+    </div>
+
+  </div>
+</div>
+
+    <section id="admin-view" class="view hidden">
+      <h2>Area Admin</h2>
+      <div id="admin-login" class="card">
+        <input id="adminEmail" type="email" placeholder="Email admin" />
+        <input id="adminPassword" type="password" placeholder="Password admin" />
+        <button id="adminLoginBtn" class="btn">Accedi</button>
+      </div>
+      <div id="admin-panel" class="card hidden">
+        <button id="adminLogoutBtn" class="btn outline">Logout</button>
+        <button class="btn outline" onclick="renderAdminTrash()">Gestisci Cestino</button>
+        <button class="btn outline" onclick="renderAdminAudit()">Visualizza Log</button>
+        <button class="btn outline" onclick="renderAdminHistory()">Registro Modifiche</button>
+        <div id="adminOffers" class="grid"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <small>Decerne &copy; 2026 • Il risparmio a portata di clic</small>
+  </footer>
+
+  <!-- DRAWER LATERALE -->
+  <div id="drawer">
+    <div class="drawer-header">
+      <h3>Menu</h3>
+    </div>
+    <ul class="nav-menu">
+      <li id="navModeUser" class="active">🏠 Home Utenti</li>
+      <li id="navModeStore">🏪 Area Supermercati</li>
+      <li id="navModeAdmin">🛡️ Pannello Admin</li>
+    </ul>
+  
+    <div class="drawer-spacer"></div>
+    
+    <hr>
+  
+    <!-- NUOVA CARD PROFILO (Appare solo se loggato) -->
+  <div id="drawerProfileCard" class="drawer-profile-card hidden">
+    <div class="mini-avatar" id="drawerAvatar">U</div>
+    <div class="user-info-text">
+      <span class="user-name" id="drawerName">Nome Utente</span>
+      <span class="user-email" id="drawerEmail">email@esempio.it</span>
+    </div>
+  </div>
+
+  <!-- Tasti Login/Reg (Scompaiono se loggato) -->
+  <div class="drawer-auth" id="drawerAuthButtons">
+    <button class="btn" onclick="openFullPageModal('profile')">Accedi</button>
+    <button class="btn outline" onclick="openFullPageModal('profile'); showRegisterForm();">Registrati</button>
+  </div>
+
+  </div>
+  
+  <div id="locationBanner" class="location-banner hidden">
+    <div class="banner-content">
+      <p>📍 <strong>Decerne</strong> vorrebbe usare la tua posizione per mostrarti le offerte nei supermercati più vicini a te. Vuoi consentire?</p>
+      <div class="banner-btns">
+        <button id="allowLoc" class="btn">Consenti</button>
+        <button id="denyLoc" class="btn outline">No, grazie</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <div id="overlay"></div>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/main.js"></script>
+
+</body>
+</html>
