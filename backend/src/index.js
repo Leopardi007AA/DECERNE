@@ -8,7 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 dotenv.config();
 
 const app = express();
-app.use(cors({ origin: process.env.ALLOWED_ORIGIN || "*" }));
+app.use(cors({ origin: process.env.ALLOWED_ORIGIN || "https://www.decerne.it" }));
 app.use(express.json());
 
 // Client "pubblico": rispetta le regole RLS come un utente vero.
@@ -28,21 +28,6 @@ const supabaseAdmin = createClient(
 // --- Endpoint di controllo: il server è vivo? ---
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, message: "Backend Decerne attivo" });
-});
-
-// --- Endpoint di test: legge le offerte pubbliche da Supabase ---
-app.get("/api/test-offers", async (req, res) => {
-  const { data, error } = await supabase
-    .from("offers")
-    .select("id, product, price, original_price, status")
-    .limit(5);
-
-  if (error) {
-    console.error(error);
-    return res.status(500).json({ ok: false, error: error.message });
-  }
-
-  res.json({ ok: true, count: data.length, offers: data });
 });
 
 // --- Endpoint: cancellazione definitiva account utente ---

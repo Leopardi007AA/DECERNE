@@ -13,7 +13,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLI
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
-const DEV_MODE = true;
+const DEV_MODE = false;
 
 const PARTNER_AUTH_KEY = "decerne_partner_auth"; // Per il "Remember Me"
 
@@ -822,9 +822,11 @@ function uid(prefix = "id") {
  */
 function generateRandomApiKey(length = 32) {
   const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const randomValues = new Uint32Array(length);
+  crypto.getRandomValues(randomValues); // generatore crittograficamente sicuro, non Math.random()
   let result = "";
   for (let i = 0; i < length; i++) {
-    result += charset.charAt(Math.floor(Math.random() * charset.length));
+    result += charset.charAt(randomValues[i] % charset.length);
   }
   return "dec_live_" + result;
 }
@@ -1639,10 +1641,11 @@ async function loginUser(email, password) {
     });
 
     if (error || !data.user) {
-      const msg = error?.message?.includes("Email not confirmed")
-        ? "Devi confermare l'email prima di accedere. Controlla la tua casella di posta."
+      const notConfirmed = error?.message?.includes("Email not confirmed");
+      const msg = notConfirmed
+        ? "Devi confermare l'email prima di accedere."
         : "Email o password errati.";
-      return { success: false, msg };
+      return { success: false, msg, needsVerification: notConfirmed };
     }
 
     const { data: profile, error: profileError } = await supabaseClient
@@ -1789,6 +1792,145 @@ async function restoreUserSession() {
   } catch (e) {
     console.error("Errore ripristino sessione utente:", e);
     state.currentUser = null;
+  }
+}
+
+// ============ VERIFICA EMAIL CON CODICE OTP ============
+let pendingVerification = null; // { type: 'customer' } oppure { type: 'store', storeInsertData: {...} }
+
+function renderOtpVerificationScreen(email) {
+  const title = $("#modalTitle");
+  const content = $("#modalContent");
+  title.innerText = "Verifica la tua email";
+  content.innerHTML = `
+    <div class="auth-container" style="text-align:center;">
+      <h3>Controlla la tua posta</h3>
+      <p style="margin-bottom: 15px; color:#64748b;">Abbiamo inviato un codice a 6 cifre a<br><strong>${email}</strong></p>
+      <div id="otpError" class="error-msg hidden"></div>
+      <input type="text" id="otpCodeInput" maxlength="6" inputmode="numeric" pattern="[0-9]*"
+        placeholder="000000" style="font-size:1.5rem; letter-spacing:8px; text-align:center; width:180px; padding:10px; margin:10px 0;">
+      <br>
+      <button class="btn" id="verifyOtpBtn" style="width:180px;">Verifica</button>
+      <p style="margin-top:20px; font-size:0.9rem;">
+        Non hai ricevuto il codice? <a href="javascript:void(0)" id="resendOtpLink">Invialo di nuovo</a>
+      </p>
+    </div>
+  `;
+
+  $("#verifyOtpBtn").onclick = async () => {
+    const token = $("#otpCodeInput").value.trim();
+    const err = $("#otpError");
+    if (token.length !== 6) {
+      err.innerText = "Inserisci il codice a 6 cifre.";
+      err.classList.remove("hidden");
+      return;
+    }
+    err.classList.add("hidden");
+    await completeEmailVerification(email, token);
+  };
+
+  $("#resendOtpLink").onclick = async (e) => {
+    e.preventDefault();
+    const { error } = await supabaseClient.auth.resend({ type: 'signup', email });
+    if (error) toast.error("Errore nell'invio. Riprova tra qualche minuto.");
+    else toast.success("Codice reinviato!");
+  };
+}
+
+async function completeEmailVerification(email, token) {
+  if (!pendingVerification) {
+    toast.error("Sessione di verifica scaduta. Ricomincia la registrazione.");
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.verifyOtp({ email, token, type: 'signup' });
+  if (error || !data.user) {
+    const err = $("#otpError");
+    err.innerText = "Codice non valido o scaduto. Riprova o richiedine uno nuovo.";
+    err.classList.remove("hidden");
+    return;
+  }
+
+  if (pendingVerification.type === 'customer') {
+    pendingVerification = null;
+    await restoreUserSession();
+    updateDrawerUI();
+    renderOffers();
+    toast.success("Email verificata! Benvenuto su Decerne.");
+    closeFullPageModal();
+  } else if (pendingVerification.type === 'store') {
+    await finalizeStoreRegistration(data.user.id);
+  }
+}
+
+async function finalizeStoreRegistration(authUserId) {
+  const d = pendingVerification.storeInsertData;
+  try {
+    const { data: storeRow, error: storeError } = await supabaseClient
+      .from('stores')
+      .insert({
+        auth_user_id: authUserId,
+        email: d.emailClean,
+        name: d.name,
+        address: d.fullAddress,
+        city: d.city,
+        cap: d.cap,
+        logo_url: d.logoUrl,
+        phone: d.phone,
+        plan: d.planChoice,
+        internal_notes: d.referralNotes
+      })
+      .select()
+      .single();
+    if (storeError) throw new Error("Errore creazione negozio: " + storeError.message);
+
+    const { data: locationRow } = await supabaseClient
+      .from('store_locations')
+      .insert({
+        store_id: storeRow.id,
+        name: "Sede Principale",
+        address: d.fullAddress
+      })
+      .select()
+      .single();
+
+    const newStore = {
+      id: storeRow.id,
+      email: storeRow.email,
+      name: storeRow.name,
+      address: storeRow.address,
+      city: storeRow.city,
+      cap: storeRow.cap,
+      logo: storeRow.logo_url || "",
+      phone: storeRow.phone || "",
+      hours: "",
+      internalNotes: storeRow.internal_notes || "",
+      locations: [{ id: locationRow.id, name: "Sede Principale", address: d.fullAddress }],
+      plan: storeRow.plan,
+      subscription: {
+        plan: storeRow.plan,
+        status: 'trial',
+        startedAt: new Date().toISOString().split("T")[0],
+        daysLeft: 30
+      }
+    };
+
+    const sessionData = JSON.stringify(newStore);
+    localStorage.setItem(PARTNER_AUTH_KEY, sessionData);
+    sessionStorage.setItem(SESSION_PARTNER, sessionData);
+
+    state.currentStore = newStore;
+    storeData.step = 'dashboard';
+    storeData.activeTab = 'home';
+    storeData.tempReg = null;
+    pendingVerification = null;
+
+    toast.success("Email verificata! Benvenuto nel tuo pannello.");
+    renderStoreView();
+    updateDrawerUI();
+  } catch (e) {
+    console.error("Errore finalizzazione registrazione negozio:", e);
+    toast.error("Errore tecnico: " + e.message);
   }
 }
 
@@ -1974,6 +2116,9 @@ function renderLoginForm() {
       const result = await loginUser(email, pass);
       if (result.success) {
         renderProfileInfo();
+      } else if (result.needsVerification) {
+        pendingVerification = { type: 'customer' };
+        renderOtpVerificationScreen(email.trim().toLowerCase());
       } else {
         const err = $("#loginError");
         err.innerText = result.msg;
@@ -2181,12 +2326,8 @@ async function validateRegistration() {
   const result = await registerUser(newUser);
 
   if (result.success) {
-    toast.success("Registrazione completata con successo!");
-    
-    // Invece di chiudere, carichiamo subito il form di login nello stesso modal
-    setTimeout(() => {
-      renderLoginForm(); // Questa funzione mostra la schermata di accesso
-    }, 500);
+    pendingVerification = { type: 'customer' };
+    renderOtpVerificationScreen(newUser.email.trim().toLowerCase());
   } else {
     toast.error(result.msg);
   }
@@ -3085,72 +3226,24 @@ async function handleOnboardingSubmit(step) {
       if (authError) throw new Error(authError.message);
       if (!authData.user) throw new Error("Registrazione non completata.");
 
-      // 2. Inserimento riga Store con nota di referral verificata
-      const { data: storeRow, error: storeError } = await supabaseClient
-        .from('stores')
-        .insert({
-          auth_user_id: authData.user.id,
-          email: emailClean,
+      // 2. Salva i dati del negozio: verranno scritti su DB solo DOPO la verifica email
+      // (prima la sessione non è ancora attiva, le RLS bloccherebbero l'inserimento)
+      pendingVerification = {
+        type: 'store',
+        storeInsertData: {
+          emailClean,
           name: storeData.tempReg.name,
-          address: fullAddress,
+          fullAddress,
           city: storeData.tempReg.city,
-          cap: cap,
-          logo_url: logoUrl,
-          phone: phone,
-          plan: planChoice,
-          internal_notes: referralNotes
-        })
-        .select()
-        .single();
-      if (storeError) throw new Error("Errore creazione negozio: " + storeError.message);
-
-      // 3. Creazione Sede Principale
-      const { data: locationRow } = await supabaseClient
-        .from('store_locations')
-        .insert({
-          store_id: storeRow.id,
-          name: "Sede Principale",
-          address: fullAddress
-        })
-        .select()
-        .single();
-
-      const newStore = {
-        id: storeRow.id,
-        email: storeRow.email,
-        name: storeRow.name,
-        address: storeRow.address,
-        city: storeRow.city,
-        cap: storeRow.cap,
-        logo: storeRow.logo_url || "",
-        phone: storeRow.phone || "",
-        hours: "",
-        internalNotes: storeRow.internal_notes || "",
-        locations: [{ id: locationRow.id, name: "Sede Principale", address: fullAddress }],
-        plan: storeRow.plan,
-        subscription: {
-          plan: storeRow.plan,
-          status: 'trial',
-          startedAt: new Date().toISOString().split("T")[0],
-          daysLeft: 30
+          cap,
+          logoUrl,
+          phone,
+          planChoice,
+          referralNotes
         }
       };
 
-      
-
-      const sessionData = JSON.stringify(newStore);
-      localStorage.setItem(PARTNER_AUTH_KEY, sessionData); 
-      sessionStorage.setItem(SESSION_PARTNER, sessionData);
-      
-      state.currentStore = newStore;
-      storeData.step = 'dashboard';
-      storeData.activeTab = 'home';
-      storeData.tempReg = null;
-
-      toast.success("Registrazione completata! Benvenuto nel tuo pannello.");
-      
-      renderStoreView();
-      updateDrawerUI();
+      renderOtpVerificationScreen(emailClean);
     }
   } catch (e) {
     console.error("Dettaglio Errore Onboarding:", e);
@@ -4126,7 +4219,7 @@ window.activatePlan = async function(planName) {
     };
 
     if (planName === 'Professional' && !partner.apiKey) {
-      updates.api_key = 'dc_' + Math.random().toString(36).substr(2, 16);
+      updates.api_key = generateRandomApiKey();
     }
 
     const { data: storeRow, error } = await supabaseClient
@@ -4327,7 +4420,7 @@ function renderImportTab() {
         
         <textarea id="jsonImportArea" placeholder='[
   { "nome": "Pasta Barilla 500g", "prezzo": 0.89, "originale": 1.29, "img": "https://...", "cat": "Dispensa" }
-]' style="width:100%; height:300px; font-family:monospace; font-size:0.85rem; padding:15px; border-radius:12px; border:1px solid #e2e8f0;"></textarea>
+ ]' style="width:100%; height:300px; font-family:monospace; font-size:0.85rem; padding:15px; border-radius:12px; border:1px solid #e2e8f0;"></textarea>
 
         <div style="margin-top:20px;">
           <button class="btn" onclick="handleJSONImport()">Avvia Importazione</button>
@@ -4418,7 +4511,7 @@ window.downloadTemplateJSON = () => {
 /**
  * TAB: DASHBOARD GENERALE
  * Calcola statistiche aggregate (Views, Click, CTR, Sedi) e disegna il grafico.
- */
+*/
 function renderGeneralDashboardTab() {
   const partner = getCurrentPartner();
   const myOffers = getMyOffers();

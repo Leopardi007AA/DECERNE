@@ -4,7 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <!-- Content Security Policy -->
-  <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
+  <meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net;
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: https:;
+  connect-src 'self' https://noqdpjlbmyjqzlmstfvx.supabase.co https://nominatim.openstreetmap.org https://cdnjs.cloudflare.com https://cdn.jsdelivr.net;
+  font-src 'self' data:;
+ ">
   <title>Decerne — Trova le migliori offerte vicino a te</title>
   <meta name="referrer" content="no-referrer-when-downgrade">
   <link rel="stylesheet" href="css/main.css">
@@ -74,7 +81,7 @@
     <!-- VIEWS -->
     
 <section id="user-view" class="view">
-  <h2 style="margin-bottom: 20px; color: var(--blue-900);">Offerte vicine</h2>
+  <h2 style="margin-bottom: 20px; color: var(--blue-900);">Offerte Vicine</h2>
   <div id="offersGrid" class="offers-list-container"></div>
 
   <div id="paginationContainer" style="margin-top: 30px; text-align: center; display: none;">
