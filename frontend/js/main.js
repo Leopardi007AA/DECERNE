@@ -3052,6 +3052,7 @@ function renderOnboarding(container) {
         <div class="step active"></div>
         <div class="step ${step >= 2 ? 'active' : ''}"></div>
         <div class="step ${step >= 3 ? 'active' : ''}"></div>
+        <div class="step ${step >= 4 ? 'active' : ''}"></div>
       </div>
       
       ${step === 1 ? `
@@ -3071,9 +3072,20 @@ function renderOnboarding(container) {
             <input type="password" id="obPassConfirm" placeholder="Conferma Password" required>
           </div>
           <input type="text" id="obRef" placeholder="Nome Referente" required value="${storeData.tempReg?.ref || ''}">
-          <button type="submit" class="btn full-width">Continua al passo 2</button>
+          <button type="submit" class="btn full-width">Continua alla verifica email</button>
         </form>
       ` : step === 2 ? `
+        <h3>Verifica la tua email</h3>
+        <p class="step-sub">Abbiamo inviato un codice a 6 cifre a <strong>${storeData.tempReg?.email || ''}</strong></p>
+        <form id="onboardingForm" class="auth-form">
+          <input type="text" id="obOtpCode" maxlength="6" inputmode="numeric" pattern="[0-9]*"
+            placeholder="000000" style="font-size:1.5rem; letter-spacing:8px; text-align:center;" required>
+          <button type="submit" class="btn full-width">Verifica codice</button>
+        </form>
+        <p style="margin-top:15px; font-size:0.9rem; text-align:center;">
+          Non hai ricevuto il codice? <a href="javascript:void(0)" onclick="resendOnboardingOtp()">Invialo di nuovo</a>
+        </p>
+      ` : step === 3 ? `
         <h3>Posizione del Negozio</h3>
         <p class="step-sub">Indica dove si trova il punto vendita.</p>
         <form id="onboardingForm" class="auth-form">
@@ -3091,10 +3103,7 @@ function renderOnboarding(container) {
               <input type="text" id="obCap" placeholder="12345" maxlength="5" required value="${storeData.tempReg?.cap || getCleanUserCap() || ''}">
             </div>
           </div>
-          <div style="display:flex; gap:10px; margin-top:10px;">
-            <button type="button" class="btn outline" onclick="storeData.onboardingStep = 1; renderStoreView();">Indietro</button>
-            <button type="submit" class="btn" style="flex:1">Continua al passo 3</button>
-          </div>
+          <button type="submit" class="btn full-width">Continua al passo 4</button>
         </form>
       ` : `
         <h3>Dettagli Aggiuntivi</h3>
@@ -3111,7 +3120,6 @@ function renderOnboarding(container) {
           </div>
 
           <div style="display:flex; gap:10px; margin-top:20px;">
-            <button type="button" class="btn outline" onclick="storeData.onboardingStep = 2; renderStoreView();">Indietro</button>
             <button type="submit" class="btn" style="flex:1">Completa Registrazione</button>
           </div>
         </form>
@@ -3123,6 +3131,13 @@ function renderOnboarding(container) {
     e.preventDefault();
     await handleOnboardingSubmit(step);
   };
+}
+
+async function resendOnboardingOtp() {
+  if (!storeData.tempReg?.email) return;
+  const { error } = await supabaseClient.auth.resend({ type: 'signup', email: storeData.tempReg.email });
+  if (error) toast.error("Errore nell'invio. Riprova tra qualche minuto.");
+  else toast.success("Codice reinviato!");
 }
 
 // Nuova funzione per gestire la logica dei passaggi
@@ -3146,112 +3161,151 @@ async function handleOnboardingSubmit(step) {
         ref: clean($("#obRef").value),
         type: $("#obType").value
       };
-      storeData.onboardingStep = 2;
-      renderStoreView();
-    } 
-    else if (step === 2) {
-      if (!storeData.tempReg) throw new Error("Dati mancanti dallo step precedente.");
-      storeData.tempReg.street = clean($("#obStreet").value);
-      storeData.tempReg.city = clean($("#obCity").value).trim().toLowerCase();
-      storeData.tempReg.cap = clean($("#obCap").value).trim();
-      storeData.onboardingStep = 3;
-      renderStoreView();
-    } 
-    else if (step === 3) {
-      if (!storeData.tempReg || !storeData.tempReg.city) throw new Error("Dati incompleti.");
 
-      const referralInput = document.getElementById("obReferral")?.value.trim() || "";
-      let referralNotes = "";
-
-      // VERIFICA DEL REFERRAL PRIMA DI PROCEDERE
-      if (referralInput) {
-        if (btn) btn.innerText = "Verifica codice...";
-        
-        // Determina se l'input è un UUID o un'email per strutturare la query corretta
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(referralInput);
-
-        let presenterStore = null;
-        let verificationError = null;
-
-        if (isUuid) {
-          // Lookup via la view pubblica: bypassa la RLS di "stores" (che mostra solo
-          // la riga dell'utente loggato) ed espone solo i campi non sensibili.
-          const res = await supabaseClient
-            .from('public_stores')
-            .select('id, name')
-            .eq('id', referralInput)
-            .maybeSingle();
-          presenterStore = res.data;
-          verificationError = res.error;
-        } else {
-          // Lookup via email: l'email è privata e non è nella view pubblica, quindi
-          // passa da una funzione RPC security-definer che la verifica server-side
-          // senza mai restituirla al client.
-          const res = await supabaseClient
-            .rpc('verify_referral_by_email', { p_email: referralInput.toLowerCase() })
-            .maybeSingle();
-          presenterStore = res.data;
-          verificationError = res.error;
-        }
-
-        if (verificationError || !presenterStore) {
-          if (btn) {
-            btn.disabled = false;
-            btn.innerText = "Completa Registrazione";
-          }
-          return toast.error("❌ Il Codice Presentatore o l'Email inseriti non sono validi!");
-        }
-
-        // Se valido, prepariamo la nota interna di tracciamento
-        referralNotes = `[Sito invitato tramite piano Referral da: ${presenterStore.name} (ID: ${presenterStore.id})]`;
-        toast.success(`🎯 Codice valido! Invitato da: ${presenterStore.name}`);
-      }
-
-      if (btn) btn.innerText = "Creazione account...";
-
-      const cityUpper = storeData.tempReg.city.toUpperCase();
-      const street = storeData.tempReg.street || "";
-      const cap = storeData.tempReg.cap || "";
-      const fullAddress = `${street}, ${cap} ${cityUpper}`.trim();
-      const logoUrl = document.getElementById("obLogo")?.value || "";
-      const phone = document.getElementById("obTel")?.value || "";
-      const planChoice = storeData.subscription.plan || 'Starter';
-      const emailClean = storeData.tempReg.email.trim().toLowerCase();
-
-      // 1. Registrazione su Supabase Auth
+      // Registriamo subito l'account: da qui in poi serve la verifica email
       const { data: authData, error: authError } = await supabaseClient.auth.signUp({
-        email: emailClean,
+        email: storeData.tempReg.email,
         password: storeData.tempReg.pass
       });
       if (authError) throw new Error(authError.message);
       if (!authData.user) throw new Error("Registrazione non completata.");
 
-      // 2. Salva i dati del negozio: verranno scritti su DB solo DOPO la verifica email
-      // (prima la sessione non è ancora attiva, le RLS bloccherebbero l'inserimento)
-      pendingVerification = {
-        type: 'store',
-        storeInsertData: {
-          emailClean,
+      storeData.tempReg.authUserId = authData.user.id;
+      storeData.onboardingStep = 2;
+      renderStoreView();
+    }
+    else if (step === 2) {
+      const token = $("#obOtpCode").value.trim();
+      if (token.length !== 6) {
+        if (btn) btn.disabled = false;
+        return toast.error("Inserisci il codice a 6 cifre.");
+      }
+
+      const { data, error } = await supabaseClient.auth.verifyOtp({
+        email: storeData.tempReg.email,
+        token,
+        type: 'signup'
+      });
+      if (error || !data.user) {
+        if (btn) btn.disabled = false;
+        return toast.error("Codice non valido o scaduto. Riprova o richiedine uno nuovo.");
+      }
+
+      toast.success("Email verificata!");
+      storeData.onboardingStep = 3;
+      renderStoreView();
+    }
+    else if (step === 3) {
+      if (!storeData.tempReg) throw new Error("Dati mancanti dallo step precedente.");
+      storeData.tempReg.street = clean($("#obStreet").value);
+      storeData.tempReg.city = clean($("#obCity").value).trim().toLowerCase();
+      storeData.tempReg.cap = clean($("#obCap").value).trim();
+      storeData.onboardingStep = 4;
+      renderStoreView();
+    }
+    else if (step === 4) {
+      if (!storeData.tempReg || !storeData.tempReg.city) throw new Error("Dati incompleti.");
+
+      const referralInput = document.getElementById("obReferral")?.value.trim() || "";
+      let referralNotes = "";
+      if (referralInput) {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(referralInput);
+        const { data: refData, error: refError } = await supabaseClient.rpc('verify_referral_by_email', {
+          p_email: isUuid ? null : referralInput
+        });
+        if (isUuid) {
+          const { data: byId } = await supabaseClient.from('public_stores').select('id, name').eq('id', referralInput).single();
+          if (!byId) {
+            if (btn) btn.disabled = false;
+            return toast.error("Codice presentatore non valido.");
+          }
+          referralNotes = `Presentato da: ${byId.name} (${byId.id})`;
+        } else if (referralInput) {
+          if (refError || !refData || refData.length === 0) {
+            if (btn) btn.disabled = false;
+            return toast.error("Email del presentatore non trovata.");
+          }
+          referralNotes = `Presentato da: ${refData[0].name} (${refData[0].id})`;
+        }
+      }
+
+      const logoUrl = clean($("#obLogo").value);
+      const phone = clean($("#obTel").value);
+      const fullAddress = `${storeData.tempReg.street}, ${storeData.tempReg.cap} ${storeData.tempReg.city}`;
+      const emailClean = storeData.tempReg.email;
+      const planChoice = storeData.subscription?.plan || 'Starter';
+
+      // La sessione è già attiva dallo step 3 (verifyOtp): possiamo scrivere direttamente su DB
+      const { data: storeRow, error: storeError } = await supabaseClient
+        .from('stores')
+        .insert({
+          auth_user_id: storeData.tempReg.authUserId,
+          email: emailClean,
           name: storeData.tempReg.name,
-          fullAddress,
+          address: fullAddress,
           city: storeData.tempReg.city,
-          cap,
-          logoUrl,
-          phone,
-          planChoice,
-          referralNotes
+          cap: storeData.tempReg.cap,
+          logo_url: logoUrl,
+          phone: phone,
+          plan: planChoice,
+          internal_notes: referralNotes
+        })
+        .select()
+        .single();
+      if (storeError) throw new Error("Errore creazione negozio: " + storeError.message);
+
+      const { data: locationRow } = await supabaseClient
+        .from('store_locations')
+        .insert({
+          store_id: storeRow.id,
+          name: "Sede Principale",
+          address: fullAddress
+        })
+        .select()
+        .single();
+
+      const newStore = {
+        id: storeRow.id,
+        email: storeRow.email,
+        name: storeRow.name,
+        address: storeRow.address,
+        city: storeRow.city,
+        cap: storeRow.cap,
+        logo: storeRow.logo_url || "",
+        phone: storeRow.phone || "",
+        hours: "",
+        internalNotes: storeRow.internal_notes || "",
+        locations: [{ id: locationRow.id, name: "Sede Principale", address: fullAddress }],
+        plan: storeRow.plan,
+        subscription: {
+          plan: storeRow.plan,
+          status: 'trial',
+          startedAt: new Date().toISOString().split("T")[0],
+          daysLeft: 30
         }
       };
 
-      renderOtpVerificationScreen(emailClean);
+      const sessionData = JSON.stringify(newStore);
+      localStorage.setItem(PARTNER_AUTH_KEY, sessionData);
+      sessionStorage.setItem(SESSION_PARTNER, sessionData);
+
+      state.currentStore = newStore;
+      storeData.step = 'dashboard';
+      storeData.activeTab = 'home';
+      storeData.tempReg = null;
+
+      toast.success("Registrazione completata! Benvenuto nel tuo pannello.");
+
+      renderStoreView();
+      updateDrawerUI();
     }
   } catch (e) {
     console.error("Dettaglio Errore Onboarding:", e);
     const form = document.getElementById("onboardingForm");
-    const btn = form ? form.querySelector('button[type="submit"]') : null;
-    if (btn) {
-      btn.disabled = false;
-      btn.innerText = "Completa Registrazione";
+    const btn2 = form ? form.querySelector('button[type="submit"]') : null;
+    if (btn2) {
+      btn2.disabled = false;
+      btn2.innerText = "Riprova";
     }
     toast.error("Errore tecnico: " + e.message);
   }
