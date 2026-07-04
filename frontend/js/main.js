@@ -2101,6 +2101,9 @@ function renderLoginForm() {
         <input type="password" id="loginPass" placeholder="Password" required>
         <button type="submit" class="btn">Accedi</button>
       </form>
+      <p style="text-align:center; margin-top:10px;">
+        <a href="javascript:void(0)" onclick="renderForgotPasswordForm()" style="font-size:0.85rem; color:#64748b;">Password dimenticata?</a>
+      </p>
       <p class="auth-switch">Non sei registrato? <a href="javascript:void(0)" onclick="showRegisterForm()">Registrati</a></p>
     </div>
   `;
@@ -2126,6 +2129,83 @@ function renderLoginForm() {
       }
       hideLoading();
     }, 300);
+  };
+}
+
+function renderForgotPasswordForm() {
+  const title = $("#modalTitle");
+  const content = $("#modalContent");
+  title.innerText = "Recupera password";
+  content.innerHTML = `
+    <div class="auth-container">
+      <h3>Recupera la tua password</h3>
+      <p style="color:#64748b; margin-bottom:15px; font-size:0.9rem;">Inserisci l'email con cui ti sei registrato: ti invieremo un link per reimpostarla.</p>
+      <div id="forgotError" class="error-msg hidden"></div>
+      <form id="forgotForm" class="auth-form">
+        <input type="email" id="forgotEmail" placeholder="Email" required>
+        <button type="submit" class="btn">Invia link di recupero</button>
+      </form>
+      <p class="auth-switch"><a href="javascript:void(0)" onclick="renderLoginForm()">Torna al login</a></p>
+    </div>
+  `;
+
+  $("#forgotForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const email = $("#forgotEmail").value.trim().toLowerCase();
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}${window.location.pathname}?reset=1`
+    });
+    if (error) {
+      const err = $("#forgotError");
+      err.innerText = "Errore nell'invio. Controlla l'email e riprova.";
+      err.classList.remove("hidden");
+      return;
+    }
+    toast.success("Se l'email è registrata, riceverai un link per reimpostare la password.");
+    renderLoginForm();
+  };
+}
+
+function renderResetPasswordForm() {
+  const title = $("#modalTitle");
+  const content = $("#modalContent");
+  title.innerText = "Imposta nuova password";
+  content.innerHTML = `
+    <div class="auth-container">
+      <h3>Imposta la nuova password</h3>
+      <div id="resetError" class="error-msg hidden"></div>
+      <form id="resetForm" class="auth-form">
+        <input type="password" id="resetPass" placeholder="Nuova password (min. 8)" required>
+        <input type="password" id="resetPassConfirm" placeholder="Conferma nuova password" required>
+        <button type="submit" class="btn">Salva nuova password</button>
+      </form>
+    </div>
+  `;
+
+  $("#resetForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const pass = $("#resetPass").value;
+    const confirm = $("#resetPassConfirm").value;
+    const err = $("#resetError");
+    if (pass.length < 8) {
+      err.innerText = "La password deve essere di almeno 8 caratteri.";
+      err.classList.remove("hidden");
+      return;
+    }
+    if (pass !== confirm) {
+      err.innerText = "Le password non coincidono.";
+      err.classList.remove("hidden");
+      return;
+    }
+    const { error } = await supabaseClient.auth.updateUser({ password: pass });
+    if (error) {
+      err.innerText = "Errore durante il salvataggio. Il link potrebbe essere scaduto: richiedine uno nuovo.";
+      err.classList.remove("hidden");
+      return;
+    }
+    toast.success("Password aggiornata! Effettua il login.");
+    history.replaceState(null, "", window.location.pathname); // pulisce ?reset=1 dall'URL
+    renderLoginForm();
   };
 }
 
@@ -2684,6 +2764,20 @@ async function init() {
 
   setupEventListeners();
 
+ // Se l'utente arriva dal link email di recupero password, mostra il form dedicato
+ const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('reset') === '1') {
+    if (urlParams.get('role') === 'store') {
+      setMode('store');
+      storeData.step = 'login';
+      renderStoreView();
+      renderResetPasswordForm(); // stesso form riusato: updateUser funziona per qualunque account Supabase Auth
+    } else {
+      openFullPageModal('profile');
+      renderResetPasswordForm();
+    }
+  }
+
   await restoreUserSession();
   const tempPartner = sessionStorage.getItem(SESSION_PARTNER);
   const permPartner = localStorage.getItem(PARTNER_AUTH_KEY);
@@ -2873,6 +2967,97 @@ function renderStoreView() {
   } else if (storeData.step === 'dashboard') {
     renderDashboard(container);
   }
+}
+
+function renderStoreLoginForm(container) {
+  container.innerHTML = `
+    <div class="pricing-wrapper" style="max-width: 420px; margin: 60px auto;">
+      <div class="onboarding-card">
+        <h3>Accesso Area Partner</h3>
+        <div id="storeLoginError" class="error-msg hidden"></div>
+        <form id="storeLoginForm" class="auth-form">
+          <input type="email" id="storeLoginEmail" placeholder="Email aziendale" required>
+          <input type="password" id="storeLoginPass" placeholder="Password" required>
+          <button type="submit" class="btn full-width">Accedi</button>
+        </form>
+        <p style="text-align:center; margin-top:10px;">
+          <a href="javascript:void(0)" onclick="renderStoreForgotPasswordForm()" style="font-size:0.85rem; color:#64748b;">Password dimenticata?</a>
+        </p>
+        <p class="auth-switch" style="text-align:center; margin-top:15px;">
+          <a href="javascript:void(0)" onclick="storeData.step='pricing'; renderStoreView();">Torna ai piani</a>
+        </p>
+      </div>
+    </div>
+  `;
+
+  $("#storeLoginForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.innerText = "Accesso in corso...";
+
+    const email = $("#storeLoginEmail").value;
+    const pass = $("#storeLoginPass").value;
+    const result = await window.loginPartnerAction(email, pass);
+
+    if (result.success) {
+      storeData.step = 'dashboard';
+      storeData.activeTab = 'home';
+      renderStoreView();
+      updateDrawerUI();
+      await refreshMyOffers();
+      toast.success("Bentornato!");
+    } else {
+      btn.disabled = false;
+      btn.innerText = "Accedi";
+      const err = $("#storeLoginError");
+      const messages = {
+        credentials: "Email o password errati.",
+        'no-store': "Nessun negozio associato a questo account.",
+        expired: "Il tuo abbonamento è scaduto. Contatta l'assistenza.",
+        technical: "Errore tecnico. Riprova tra poco."
+      };
+      err.innerText = messages[result.reason] || "Errore durante l'accesso.";
+      err.classList.remove("hidden");
+    }
+  };
+}
+
+function renderStoreForgotPasswordForm() {
+  const container = $("#store-app-container");
+  container.innerHTML = `
+    <div class="pricing-wrapper" style="max-width: 420px; margin: 60px auto;">
+      <div class="onboarding-card">
+        <h3>Recupera password</h3>
+        <p style="color:#64748b; margin-bottom:15px; font-size:0.9rem;">Inserisci l'email aziendale: ti invieremo un link per reimpostare la password.</p>
+        <div id="storeForgotError" class="error-msg hidden"></div>
+        <form id="storeForgotForm" class="auth-form">
+          <input type="email" id="storeForgotEmail" placeholder="Email aziendale" required>
+          <button type="submit" class="btn full-width">Invia link di recupero</button>
+        </form>
+        <p class="auth-switch" style="text-align:center; margin-top:15px;">
+          <a href="javascript:void(0)" onclick="storeData.step='login'; renderStoreView();">Torna al login</a>
+        </p>
+      </div>
+    </div>
+  `;
+
+  $("#storeForgotForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const email = $("#storeForgotEmail").value.trim().toLowerCase();
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}${window.location.pathname}?reset=1&role=store`
+    });
+    if (error) {
+      const err = $("#storeForgotError");
+      err.innerText = "Errore nell'invio. Controlla l'email e riprova.";
+      err.classList.remove("hidden");
+      return;
+    }
+    toast.success("Se l'email è registrata, riceverai un link per reimpostare la password.");
+    storeData.step = 'login';
+    renderStoreView();
+  };
 }
 
 function renderPricingTable(container) {
@@ -3067,10 +3252,16 @@ function renderOnboarding(container) {
             <option value="local">Negozio Alimentare</option>
           </select>
           <input type="email" id="obEmail" placeholder="Email Aziendale" required value="${storeData.tempReg?.email || ''}">
-          <div class="form-row">
-            <input type="password" id="obPass" placeholder="Password" required>
-            <input type="password" id="obPassConfirm" placeholder="Conferma Password" required>
-          </div>
+          ${storeData.tempReg?.existingAccount ? `
+            <p style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px; font-size:0.85rem; color:#1e40af;">
+              Questa email è già registrata su Decerne. Userai la password che hai già — non serve impostarne una nuova.
+            </p>
+          ` : `
+            <div class="form-row">
+              <input type="password" id="obPass" placeholder="Password" required>
+              <input type="password" id="obPassConfirm" placeholder="Conferma Password" required>
+            </div>
+          `}
           <input type="text" id="obRef" placeholder="Nome Referente" required value="${storeData.tempReg?.ref || ''}">
           <button type="submit" class="btn full-width">Continua alla verifica email</button>
         </form>
@@ -3135,7 +3326,9 @@ function renderOnboarding(container) {
 
 async function resendOnboardingOtp() {
   if (!storeData.tempReg?.email) return;
-  const { error } = await supabaseClient.auth.resend({ type: 'signup', email: storeData.tempReg.email });
+  const { error } = storeData.tempReg.existingAccount
+    ? await supabaseClient.auth.signInWithOtp({ email: storeData.tempReg.email, options: { shouldCreateUser: false } })
+    : await supabaseClient.auth.resend({ type: 'signup', email: storeData.tempReg.email });
   if (error) toast.error("Errore nell'invio. Riprova tra qualche minuto.");
   else toast.success("Codice reinviato!");
 }
@@ -3148,29 +3341,61 @@ async function handleOnboardingSubmit(step) {
     if (btn) btn.disabled = true;
 
     if (step === 1) {
-      const pass = $("#obPass").value;
-      const confirm = $("#obPassConfirm").value;
-      if (pass !== confirm) {
+      const emailClean = clean($("#obEmail").value).trim().toLowerCase();
+      const nameVal = clean($("#obName").value);
+      const refVal = clean($("#obRef").value);
+      const typeVal = $("#obType").value;
+
+      // Primo tentativo: c'è già un account (cliente o altro) con questa email?
+      // shouldCreateUser:false NON crea nulla, fallisce se l'email non esiste ancora
+      const { error: otpCheckError } = await supabaseClient.auth.signInWithOtp({
+        email: emailClean,
+        options: { shouldCreateUser: false }
+      });
+
+      if (!otpCheckError) {
+        // Esiste già un account con questa email: niente password nuova, codice già inviato
+        storeData.tempReg = {
+          name: nameVal,
+          email: emailClean,
+          ref: refVal,
+          type: typeVal,
+          existingAccount: true
+        };
+        storeData.onboardingStep = 2;
+        renderStoreView();
+        return;
+      }
+
+      // Nessun account esistente: serve una password nuova, se non l'ha ancora inserita mostriamo il campo
+      if (!storeData.tempReg?.existingAccount && !document.getElementById("obPass")) {
+        // Primo giro senza campo password visibile: impossibile, il campo c'è di default per email nuove.
+        // Questo ramo non dovrebbe mai attivarsi, ma resta come sicurezza.
+      }
+
+      const pass = document.getElementById("obPass")?.value;
+      const confirm = document.getElementById("obPassConfirm")?.value;
+      if (!pass || pass !== confirm) {
         if (btn) btn.disabled = false;
         return toast.error("Le password non coincidono!");
       }
+
       storeData.tempReg = {
-        name: clean($("#obName").value),
-        email: clean($("#obEmail").value),
+        name: nameVal,
+        email: emailClean,
         pass: pass,
-        ref: clean($("#obRef").value),
-        type: $("#obType").value
+        ref: refVal,
+        type: typeVal,
+        existingAccount: false
       };
 
-      // Registriamo subito l'account: da qui in poi serve la verifica email
       const { data: authData, error: authError } = await supabaseClient.auth.signUp({
-        email: storeData.tempReg.email,
-        password: storeData.tempReg.pass
+        email: emailClean,
+        password: pass
       });
       if (authError) throw new Error(authError.message);
       if (!authData.user) throw new Error("Registrazione non completata.");
 
-      storeData.tempReg.authUserId = authData.user.id;
       storeData.onboardingStep = 2;
       renderStoreView();
     }
@@ -3181,16 +3406,20 @@ async function handleOnboardingSubmit(step) {
         return toast.error("Inserisci il codice a 6 cifre.");
       }
 
+      // Email nuova -> tipo 'signup' (creata da signUp). Email già esistente -> tipo 'email' (da signInWithOtp)
+      const otpType = storeData.tempReg.existingAccount ? 'email' : 'signup';
+
       const { data, error } = await supabaseClient.auth.verifyOtp({
         email: storeData.tempReg.email,
         token,
-        type: 'signup'
+        type: otpType
       });
       if (error || !data.user) {
         if (btn) btn.disabled = false;
         return toast.error("Codice non valido o scaduto. Riprova o richiedine uno nuovo.");
       }
 
+      storeData.tempReg.authUserId = data.user.id;
       toast.success("Email verificata!");
       storeData.onboardingStep = 3;
       renderStoreView();
@@ -3709,6 +3938,11 @@ function renderStoreLoginForm(container) {
     } else if (result.reason === 'credentials') {
       toast.error("Email o password errati.");
       errBox.innerText = "Email o password non corretti.";
+    } else if (result.reason === 'no-store') {
+      toast.error("Nessun account supermercato trovato.");
+      errBox.innerHTML = `⚠️ Non esiste un account supermercato collegato a questa email.<br><br>
+                          <button class="btn outline" style="padding:5px 10px; font-size:0.7rem;" 
+                          onclick="storeData.step='pricing'; renderStoreView();">Registra il tuo negozio</button>`;
     } else {
       toast.error("Si è verificato un errore tecnico durante l'accesso.");
       errBox.innerText = "Errore tecnico. Riprova.";
