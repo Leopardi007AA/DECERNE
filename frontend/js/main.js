@@ -2061,9 +2061,466 @@ async function renderCartContent() {
           </div>
         </div>
       `).join('')}
-      <button class="btn outline full-width" onclick="window.print()" style="margin-top:20px;">🖨️ Stampa lista</button>
+      <button class="btn full-width" onclick="openCartMapView()" style="margin-top:20px; background:#2563eb; color:white; font-weight:600;">📍 Segui nella mappa fino ai negozi</button>
     </div>
   `;
+}
+
+async function geocodeStoreAddress(store) {
+  try {
+    const query = encodeURIComponent(`${store.address}, ${store.cap} ${store.city}, Italia`);
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${query}`, {
+      headers: { 'Accept-Language': 'it' }
+    });
+    const data = await res.json();
+    if (data && data[0]) {
+      const lat = parseFloat(data[0].lat);
+      const lng = parseFloat(data[0].lon);
+      await supabaseClient.rpc('cache_store_coordinates', { p_store_id: store.id, p_lat: lat, p_lng: lng });
+      return { lat, lng };
+    }
+  } catch (e) {
+    console.warn("Geocoding fallito per negozio:", store.id, e);
+  }
+  return null;
+}
+
+async function fetchRouteCoords(fromLat, fromLng, toLat, toLng) {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.routes && data.routes[0]) {
+      const r = data.routes[0];
+      return {
+        coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
+        distanceKm: r.distance / 1000,
+        durationMin: r.duration / 60
+      };
+    }
+  } catch (e) {
+    console.warn("Routing fallito:", e);
+  }
+  return null;
+}
+
+function formatEta(minutesFromNow) {
+  const eta = new Date(Date.now() + minutesFromNow * 60000);
+  return eta.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDuration(minutes) {
+  const m = Math.round(minutes);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return `${h}h ${rem}min`;
+}
+
+async function openCartMapView() {
+  const userId = state.currentUser?.id;
+  if (!userId) return;
+
+  const content = $("#modalContent");
+  content.innerHTML = `<div style="padding:50px; text-align:center; color:#64748b;">Preparazione mappa...</div>`;
+
+  const { data: items, error } = await supabaseClient
+    .from('shopping_list_items')
+    .select('offer_id, offers(id, store_id, product, price, img_url, status)')
+    .eq('user_id', userId);
+
+  if (error || !items) {
+    content.innerHTML = `<div style="padding:50px; color:#64748b;">Errore nel caricamento della lista.</div>`;
+    return;
+  }
+
+  const cart = items.map(i => i.offers).filter(o => o && o.status === 'active');
+  if (cart.length === 0) {
+    content.innerHTML = `<div style="padding:50px; color:#64748b;"><h3>La tua lista è vuota</h3></div>`;
+    return;
+  }
+
+  const cartItemsByStore = {};
+  cart.forEach(o => {
+    if (!cartItemsByStore[o.store_id]) cartItemsByStore[o.store_id] = [];
+    cartItemsByStore[o.store_id].push({ product: o.product, price: o.price, offerId: o.id });
+  });
+
+  const storeIds = Object.keys(cartItemsByStore);
+  const storesById = await fetchPublicStoresMap(storeIds);
+
+  let userPos = null;
+  try {
+    userPos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        err => reject(err),
+        { timeout: 15000, maximumAge: 30000, enableHighAccuracy: true }
+      );
+    });
+  } catch (e) {
+    let title = "Posizione non disponibile";
+    let msg = "Consenti l'accesso alla posizione dal browser e riprova.";
+    if (e.code === 3) {
+      title = "Segnale GPS debole";
+      msg = "Non siamo riusciti a rilevare la tua posizione in tempo. Riprova, magari all'aperto o vicino a una finestra.";
+    } else if (e.code === 2) {
+      title = "Posizione non rilevabile";
+      msg = "Il dispositivo non riesce a determinare la tua posizione al momento. Riprova tra poco.";
+    }
+    content.innerHTML = `<div style="padding:50px; text-align:center; color:#64748b;">
+      <h3>${title}</h3>
+      <p>${msg}</p>
+      <button class="btn" onclick="openCartMapView()">Riprova</button>
+      <button class="btn outline" onclick="renderCartContent()">Torna alla lista</button>
+    </div>`;
+    return;
+  }
+
+  for (const id of storeIds) {
+    const store = storesById[id];
+    if (store && (store.latitude == null || store.longitude == null)) {
+      const coords = await geocodeStoreAddress(store);
+      if (coords) {
+        store.latitude = coords.lat;
+        store.longitude = coords.lng;
+      }
+    }
+  }
+
+  const validStores = storeIds.map(id => storesById[id]).filter(s => s && s.latitude != null && s.longitude != null);
+
+  content.innerHTML = `
+    <div style="padding:10px;">
+      <div style="display:flex; gap:8px; margin-bottom:10px;">
+        <button class="btn outline" onclick="stopCartMapTracking()">← Torna alla lista</button>
+        <button class="btn outline" id="followMeBtn" onclick="toggleFollowMe()" style="margin-left:auto;">🎯 Seguimi</button>
+      </div>
+      <p style="font-size:0.8rem; color:#94a3b8; margin-bottom:8px;">Tocca un negozio sulla mappa per tracciare subito il percorso.</p>
+      <div id="cartMapContainer" style="width:100%; height:52vh; border-radius:12px; overflow:hidden;"></div>
+      <div id="cartRouteInfoBar" style="display:none; margin-top:10px; padding:12px; background:#161616; color:white; border-radius:10px; text-align:center; font-size:0.95rem;"></div>
+
+      <div style="margin-top:14px; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;">
+        <p style="font-size:0.85rem; color:#475569; margin-bottom:8px;">💡 Facoltativo: quanto ti costa il carburante per ogni chilometro? Ti diciamo se conviene un prezzo più alto ma più vicino.</p>
+        <div style="display:flex; gap:8px;">
+          <input type="number" id="costPerKmInput" placeholder="Es: 0.15" step="0.01" min="0" style="flex:1; padding:8px; border-radius:8px; border:1px solid #cbd5e1;">
+          <button class="btn" onclick="evaluateSmartSavings()">Valuta risparmio</button>
+        </div>
+        <div id="smartSavingsPanel" style="margin-top:10px;"></div>
+      </div>
+    </div>
+  `;
+
+  setTimeout(() => {
+    cartMap = L.map('cartMapContainer').setView([userPos.lat, userPos.lng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(cartMap);
+
+    const carIcon = L.divIcon({
+      html: `<div id="carIconInner" style="font-size:26px; transform-origin:center; transition:transform 0.3s linear;">🚗</div>`,
+      className: '', iconSize: [30, 30], iconAnchor: [15, 15]
+    });
+    cartUserMarker = L.marker([userPos.lat, userPos.lng], { icon: carIcon }).addTo(cartMap).bindPopup("<strong>La tua posizione</strong>");
+
+    const bounds = [[userPos.lat, userPos.lng]];
+    cartStoreMarkers = {};
+    cartStoreRoutes = {};
+    cartItemsByStoreGlobal = cartItemsByStore;
+    cartUserPos = userPos;
+
+    (async () => {
+      await Promise.all(validStores.map(async (store) => {
+        const productList = cartItemsByStore[store.id].map(p => `• ${p.product} (${formatPrice(p.price)})`).join('<br>');
+        const marker = L.marker([store.latitude, store.longitude], { icon: makeStoreIcon(false) }).addTo(cartMap);
+        cartStoreMarkers[store.id] = marker;
+        bounds.push([store.latitude, store.longitude]);
+
+        const route = await fetchRouteCoords(userPos.lat, userPos.lng, store.latitude, store.longitude);
+
+        if (route) {
+          const line = L.polyline(route.coords, { color: '#94a3b8', weight: 4, opacity: 0.5 }).addTo(cartMap);
+          cartStoreRoutes[store.id] = { store, distanceKm: route.distanceKm, durationMin: route.durationMin, line };
+          marker.bindPopup(`
+            <strong>${store.name}</strong><br>${productList}<br>
+            <div style="margin-top:8px; font-size:0.85rem; color:#475569;">
+              📏 ${route.distanceKm.toFixed(1)} km &nbsp;·&nbsp; 🕒 ${formatDuration(route.durationMin)} &nbsp;·&nbsp; Arrivo: ${formatEta(route.durationMin)}
+            </div>
+          `);
+        } else {
+          L.polyline([[userPos.lat, userPos.lng], [store.latitude, store.longitude]],
+            { color: '#94a3b8', weight: 3, dashArray: '6,6' }).addTo(cartMap);
+          marker.bindPopup(`<strong>${store.name}</strong><br>${productList}`);
+        }
+
+        // Un tap sul negozio basta per tracciare subito il percorso, niente popup da aprire
+        marker.on('click', () => setActiveDestination(store.id));
+      }));
+
+      // Imposta di default il negozio più vicino come percorso attivo, per mostrare subito la barra
+      const nearestId = Object.keys(cartStoreRoutes).sort(
+        (a, b) => cartStoreRoutes[a].distanceKm - cartStoreRoutes[b].distanceKm
+      )[0];
+      if (nearestId) setActiveDestination(nearestId);
+
+      cartMap.fitBounds(bounds, { padding: [40, 40] });
+      setTimeout(() => cartMap.invalidateSize(), 100);
+    })();
+
+    cartMap.on('dragstart', () => { cartFollowMe = false; updateFollowBtnLabel(); });
+
+    startLiveTracking();
+  }, 50);
+}
+
+// ============ TRACCIAMENTO POSIZIONE IN TEMPO REALE (stile navigatore) ============
+let cartMap = null;
+let cartUserMarker = null;
+let cartWatchId = null;
+let cartFollowMe = true;
+let cartLastPos = null;
+let cartStoreRoutes = {};
+let cartStoreMarkers = {};
+let cartActiveDestinationId = null;
+let cartLastRouteRecalc = 0;
+let cartItemsByStoreGlobal = {};
+let cartUserPos = null;
+
+function makeStoreIcon(active) {
+  return L.divIcon({
+    html: `<div style="font-size:28px; ${active ? 'filter:drop-shadow(0 0 4px #2563eb);' : 'opacity:0.75;'}">${active ? '📍' : '🏬'}</div>`,
+    className: '', iconSize: [30, 30], iconAnchor: [15, 28]
+  });
+}
+
+function setActiveDestination(storeId) {
+  if (cartActiveDestinationId && cartStoreMarkers[cartActiveDestinationId]) {
+    cartStoreMarkers[cartActiveDestinationId].setIcon(makeStoreIcon(false));
+    cartStoreRoutes[cartActiveDestinationId]?.line?.setStyle({ color: '#94a3b8', weight: 4, opacity: 0.5 });
+  }
+
+  cartActiveDestinationId = storeId;
+
+  if (cartStoreMarkers[storeId]) cartStoreMarkers[storeId].setIcon(makeStoreIcon(true));
+  cartStoreRoutes[storeId]?.line?.setStyle({ color: '#2563eb', weight: 5, opacity: 0.85 });
+
+  updateRouteInfoBar(cartStoreRoutes[storeId]?.distanceKm, cartStoreRoutes[storeId]?.durationMin);
+}
+
+function updateRouteInfoBar(distanceKm, durationMin) {
+  const bar = document.getElementById('cartRouteInfoBar');
+  if (!bar) return;
+  if (distanceKm == null || durationMin == null) {
+    bar.style.display = 'none';
+    return;
+  }
+  const routeInfo = cartStoreRoutes[cartActiveDestinationId];
+  bar.style.display = 'block';
+  bar.innerHTML = `
+    <strong>${routeInfo?.store?.name || ''}</strong> —
+    📏 ${distanceKm.toFixed(1)} km &nbsp;·&nbsp;
+    🕒 ${formatDuration(durationMin)} rimanenti &nbsp;·&nbsp;
+    Arrivo previsto: ${formatEta(durationMin)}
+  `;
+}
+
+async function recalculateActiveRoute(currentLat, currentLng) {
+  if (!cartActiveDestinationId) return;
+  const dest = cartStoreRoutes[cartActiveDestinationId]?.store;
+  if (!dest) return;
+
+  const route = await fetchRouteCoords(currentLat, currentLng, dest.latitude, dest.longitude);
+  if (route) {
+    cartStoreRoutes[cartActiveDestinationId].distanceKm = route.distanceKm;
+    cartStoreRoutes[cartActiveDestinationId].durationMin = route.durationMin;
+    updateRouteInfoBar(route.distanceKm, route.durationMin);
+  }
+}
+
+async function evaluateSmartSavings() {
+  const panel = document.getElementById('smartSavingsPanel');
+  const costPerKm = parseFloat(document.getElementById('costPerKmInput')?.value);
+
+  if (!costPerKm || costPerKm <= 0) {
+    panel.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Inserisci un costo per km valido (es: 0.15).</p>`;
+    return;
+  }
+  if (!cartUserPos) {
+    panel.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Posizione non disponibile, riprova tra poco.</p>`;
+    return;
+  }
+
+  panel.innerHTML = `<p style="color:#64748b; font-size:0.85rem;">Confronto in corso...</p>`;
+
+  // Prendiamo tutte le offerte attive per cercare lo stesso prodotto in altri negozi
+  const { data: allActiveOffers, error } = await supabaseClient
+    .from('offers')
+    .select('id, product, price, store_id')
+    .eq('status', 'active');
+
+  if (error || !allActiveOffers) {
+    panel.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Errore nel confronto. Riprova.</p>`;
+    return;
+  }
+
+  const storesInItineraryIds = new Set(Object.keys(cartStoreRoutes));
+  const results = [];
+
+  for (const [storeId, items] of Object.entries(cartItemsByStoreGlobal)) {
+    for (const item of items) {
+      const alternatives = allActiveOffers.filter(o =>
+        o.store_id !== storeId &&
+        o.product.trim().toLowerCase() === item.product.trim().toLowerCase()
+      );
+      if (alternatives.length === 0) continue;
+
+      // Il negozio attuale lo stai già visitando per altri prodotti: nessun costo di viaggio aggiuntivo
+      const currentTotalCost = item.price;
+
+      let best = null;
+      for (const alt of alternatives) {
+        let extraTravelCost = 0;
+        let extraKm = 0;
+
+        if (!storesInItineraryIds.has(alt.store_id)) {
+          // Negozio NON già nel percorso: serve un viaggio a parte (andata e ritorno)
+          let altStore = (await fetchPublicStoresMap([alt.store_id]))[alt.store_id];
+          if (altStore && (altStore.latitude == null || altStore.longitude == null)) {
+            const coords = await geocodeStoreAddress(altStore);
+            if (coords) { altStore.latitude = coords.lat; altStore.longitude = coords.lng; }
+          }
+          if (altStore?.latitude != null) {
+            const route = await fetchRouteCoords(cartUserPos.lat, cartUserPos.lng, altStore.latitude, altStore.longitude);
+            if (route) {
+              extraKm = route.distanceKm * 2; // andata e ritorno
+              extraTravelCost = extraKm * costPerKm;
+            }
+          }
+        }
+        // Se il negozio alternativo è GIÀ nel percorso, costo di viaggio extra = 0
+
+        const altTotalCost = alt.price + extraTravelCost;
+        if (!best || altTotalCost < best.altTotalCost) {
+          best = { ...alt, altTotalCost, extraKm, extraTravelCost, alreadyInRoute: storesInItineraryIds.has(alt.store_id) };
+        }
+      }
+
+      if (best && best.altTotalCost < currentTotalCost - 0.01) {
+        results.push({
+          product: item.product,
+          currentPrice: currentTotalCost,
+          betterOption: best,
+          savings: currentTotalCost - best.altTotalCost
+        });
+      } else if (best) {
+        results.push({
+          product: item.product,
+          currentPrice: currentTotalCost,
+          worseOption: best,
+          extraCostIfSwitch: best.altTotalCost - currentTotalCost
+        });
+      }
+    }
+  }
+
+  if (results.length === 0) {
+    panel.innerHTML = `<p style="color:#16a34a; font-size:0.85rem;">✅ Stai già facendo le scelte migliori: nessun'altra combinazione conviene di più.</p>`;
+    return;
+  }
+
+  let totalSavings = 0;
+  const cards = results.map(r => {
+    if (r.betterOption) {
+      totalSavings += r.savings;
+      const travelNote = r.betterOption.alreadyInRoute
+        ? "già nel tuo percorso, nessun costo extra"
+        : `+${r.betterOption.extraKm.toFixed(1)} km extra (~${formatPrice(r.betterOption.extraTravelCost)})`;
+      return `
+        <div style="padding:8px; border-left:3px solid #16a34a; background:#f0fdf4; margin-bottom:6px; border-radius:6px; font-size:0.85rem;">
+          <strong>${r.product}</strong>: conviene cambiare — risparmi ${formatPrice(r.savings)}<br>
+          <span style="color:#64748b;">Qui: ${formatPrice(r.currentPrice)} · Altrove: ${formatPrice(r.betterOption.price)} (${travelNote})</span>
+        </div>`;
+    } else {
+      return `
+        <div style="padding:8px; border-left:3px solid #2563eb; background:#eff6ff; margin-bottom:6px; border-radius:6px; font-size:0.85rem;">
+          <strong>${r.product}</strong>: conviene restare qui — l'alternativa ti costerebbe ${formatPrice(r.extraCostIfSwitch)} in più tra prezzo e viaggio
+        </div>`;
+    }
+  }).join('');
+
+  panel.innerHTML = `
+    ${cards}
+    ${totalSavings > 0 ? `<p style="font-weight:600; margin-top:8px;">💰 Risparmio totale possibile: ${formatPrice(totalSavings)}</p>` : ''}
+    <p style="font-size:0.75rem; color:#94a3b8; margin-top:6px;">Assumiamo che tu visiti comunque i negozi già presenti nel tuo percorso attuale.</p>
+  `;
+}
+
+function calculateBearing(lat1, lon1, lat2, lon2) {
+  const toRad = d => d * Math.PI / 180;
+  const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+            Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function startLiveTracking() {
+  if (!navigator.geolocation) return;
+  cartWatchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const newLat = pos.coords.latitude;
+      const newLng = pos.coords.longitude;
+
+      let heading = pos.coords.heading;
+      if ((heading === null || isNaN(heading)) && cartLastPos) {
+        heading = calculateBearing(cartLastPos.lat, cartLastPos.lng, newLat, newLng);
+      }
+      cartLastPos = { lat: newLat, lng: newLng };
+
+      if (cartUserMarker) {
+        cartUserMarker.setLatLng([newLat, newLng]);
+        const iconEl = document.getElementById('carIconInner');
+        if (iconEl && heading !== null && !isNaN(heading)) {
+          iconEl.style.transform = `rotate(${heading}deg)`;
+        }
+      }
+      if (cartMap && cartFollowMe) cartMap.panTo([newLat, newLng]);
+
+      const now = Date.now();
+      if (cartActiveDestinationId && now - cartLastRouteRecalc > 20000) {
+        cartLastRouteRecalc = now;
+        recalculateActiveRoute(newLat, newLng);
+      }
+    },
+    (err) => console.warn("Errore tracciamento posizione:", err),
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+  );
+}
+
+function toggleFollowMe() {
+  cartFollowMe = !cartFollowMe;
+  updateFollowBtnLabel();
+  if (cartFollowMe && cartUserMarker && cartMap) cartMap.panTo(cartUserMarker.getLatLng());
+}
+
+function updateFollowBtnLabel() {
+  const btn = document.getElementById('followMeBtn');
+  if (btn) btn.innerText = cartFollowMe ? "🎯 Seguimi (attivo)" : "🎯 Seguimi";
+}
+
+function stopCartMapTracking() {
+  if (cartWatchId !== null) {
+    navigator.geolocation.clearWatch(cartWatchId);
+    cartWatchId = null;
+  }
+  cartMap = null;
+  cartUserMarker = null;
+  cartLastPos = null;
+  cartStoreRoutes = {};
+  cartActiveDestinationId = null;
+  cartLastRouteRecalc = 0;
+  cartItemsByStoreGlobal = {};
+  cartUserPos = null;
+  renderCartContent();
 }
 
 window.removeFromCart = async (id) => {
@@ -2199,7 +2656,11 @@ function renderResetPasswordForm() {
     }
     const { error } = await supabaseClient.auth.updateUser({ password: pass });
     if (error) {
-      err.innerText = "Errore durante il salvataggio. Il link potrebbe essere scaduto: richiedine uno nuovo.";
+      if (error.message?.toLowerCase().includes("different from the old password")) {
+        err.innerText = "La nuova password deve essere diversa da quella attuale. Scegline una diversa.";
+      } else {
+        err.innerText = "Errore durante il salvataggio. Il link potrebbe essere scaduto: richiedine uno nuovo.";
+      }
       err.classList.remove("hidden");
       return;
     }
@@ -2767,14 +3228,34 @@ async function init() {
  // Se l'utente arriva dal link email di recupero password, mostra il form dedicato
  const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('reset') === '1') {
-    if (urlParams.get('role') === 'store') {
-      setMode('store');
-      storeData.step = 'login';
-      renderStoreView();
-      renderResetPasswordForm(); // stesso form riusato: updateUser funziona per qualunque account Supabase Auth
+    // Leggiamo NOI i token dal frammento URL (#access_token=...&refresh_token=...),
+    // invece di fidarci del rilevamento automatico: evita che venga usata per sbaglio
+    // una sessione diversa già presente nel browser.
+    const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+    const accessToken = hashParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token');
+    const linkType = hashParams.get('type');
+
+    if (accessToken && refreshToken && linkType === 'recovery') {
+      const { error: sessionError } = await supabaseClient.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      });
+      if (sessionError) {
+        toast.error("Il link di recupero non è valido o è scaduto. Richiedine uno nuovo.");
+      } else {
+        if (urlParams.get('role') === 'store') {
+          setMode('store');
+          storeData.step = 'login';
+          renderStoreView();
+          renderResetPasswordForm();
+        } else {
+          openFullPageModal('profile');
+          renderResetPasswordForm();
+        }
+      }
     } else {
-      openFullPageModal('profile');
-      renderResetPasswordForm();
+      toast.error("Link di recupero non valido. Richiedine uno nuovo.");
     }
   }
 

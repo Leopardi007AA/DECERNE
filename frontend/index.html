@@ -7,11 +7,11 @@
   <meta http-equiv="Content-Security-Policy" content="
   default-src 'self';
   script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net;
-  style-src 'self' 'unsafe-inline';
+  style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;
   img-src 'self' data: https:;
-  connect-src 'self' https://noqdpjlbmyjqzlmstfvx.supabase.co https://nominatim.openstreetmap.org https://cdnjs.cloudflare.com https://cdn.jsdelivr.net;
+  connect-src 'self' https://noqdpjlbmyjqzlmstfvx.supabase.co https://nominatim.openstreetmap.org https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://router.project-osrm.org;
   font-src 'self' data:;
- ">
+">
   <title>Decerne — Trova le migliori offerte vicino a te</title>
   <meta name="referrer" content="no-referrer-when-downgrade">
   <link rel="stylesheet" href="css/main.css">
@@ -281,8 +281,10 @@
   <div id="toast-container" class="toast-container"></div>
   <div id="overlay"></div>
   
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="js/main.js"></script>
 
 </body>
