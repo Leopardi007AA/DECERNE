@@ -2066,18 +2066,28 @@ async function renderCartContent() {
   `;
 }
 
+async function tryGeocodeQuery(query) {
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`, {
+    headers: { 'Accept-Language': 'it' }
+  });
+  const data = await res.json();
+  return (data && data[0]) ? { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) } : null;
+}
+
 async function geocodeStoreAddress(store) {
   try {
-    const query = encodeURIComponent(`${store.address}, ${store.cap} ${store.city}, Italia`);
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${query}`, {
-      headers: { 'Accept-Language': 'it' }
-    });
-    const data = await res.json();
-    if (data && data[0]) {
-      const lat = parseFloat(data[0].lat);
-      const lng = parseFloat(data[0].lon);
-      await supabaseClient.rpc('cache_store_coordinates', { p_store_id: store.id, p_lat: lat, p_lng: lng });
-      return { lat, lng };
+    // Tentativo 1: indirizzo completo così com'è salvato (già include CAP e città)
+    let coords = await tryGeocodeQuery(`${store.address}, Italia`);
+
+    // Tentativo 2 (ripiego): solo città, se l'indirizzo preciso non è nel database di OpenStreetMap
+    if (!coords) {
+      console.warn(`Indirizzo esatto non trovato per "${store.name}", provo solo con la città.`);
+      coords = await tryGeocodeQuery(`${store.city}, Italia`);
+    }
+
+    if (coords) {
+      await supabaseClient.rpc('cache_store_coordinates', { p_store_id: store.id, p_lat: coords.lat, p_lng: coords.lng });
+      return coords;
     }
   } catch (e) {
     console.warn("Geocoding fallito per negozio:", store.id, e);
@@ -2188,7 +2198,9 @@ async function openCartMapView() {
     }
   }
 
-  const validStores = storeIds.map(id => storesById[id]).filter(s => s && s.latitude != null && s.longitude != null);
+  const allSelectedStores = storeIds.map(id => storesById[id]).filter(Boolean);
+  const validStores = allSelectedStores.filter(s => s.latitude != null && s.longitude != null);
+  const unlocatableStores = allSelectedStores.filter(s => s.latitude == null || s.longitude == null);
 
   content.innerHTML = `
     <div style="padding:10px;">
@@ -2197,6 +2209,11 @@ async function openCartMapView() {
         <button class="btn outline" id="followMeBtn" onclick="toggleFollowMe()" style="margin-left:auto;">🎯 Seguimi</button>
       </div>
       <p style="font-size:0.8rem; color:#94a3b8; margin-bottom:8px;">Tocca un negozio sulla mappa per tracciare subito il percorso.</p>
+      ${unlocatableStores.length > 0 ? `
+        <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:0.8rem; color:#92400e;">
+          ⚠️ Non siamo riusciti a individuare l'indirizzo di: ${unlocatableStores.map(s => s.name).join(', ')}. Verifica che l'indirizzo del negozio sia corretto e completo.
+        </div>
+      ` : ''}
       <div id="cartMapContainer" style="width:100%; height:52vh; border-radius:12px; overflow:hidden;"></div>
       <div id="cartRouteInfoBar" style="display:none; margin-top:10px; padding:12px; background:#161616; color:white; border-radius:10px; text-align:center; font-size:0.95rem;"></div>
 
@@ -2225,44 +2242,36 @@ async function openCartMapView() {
 
     const bounds = [[userPos.lat, userPos.lng]];
     cartStoreMarkers = {};
-    cartStoreRoutes = {};
     cartItemsByStoreGlobal = cartItemsByStore;
     cartUserPos = userPos;
 
     (async () => {
-      await Promise.all(validStores.map(async (store) => {
+      // Ordina le tappe dalla più vicina alla più lontana, partendo dalla tua posizione
+      const visitOrder = computeVisitOrder(userPos.lat, userPos.lng, validStores);
+      cartVisitOrder = visitOrder;
+
+      const routePoints = [{ lat: userPos.lat, lng: userPos.lng }, ...visitOrder.map(s => ({ lat: s.latitude, lng: s.longitude }))];
+      const multiRoute = await fetchMultiStopRoute(routePoints);
+
+      if (multiRoute) {
+        cartMultiRoute = multiRoute;
+        L.polyline(multiRoute.coords, { color: '#2563eb', weight: 5, opacity: 0.8 }).addTo(cartMap);
+      }
+
+      visitOrder.forEach((store, idx) => {
         const productList = cartItemsByStore[store.id].map(p => `• ${p.product} (${formatPrice(p.price)})`).join('<br>');
-        const marker = L.marker([store.latitude, store.longitude], { icon: makeStoreIcon(false) }).addTo(cartMap);
+        const marker = L.marker([store.latitude, store.longitude], { icon: makeNumberedIcon(idx + 1) }).addTo(cartMap);
         cartStoreMarkers[store.id] = marker;
         bounds.push([store.latitude, store.longitude]);
 
-        const route = await fetchRouteCoords(userPos.lat, userPos.lng, store.latitude, store.longitude);
+        const legInfo = multiRoute?.legs?.[idx];
+        marker.bindPopup(`
+          <strong>Tappa ${idx + 1}: ${store.name}</strong><br>${productList}
+          ${legInfo ? `<div style="margin-top:8px; font-size:0.85rem; color:#475569;">📏 ${legInfo.distanceKm.toFixed(1)} km da qui &nbsp;·&nbsp; 🕒 ${formatDuration(legInfo.durationMin)}</div>` : ''}
+        `);
+      });
 
-        if (route) {
-          const line = L.polyline(route.coords, { color: '#94a3b8', weight: 4, opacity: 0.5 }).addTo(cartMap);
-          cartStoreRoutes[store.id] = { store, distanceKm: route.distanceKm, durationMin: route.durationMin, line };
-          marker.bindPopup(`
-            <strong>${store.name}</strong><br>${productList}<br>
-            <div style="margin-top:8px; font-size:0.85rem; color:#475569;">
-              📏 ${route.distanceKm.toFixed(1)} km &nbsp;·&nbsp; 🕒 ${formatDuration(route.durationMin)} &nbsp;·&nbsp; Arrivo: ${formatEta(route.durationMin)}
-            </div>
-          `);
-        } else {
-          L.polyline([[userPos.lat, userPos.lng], [store.latitude, store.longitude]],
-            { color: '#94a3b8', weight: 3, dashArray: '6,6' }).addTo(cartMap);
-          marker.bindPopup(`<strong>${store.name}</strong><br>${productList}`);
-        }
-
-        // Un tap sul negozio basta per tracciare subito il percorso, niente popup da aprire
-        marker.on('click', () => setActiveDestination(store.id));
-      }));
-
-      // Imposta di default il negozio più vicino come percorso attivo, per mostrare subito la barra
-      const nearestId = Object.keys(cartStoreRoutes).sort(
-        (a, b) => cartStoreRoutes[a].distanceKm - cartStoreRoutes[b].distanceKm
-      )[0];
-      if (nearestId) setActiveDestination(nearestId);
-
+      updateTripInfoBar();
       cartMap.fitBounds(bounds, { padding: [40, 40] });
       setTimeout(() => cartMap.invalidateSize(), 100);
     })();
@@ -2279,61 +2288,78 @@ let cartUserMarker = null;
 let cartWatchId = null;
 let cartFollowMe = true;
 let cartLastPos = null;
-let cartStoreRoutes = {};
 let cartStoreMarkers = {};
-let cartActiveDestinationId = null;
 let cartLastRouteRecalc = 0;
 let cartItemsByStoreGlobal = {};
 let cartUserPos = null;
+let cartVisitOrder = [];
+let cartMultiRoute = null;
 
-function makeStoreIcon(active) {
+function computeVisitOrder(startLat, startLng, stores) {
+  const remaining = [...stores];
+  const ordered = [];
+  let curLat = startLat, curLng = startLng;
+  while (remaining.length) {
+    let nearestIdx = 0, nearestDist = Infinity;
+    remaining.forEach((s, i) => {
+      const d = Math.hypot(s.latitude - curLat, s.longitude - curLng);
+      if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+    });
+    const next = remaining.splice(nearestIdx, 1)[0];
+    ordered.push(next);
+    curLat = next.latitude; curLng = next.longitude;
+  }
+  return ordered;
+}
+
+async function fetchMultiStopRoute(points) {
+  try {
+    const coordsStr = points.map(p => `${p.lng},${p.lat}`).join(';');
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.routes && data.routes[0]) {
+      const r = data.routes[0];
+      return {
+        coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
+        totalDistanceKm: r.distance / 1000,
+        totalDurationMin: r.duration / 60,
+        legs: r.legs.map(l => ({ distanceKm: l.distance / 1000, durationMin: l.duration / 60 }))
+      };
+    }
+  } catch (e) {
+    console.warn("Routing multi-tappa fallito:", e);
+  }
+  return null;
+}
+
+function makeNumberedIcon(number) {
   return L.divIcon({
-    html: `<div style="font-size:28px; ${active ? 'filter:drop-shadow(0 0 4px #2563eb);' : 'opacity:0.75;'}">${active ? '📍' : '🏬'}</div>`,
-    className: '', iconSize: [30, 30], iconAnchor: [15, 28]
+    html: `<div style="width:28px; height:28px; border-radius:50%; background:#2563eb; color:white; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.85rem; box-shadow:0 2px 6px rgba(0,0,0,0.35);">${number}</div>`,
+    className: '', iconSize: [28, 28], iconAnchor: [14, 14]
   });
 }
 
-function setActiveDestination(storeId) {
-  if (cartActiveDestinationId && cartStoreMarkers[cartActiveDestinationId]) {
-    cartStoreMarkers[cartActiveDestinationId].setIcon(makeStoreIcon(false));
-    cartStoreRoutes[cartActiveDestinationId]?.line?.setStyle({ color: '#94a3b8', weight: 4, opacity: 0.5 });
-  }
-
-  cartActiveDestinationId = storeId;
-
-  if (cartStoreMarkers[storeId]) cartStoreMarkers[storeId].setIcon(makeStoreIcon(true));
-  cartStoreRoutes[storeId]?.line?.setStyle({ color: '#2563eb', weight: 5, opacity: 0.85 });
-
-  updateRouteInfoBar(cartStoreRoutes[storeId]?.distanceKm, cartStoreRoutes[storeId]?.durationMin);
-}
-
-function updateRouteInfoBar(distanceKm, durationMin) {
+function updateTripInfoBar() {
   const bar = document.getElementById('cartRouteInfoBar');
-  if (!bar) return;
-  if (distanceKm == null || durationMin == null) {
-    bar.style.display = 'none';
-    return;
-  }
-  const routeInfo = cartStoreRoutes[cartActiveDestinationId];
+  if (!bar || !cartMultiRoute || !cartVisitOrder.length) return;
   bar.style.display = 'block';
+  const stopsList = cartVisitOrder.map((s, i) => `${i + 1}. ${s.name}`).join(' → ');
   bar.innerHTML = `
-    <strong>${routeInfo?.store?.name || ''}</strong> —
-    📏 ${distanceKm.toFixed(1)} km &nbsp;·&nbsp;
-    🕒 ${formatDuration(durationMin)} rimanenti &nbsp;·&nbsp;
-    Arrivo previsto: ${formatEta(durationMin)}
+    <div style="font-size:0.8rem; color:#cbd5e1; margin-bottom:4px;">${stopsList}</div>
+    <strong>Percorso completo</strong>: 📏 ${cartMultiRoute.totalDistanceKm.toFixed(1)} km &nbsp;·&nbsp;
+    🕒 ${formatDuration(cartMultiRoute.totalDurationMin)} &nbsp;·&nbsp;
+    Arrivo all'ultima tappa: ${formatEta(cartMultiRoute.totalDurationMin)}
   `;
 }
 
-async function recalculateActiveRoute(currentLat, currentLng) {
-  if (!cartActiveDestinationId) return;
-  const dest = cartStoreRoutes[cartActiveDestinationId]?.store;
-  if (!dest) return;
-
-  const route = await fetchRouteCoords(currentLat, currentLng, dest.latitude, dest.longitude);
-  if (route) {
-    cartStoreRoutes[cartActiveDestinationId].distanceKm = route.distanceKm;
-    cartStoreRoutes[cartActiveDestinationId].durationMin = route.durationMin;
-    updateRouteInfoBar(route.distanceKm, route.durationMin);
+async function recalculateTrip(currentLat, currentLng) {
+  if (!cartVisitOrder.length) return;
+  const routePoints = [{ lat: currentLat, lng: currentLng }, ...cartVisitOrder.map(s => ({ lat: s.latitude, lng: s.longitude }))];
+  const multiRoute = await fetchMultiStopRoute(routePoints);
+  if (multiRoute) {
+    cartMultiRoute = multiRoute;
+    updateTripInfoBar();
   }
 }
 
@@ -2486,9 +2512,9 @@ function startLiveTracking() {
       if (cartMap && cartFollowMe) cartMap.panTo([newLat, newLng]);
 
       const now = Date.now();
-      if (cartActiveDestinationId && now - cartLastRouteRecalc > 20000) {
+      if (cartVisitOrder.length && now - cartLastRouteRecalc > 20000) {
         cartLastRouteRecalc = now;
-        recalculateActiveRoute(newLat, newLng);
+        recalculateTrip(newLat, newLng);
       }
     },
     (err) => console.warn("Errore tracciamento posizione:", err),
@@ -2515,11 +2541,12 @@ function stopCartMapTracking() {
   cartMap = null;
   cartUserMarker = null;
   cartLastPos = null;
-  cartStoreRoutes = {};
-  cartActiveDestinationId = null;
+  cartStoreMarkers = {};
   cartLastRouteRecalc = 0;
   cartItemsByStoreGlobal = {};
   cartUserPos = null;
+  cartVisitOrder = [];
+  cartMultiRoute = null;
   renderCartContent();
 }
 
