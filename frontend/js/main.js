@@ -518,9 +518,34 @@ window.saveStoreProfile = async (e) => {
     const logoInput = document.getElementById("profLogo");
     const hoursInput = document.getElementById("profHours");
     const notesInput = document.getElementById("profNotes");
+    const streetInput = document.getElementById("profStreet");
+    const cityInput = document.getElementById("profCity");
+    const capInput = document.getElementById("profCap");
 
     const newName = clean(nameInput?.value || "");
     const newLogo = clean(logoInput?.value || "");
+
+    const newStreet = clean(streetInput?.value || "");
+    const newCity = clean(cityInput?.value || "").trim().toLowerCase();
+    const newCap = clean(capInput?.value || "").trim();
+    const newFullAddress = newStreet && newCap && newCity ? `${newStreet}, ${newCap} ${newCity}` : currentPartner.address;
+
+    const addressChanged = newFullAddress !== currentPartner.address;
+
+    const latInput = document.getElementById("profLat");
+    const lngInput = document.getElementById("profLng");
+    const latVal = parseFloat(latInput?.value);
+    const lngVal = parseFloat(lngInput?.value);
+    let coordUpdate = {};
+    const coordsProvided = latInput?.value?.trim() || lngInput?.value?.trim();
+    if (coordsProvided) {
+      if (isNaN(latVal) || isNaN(lngVal) || latVal < -90 || latVal > 90 || lngVal < -180 || lngVal > 180) {
+        return toast.error("Coordinate non valide. Controlla i numeri inseriti (es: 42.4037 e 12.8533).");
+      }
+      coordUpdate = { latitude: latVal, longitude: lngVal };
+    }
+
+    const coordsChanged = coordsProvided && (latVal !== currentPartner.latitude || lngVal !== currentPartner.longitude);
 
     const { data: storeRow, error } = await supabaseClient
       .from('stores')
@@ -529,46 +554,17 @@ window.saveStoreProfile = async (e) => {
         phone: clean(telInput?.value || ""),
         hours: clean(hoursInput?.value || ""),
         logo_url: newLogo,
-        internal_notes: clean(notesInput?.value || "")
+        internal_notes: clean(notesInput?.value || ""),
+        address: newFullAddress,
+        city: newCity || currentPartner.city,
+        cap: newCap || currentPartner.cap,
+        ...coordUpdate
       })
       .eq('id', currentPartner.id)
       .select()
       .single();
 
-    if (error) {
-      console.error("Errore salvataggio profilo:", error);
-      return toast.error("Errore tecnico durante il salvataggio.");
-    }
-
-    // Aggiorna la sessione locale. Non serve più toccare le offerte: nome e logo
-    // si leggono sempre dal negozio con una JOIN, niente più copie da sincronizzare.
-    const updatedStore = {
-      ...currentPartner,
-      name: storeRow.name,
-      phone: storeRow.phone || "",
-      hours: storeRow.hours || "",
-      internalNotes: storeRow.internal_notes || "",
-      logo: storeRow.logo_url || ""
-    };
-
-    const dataString = JSON.stringify(updatedStore);
-    sessionStorage.setItem(SESSION_PARTNER, dataString);
-    localStorage.setItem(PARTNER_AUTH_KEY, dataString);
-    state.currentStore = updatedStore;
-
-    toast.success("Profilo salvato!");
-    
-    updateDrawerUI();      // Cambia il nome nel menu
-    await refreshMyOffers(); // Rinfresca la dashboard del negozio
-    renderOffers();        // Rinfresca la griglia pubblica con nome/logo aggiornati
-    renderStoreView();
-
-  } catch (err) {
-    console.error("Errore salvataggio profilo:", err);
-    toast.error("Errore tecnico durante il salvataggio.");
-  }
-};
-
+      
 window.logoutPartner = () => {
   showConfirm("Vuoi uscire dall'area partner?", () => {
     // PULIZIA TOTALE
@@ -1348,6 +1344,41 @@ function renderProfileTab() {
           <input type="text" id="profHours" value="${partner.hours || ''}" placeholder="Es: Lun-Sab 08:30-20:00">
         </div>
 
+        <h4 style="color: #64748b; font-size: 0.8rem; text-transform: uppercase; margin-top:20px;">Indirizzo e Posizione</h4>
+
+        <div class="input-group">
+          <label>Indirizzo e Numero Civico</label>
+          <input type="text" id="profStreet" value="${extractStreetFromAddress(partner.address, partner.cap, partner.city)}" placeholder="Es: Via Roma, 15">
+        </div>
+        <div class="form-row">
+          <div class="input-group" style="flex: 2;">
+            <label>Città</label>
+            <input type="text" id="profCity" value="${partner.city || ''}" placeholder="Es: Milano">
+          </div>
+          <div class="input-group" style="flex: 1;">
+            <label>CAP</label>
+            <input type="text" id="profCap" value="${partner.cap || ''}" maxlength="5" placeholder="12345">
+          </div>
+        </div>
+
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-top:10px;">
+          <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">
+            📍 Coordinate esatte del negozio (per la mappa dei clienti).
+            <a href="javascript:void(0)" onclick="openProfileGoogleMapsHelper()">Trova le tue coordinate su Google Maps →</a>
+          </p>
+          <div class="form-row">
+            <div class="input-group">
+              <label>Latitudine</label>
+              <input type="text" id="profLat" placeholder="Es: 42.4037" value="${partner.latitude || ''}">
+            </div>
+            <div class="input-group">
+              <label>Longitudine</label>
+              <input type="text" id="profLng" placeholder="Es: 12.8533" value="${partner.longitude || ''}">
+            </div>
+          </div>
+          <p style="font-size:0.75rem; color:#94a3b8; margin-top:6px;">Se cambi l'indirizzo, ricordati di aggiornare anche le coordinate qui sopra.</p>
+        </div>
+
         <div class="input-group">
           <label>Note Interne / Memo</label>
           <textarea id="profNotes" rows="3" placeholder="Inserisci note visibili solo a te...">${partner.internalNotes || ''}</textarea>
@@ -1357,6 +1388,13 @@ function renderProfileTab() {
       </form>
     </div>
   `;
+}
+
+function extractStreetFromAddress(address, cap, city) {
+  if (!address) return '';
+  if (!cap || !city) return address;
+  const pattern = new RegExp(`,\\s*${cap}\\s*${city}\\s*$`, 'i');
+  return address.replace(pattern, '').trim();
 }
 
 // Funzione helper per aggiungere campi nel DOM
@@ -2074,20 +2112,38 @@ async function tryGeocodeQuery(query) {
   return (data && data[0]) ? { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) } : null;
 }
 
+// Estrae solo il nome della via, senza numero civico/CAP/città (es: "via porrara 54" -> "via porrara")
+function extractStreetName(address) {
+  const beforeComma = address.split(',')[0].trim();
+  return beforeComma.replace(/\s+\d+[a-zA-Z]?$/, '').trim();
+}
+
 async function geocodeStoreAddress(store) {
   try {
-    // Tentativo 1: indirizzo completo così com'è salvato (già include CAP e città)
+    // Tentativo 1: indirizzo completo così com'è salvato
     let coords = await tryGeocodeQuery(`${store.address}, Italia`);
-
-    // Tentativo 2 (ripiego): solo città, se l'indirizzo preciso non è nel database di OpenStreetMap
-    if (!coords) {
-      console.warn(`Indirizzo esatto non trovato per "${store.name}", provo solo con la città.`);
-      coords = await tryGeocodeQuery(`${store.city}, Italia`);
-    }
-
     if (coords) {
       await supabaseClient.rpc('cache_store_coordinates', { p_store_id: store.id, p_lat: coords.lat, p_lng: coords.lng });
-      return coords;
+      return { ...coords, approximate: false };
+    }
+
+    // Tentativo 2: solo il nome della via + città, senza numero civico (spesso è quello che manca su OSM)
+    const streetOnly = extractStreetName(store.address);
+    if (streetOnly) {
+      coords = await tryGeocodeQuery(`${streetOnly}, ${store.city}, Italia`);
+      if (coords) {
+        console.warn(`Numero civico non trovato per "${store.name}", uso la posizione della via.`);
+        await supabaseClient.rpc('cache_store_coordinates', { p_store_id: store.id, p_lat: coords.lat, p_lng: coords.lng });
+        return { ...coords, approximate: true };
+      }
+    }
+
+    // Tentativo 3 (ultimo ripiego): solo la città. Segnato chiaramente come approssimativo, mai spacciato per preciso
+    coords = await tryGeocodeQuery(`${store.city}, Italia`);
+    if (coords) {
+      console.warn(`Indirizzo non trovato su OpenStreetMap per "${store.name}", uso solo la città (posizione approssimativa).`);
+      // NON salviamo in cache questo livello di approssimazione: se OSM aggiunge la via in futuro, va ritentato il livello preciso
+      return { ...coords, approximate: true, cityOnly: true };
     }
   } catch (e) {
     console.warn("Geocoding fallito per negozio:", store.id, e);
@@ -2194,6 +2250,7 @@ async function openCartMapView() {
       if (coords) {
         store.latitude = coords.lat;
         store.longitude = coords.lng;
+        store.approximateLocation = coords.approximate || false;
       }
     }
   }
@@ -2260,14 +2317,17 @@ async function openCartMapView() {
 
       visitOrder.forEach((store, idx) => {
         const productList = cartItemsByStore[store.id].map(p => `• ${p.product} (${formatPrice(p.price)})`).join('<br>');
-        const marker = L.marker([store.latitude, store.longitude], { icon: makeNumberedIcon(idx + 1) }).addTo(cartMap);
+        const marker = L.marker([store.latitude, store.longitude], { icon: makeNumberedIcon(idx + 1, store.approximateLocation) }).addTo(cartMap);
         cartStoreMarkers[store.id] = marker;
         bounds.push([store.latitude, store.longitude]);
 
         const legInfo = multiRoute?.legs?.[idx];
+        const approxNote = store.approximateLocation
+          ? `<div style="margin-top:6px; font-size:0.75rem; color:#b45309;">⚠️ Posizione approssimativa: l'indirizzo esatto non è nel database delle mappe gratuite.</div>` : '';
         marker.bindPopup(`
           <strong>Tappa ${idx + 1}: ${store.name}</strong><br>${productList}
           ${legInfo ? `<div style="margin-top:8px; font-size:0.85rem; color:#475569;">📏 ${legInfo.distanceKm.toFixed(1)} km da qui &nbsp;·&nbsp; 🕒 ${formatDuration(legInfo.durationMin)}</div>` : ''}
+          ${approxNote}
         `);
       });
 
@@ -2333,9 +2393,11 @@ async function fetchMultiStopRoute(points) {
   return null;
 }
 
-function makeNumberedIcon(number) {
+function makeNumberedIcon(number, approximate) {
+  const bg = approximate ? '#b45309' : '#2563eb';
+  const border = approximate ? 'border:2px dashed white;' : '';
   return L.divIcon({
-    html: `<div style="width:28px; height:28px; border-radius:50%; background:#2563eb; color:white; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.85rem; box-shadow:0 2px 6px rgba(0,0,0,0.35);">${number}</div>`,
+    html: `<div style="width:28px; height:28px; border-radius:50%; background:${bg}; ${border} color:white; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.85rem; box-shadow:0 2px 6px rgba(0,0,0,0.35);">${number}</div>`,
     className: '', iconSize: [28, 28], iconAnchor: [14, 14]
   });
 }
