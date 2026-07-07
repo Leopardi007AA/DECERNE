@@ -474,6 +474,8 @@ window.loginPartnerAction = async (email, pass) => {
       address: storeRow.address,
       city: storeRow.city,
       cap: storeRow.cap,
+      latitude: storeRow.latitude,
+      longitude: storeRow.longitude,
       logo: storeRow.logo_url || "",
       phone: storeRow.phone || "",
       hours: storeRow.hours || "",
@@ -564,7 +566,49 @@ window.saveStoreProfile = async (e) => {
       .select()
       .single();
 
-      
+    if (error) {
+      console.error("Errore salvataggio profilo:", error);
+      return toast.error("Errore tecnico durante il salvataggio.");
+    }
+
+    // Aggiorna la sessione locale. Non serve più toccare le offerte: nome e logo
+    // si leggono sempre dal negozio con una JOIN, niente più copie da sincronizzare.
+    const updatedStore = {
+      ...currentPartner,
+      name: storeRow.name,
+      phone: storeRow.phone || "",
+      hours: storeRow.hours || "",
+      internalNotes: storeRow.internal_notes || "",
+      logo: storeRow.logo_url || "",
+      address: storeRow.address,
+      city: storeRow.city,
+      cap: storeRow.cap,
+      latitude: storeRow.latitude,
+      longitude: storeRow.longitude
+    };
+
+    const dataString = JSON.stringify(updatedStore);
+    sessionStorage.setItem(SESSION_PARTNER, dataString);
+    localStorage.setItem(PARTNER_AUTH_KEY, dataString);
+    state.currentStore = updatedStore;
+
+    if (addressChanged && !coordsChanged) {
+      toast.success("Profilo salvato! Hai cambiato l'indirizzo: ricordati di aggiornare anche le coordinate per la mappa.");
+    } else {
+      toast.success("Profilo salvato!");
+    }
+    
+    updateDrawerUI();      // Cambia il nome nel menu
+    await refreshMyOffers(); // Rinfresca la dashboard del negozio
+    renderOffers();        // Rinfresca la griglia pubblica con nome/logo aggiornati
+    renderStoreView();
+
+  } catch (err) {
+    console.error("Errore salvataggio profilo:", err);
+    toast.error("Errore tecnico durante il salvataggio.");
+  }
+};
+
 window.logoutPartner = () => {
   showConfirm("Vuoi uscire dall'area partner?", () => {
     // PULIZIA TOTALE
@@ -3274,20 +3318,22 @@ async function refreshPartnerSession(storeId) {
     .select('*')
     .eq('store_id', storeRow.id);
 
-  const freshStore = {
-    id: storeRow.id,
-    email: storeRow.email,
-    name: storeRow.name,
-    address: storeRow.address,
-    city: storeRow.city,
-    cap: storeRow.cap,
-    logo: storeRow.logo_url || "",
-    phone: storeRow.phone || "",
-    hours: storeRow.hours || "",
-    internalNotes: storeRow.internal_notes || "",
-    apiKey: storeRow.api_key || "",
-    locations: (locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address })),
-    plan: storeRow.plan,
+    const freshStore = {
+      id: storeRow.id,
+      email: storeRow.email,
+      name: storeRow.name,
+      address: storeRow.address,
+      city: storeRow.city,
+      cap: storeRow.cap,
+      latitude: storeRow.latitude,
+      longitude: storeRow.longitude,
+      logo: storeRow.logo_url || "",
+      phone: storeRow.phone || "",
+      hours: storeRow.hours || "",
+      internalNotes: storeRow.internal_notes || "",
+      apiKey: storeRow.api_key || "",
+      locations: (locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address })),
+      plan: storeRow.plan,
     subscription: {
       plan: storeRow.plan,
       status: storeRow.subscription_status,
@@ -3864,7 +3910,25 @@ function renderOnboarding(container) {
               <input type="text" id="obCap" placeholder="12345" maxlength="5" required value="${storeData.tempReg?.cap || getCleanUserCap() || ''}">
             </div>
           </div>
-          <button type="submit" class="btn full-width">Continua al passo 4</button>
+
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-top:10px;">
+            <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">
+              📍 Facoltativo ma consigliato: le coordinate esatte rendono il tuo negozio localizzabile con precisione sulla mappa dei clienti.
+              <a href="javascript:void(0)" onclick="openGoogleMapsHelper()">Trova le tue coordinate su Google Maps →</a>
+            </p>
+            <div class="form-row">
+              <div class="input-group">
+                <label>Latitudine</label>
+                <input type="text" id="obLat" placeholder="Es: 42.4037" value="${storeData.tempReg?.latitude || ''}">
+              </div>
+              <div class="input-group">
+                <label>Longitudine</label>
+                <input type="text" id="obLng" placeholder="Es: 12.8533" value="${storeData.tempReg?.longitude || ''}">
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn full-width" style="margin-top:14px;">Continua al passo 4</button>
         </form>
       ` : `
         <h3>Dettagli Aggiuntivi</h3>
