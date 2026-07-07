@@ -534,15 +534,23 @@ window.saveStoreProfile = async (e) => {
 
     const addressChanged = newFullAddress !== currentPartner.address;
 
-    const latInput = document.getElementById("profLat");
-    const lngInput = document.getElementById("profLng");
-    const latVal = parseFloat(latInput?.value);
-    const lngVal = parseFloat(lngInput?.value);
+    const latDeg = document.getElementById("profLatDeg")?.value;
+    const latMin = document.getElementById("profLatMin")?.value;
+    const latSec = document.getElementById("profLatSec")?.value;
+    const latDir = document.getElementById("profLatDir")?.value;
+    const lngDeg = document.getElementById("profLngDeg")?.value;
+    const lngMin = document.getElementById("profLngMin")?.value;
+    const lngSec = document.getElementById("profLngSec")?.value;
+    const lngDir = document.getElementById("profLngDir")?.value;
+
     let coordUpdate = {};
-    const coordsProvided = latInput?.value?.trim() || lngInput?.value?.trim();
+    const coordsProvided = latDeg?.trim() || lngDeg?.trim();
+    let latVal, lngVal;
     if (coordsProvided) {
+      latVal = dmsToDecimal(latDeg, latMin, latSec, latDir);
+      lngVal = dmsToDecimal(lngDeg, lngMin, lngSec, lngDir);
       if (isNaN(latVal) || isNaN(lngVal) || latVal < -90 || latVal > 90 || lngVal < -180 || lngVal > 180) {
-        return toast.error("Coordinate non valide. Controlla i numeri inseriti (es: 42.4037 e 12.8533).");
+        return toast.error("Coordinate non valide. Controlla gradi, primi e secondi inseriti.");
       }
       coordUpdate = { latitude: latVal, longitude: lngVal };
     }
@@ -941,6 +949,30 @@ async function fetchPublicStoresMap(storeIds) {
 
   if (error) console.error("Errore caricamento dati negozi pubblici:", error);
   return Object.fromEntries((data || []).map(s => [s.id, s]));
+}
+
+async function fetchPublicLocationsMap(locationIds) {
+  const uniqueIds = [...new Set(locationIds)].filter(Boolean);
+  if (uniqueIds.length === 0) return {};
+
+  const { data, error } = await supabaseClient
+    .from('public_store_locations')
+    .select('location_id, store_id, location_name, store_name, address, city, cap, latitude, longitude, plan')
+    .in('location_id', uniqueIds);
+
+  if (error) console.error("Errore caricamento dati sedi negozio:", error);
+
+  return Object.fromEntries((data || []).map(l => [l.location_id, {
+    id: l.location_id,
+    store_id: l.store_id,
+    name: (l.location_name && l.location_name !== 'Sede Principale') ? `${l.store_name} (${l.location_name})` : l.store_name,
+    address: l.address,
+    city: l.city,
+    cap: l.cap,
+    latitude: l.latitude != null ? parseFloat(l.latitude) : null,
+    longitude: l.longitude != null ? parseFloat(l.longitude) : null,
+    plan: l.plan
+  }]));
 }
 
 async function renderOffers(page = state.currentPage, pageSize = state.pageSize) {
@@ -1348,6 +1380,9 @@ function renderProfileTab() {
   const partner = getCurrentPartner();
   if (!partner) return '';
 
+  const latDMS = decimalToDMS(partner.latitude, true);
+  const lngDMS = decimalToDMS(partner.longitude, false);
+
   return `
     <header class="tab-header">
       <h2>⚙️ Impostazioni Account</h2>
@@ -1407,30 +1442,47 @@ function renderProfileTab() {
 
         <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-top:10px;">
           <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">
-            📍 Coordinate esatte del negozio (per la mappa dei clienti).
+            📍 Coordinate esatte del negozio (formato tipo 42°24'55.2"N 12°51'18.8"E, come mostrato da Google Maps).
             <a href="javascript:void(0)" onclick="openProfileGoogleMapsHelper()">Trova le tue coordinate su Google Maps →</a>
           </p>
-          <div class="form-row">
-            <div class="input-group">
-              <label>Latitudine</label>
-              <input type="text" id="profLat" placeholder="Es: 42.4037" value="${partner.latitude || ''}">
+          <label style="font-size:0.75rem; color:#64748b;">Latitudine</label>
+          <div class="form-row" style="align-items:flex-end;">
+            <div class="input-group" style="flex:1;">
+              <input type="number" id="profLatDeg" min="0" max="90" placeholder="Gradi (42)" value="${latDMS.deg}">
             </div>
-            <div class="input-group">
-              <label>Longitudine</label>
-              <input type="text" id="profLng" placeholder="Es: 12.8533" value="${partner.longitude || ''}">
+            <div class="input-group" style="flex:1;">
+              <input type="number" id="profLatMin" min="0" max="59" placeholder="Primi (24)" value="${latDMS.min}">
+            </div>
+            <div class="input-group" style="flex:1;">
+              <input type="number" id="profLatSec" min="0" max="59.99" step="0.1" placeholder="Secondi (55.2)" value="${latDMS.sec}">
+            </div>
+            <div class="input-group" style="flex:0.6;">
+              <select id="profLatDir">
+                <option value="N" ${latDMS.dir === 'N' ? 'selected' : ''}>N</option>
+                <option value="S" ${latDMS.dir === 'S' ? 'selected' : ''}>S</option>
+              </select>
+            </div>
+          </div>
+          <label style="font-size:0.75rem; color:#64748b; margin-top:8px; display:block;">Longitudine</label>
+          <div class="form-row" style="align-items:flex-end;">
+            <div class="input-group" style="flex:1;">
+              <input type="number" id="profLngDeg" min="0" max="180" placeholder="Gradi (12)" value="${lngDMS.deg}">
+            </div>
+            <div class="input-group" style="flex:1;">
+              <input type="number" id="profLngMin" min="0" max="59" placeholder="Primi (51)" value="${lngDMS.min}">
+            </div>
+            <div class="input-group" style="flex:1;">
+              <input type="number" id="profLngSec" min="0" max="59.99" step="0.1" placeholder="Secondi (18.8)" value="${lngDMS.sec}">
+            </div>
+            <div class="input-group" style="flex:0.6;">
+              <select id="profLngDir">
+                <option value="E" ${lngDMS.dir === 'E' ? 'selected' : ''}>E</option>
+                <option value="W" ${lngDMS.dir === 'W' ? 'selected' : ''}>O</option>
+              </select>
             </div>
           </div>
           <p style="font-size:0.75rem; color:#94a3b8; margin-top:6px;">Se cambi l'indirizzo, ricordati di aggiornare anche le coordinate qui sopra.</p>
         </div>
-
-        <div class="input-group">
-          <label>Note Interne / Memo</label>
-          <textarea id="profNotes" rows="3" placeholder="Inserisci note visibili solo a te...">${partner.internalNotes || ''}</textarea>
-        </div>
-
-        <button type="submit" class="btn" style="margin-top: 20px; width: 100%;">Salva Impostazioni Account</button>
-      </form>
-    </div>
   `;
 }
 
@@ -1440,6 +1492,38 @@ function extractStreetFromAddress(address, cap, city) {
   const pattern = new RegExp(`,\\s*${cap}\\s*${city}\\s*$`, 'i');
   return address.replace(pattern, '').trim();
 }
+
+function decimalToDMS(value, isLat) {
+  if (value === null || value === undefined || isNaN(value)) {
+    return { deg: '', min: '', sec: '', dir: isLat ? 'N' : 'E' };
+  }
+  const dir = isLat ? (value < 0 ? 'S' : 'N') : (value < 0 ? 'W' : 'E');
+  const abs = Math.abs(value);
+  const deg = Math.floor(abs);
+  const minFull = (abs - deg) * 60;
+  const min = Math.floor(minFull);
+  const sec = Math.round((minFull - min) * 60 * 10) / 10;
+  return { deg, min, sec, dir };
+}
+
+function dmsToDecimal(deg, min, sec, dir) {
+  const d = parseFloat(deg), m = parseFloat(min), s = parseFloat(sec);
+  if (isNaN(d) || isNaN(m) || isNaN(s)) return NaN;
+  let decimal = d + (m / 60) + (s / 3600);
+  if (dir === 'S' || dir === 'W') decimal = -decimal;
+  return decimal;
+}
+
+window.openProfileGoogleMapsHelper = () => {
+  const street = document.getElementById("profStreet")?.value || "";
+  const city = document.getElementById("profCity")?.value || "";
+  const query = `${street}, ${city}, Italia`;
+  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank', 'noopener');
+};
+
+window.openStoreInGoogleMaps = (address) => {
+  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank', 'noopener');
+};
 
 // Funzione helper per aggiungere campi nel DOM
 window.addNewLocationField = () => {
@@ -2109,7 +2193,7 @@ async function renderCartContent() {
 
   const { data: items, error } = await supabaseClient
     .from('shopping_list_items')
-    .select('offer_id, offers(id, store_id, product, price, img_url, status)')
+    .select('offer_id, offers(id, store_id, location_id, product, price, img_url, status)')
     .eq('user_id', userId);
 
   if (error) {
@@ -2126,7 +2210,7 @@ async function renderCartContent() {
     return;
   }
 
-  const storesById = await fetchPublicStoresMap(cart.map(o => o.store_id));
+  const locationsById = await fetchPublicLocationsMap(cart.map(o => o.location_id));
 
   content.innerHTML = `
     <div class="offers-list-container">
@@ -2135,7 +2219,7 @@ async function renderCartContent() {
           <img src="${getSafeImageUrl(o.img_url)}" style="width:60px; height:60px; object-fit:cover; margin:10px; border-radius:8px;">
           <div class="product-info" style="padding:10px;">
             <div class="product-details">
-              <div class="store-name">${storesById[o.store_id]?.name || ""}</div>
+              <div class="store-name">${locationsById[o.location_id]?.name || ""}</div>
               <h3 style="font-size:0.95rem;">${o.product}</h3>
               <div class="price-tag" style="font-size:1rem;">${formatPrice(o.price)}</div>
             </div>
@@ -2167,7 +2251,7 @@ async function geocodeStoreAddress(store) {
     // Tentativo 1: indirizzo completo così com'è salvato
     let coords = await tryGeocodeQuery(`${store.address}, Italia`);
     if (coords) {
-      await supabaseClient.rpc('cache_store_coordinates', { p_store_id: store.id, p_lat: coords.lat, p_lng: coords.lng });
+      await supabaseClient.rpc('cache_location_coordinates', { p_location_id: store.id, p_lat: coords.lat, p_lng: coords.lng });
       return { ...coords, approximate: false };
     }
 
@@ -2177,7 +2261,7 @@ async function geocodeStoreAddress(store) {
       coords = await tryGeocodeQuery(`${streetOnly}, ${store.city}, Italia`);
       if (coords) {
         console.warn(`Numero civico non trovato per "${store.name}", uso la posizione della via.`);
-        await supabaseClient.rpc('cache_store_coordinates', { p_store_id: store.id, p_lat: coords.lat, p_lng: coords.lng });
+        await supabaseClient.rpc('cache_location_coordinates', { p_location_id: store.id, p_lat: coords.lat, p_lng: coords.lng });
         return { ...coords, approximate: true };
       }
     }
@@ -2236,7 +2320,7 @@ async function openCartMapView() {
 
   const { data: items, error } = await supabaseClient
     .from('shopping_list_items')
-    .select('offer_id, offers(id, store_id, product, price, img_url, status)')
+    .select('offer_id, offers(id, store_id, location_id, product, price, img_url, status)')
     .eq('user_id', userId);
 
   if (error || !items) {
@@ -2251,13 +2335,12 @@ async function openCartMapView() {
   }
 
   const cartItemsByStore = {};
-  cart.forEach(o => {
-    if (!cartItemsByStore[o.store_id]) cartItemsByStore[o.store_id] = [];
-    cartItemsByStore[o.store_id].push({ product: o.product, price: o.price, offerId: o.id });
-  });
-
-  const storeIds = Object.keys(cartItemsByStore);
-  const storesById = await fetchPublicStoresMap(storeIds);
+cart.forEach(o => {
+  if (!cartItemsByStore[o.location_id]) cartItemsByStore[o.location_id] = [];
+  cartItemsByStore[o.location_id].push({ product: o.product, price: o.price, offerId: o.id });
+});
+const storeIds = Object.keys(cartItemsByStore);
+const storesById = await fetchPublicLocationsMap(storeIds);
 
   let userPos = null;
   try {
@@ -2487,7 +2570,7 @@ async function evaluateSmartSavings() {
   // Prendiamo tutte le offerte attive per cercare lo stesso prodotto in altri negozi
   const { data: allActiveOffers, error } = await supabaseClient
     .from('offers')
-    .select('id, product, price, store_id')
+    .select('id, product, price, location_id')
     .eq('status', 'active');
 
   if (error || !allActiveOffers) {
@@ -2501,7 +2584,7 @@ async function evaluateSmartSavings() {
   for (const [storeId, items] of Object.entries(cartItemsByStoreGlobal)) {
     for (const item of items) {
       const alternatives = allActiveOffers.filter(o =>
-        o.store_id !== storeId &&
+        o.location_id !== storeId &&
         o.product.trim().toLowerCase() === item.product.trim().toLowerCase()
       );
       if (alternatives.length === 0) continue;
@@ -2514,9 +2597,9 @@ async function evaluateSmartSavings() {
         let extraTravelCost = 0;
         let extraKm = 0;
 
-        if (!storesInItineraryIds.has(alt.store_id)) {
+        if (!storesInItineraryIds.has(alt.location_id)) {
           // Negozio NON già nel percorso: serve un viaggio a parte (andata e ritorno)
-          let altStore = (await fetchPublicStoresMap([alt.store_id]))[alt.store_id];
+          let altStore = (await fetchPublicLocationsMap([alt.location_id]))[alt.location_id];
           if (altStore && (altStore.latitude == null || altStore.longitude == null)) {
             const coords = await geocodeStoreAddress(altStore);
             if (coords) { altStore.latitude = coords.lat; altStore.longitude = coords.lng; }
@@ -2533,7 +2616,7 @@ async function evaluateSmartSavings() {
 
         const altTotalCost = alt.price + extraTravelCost;
         if (!best || altTotalCost < best.altTotalCost) {
-          best = { ...alt, altTotalCost, extraKm, extraTravelCost, alreadyInRoute: storesInItineraryIds.has(alt.store_id) };
+          best = { ...alt, altTotalCost, extraKm, extraTravelCost, alreadyInRoute: storesInItineraryIds.has(alt.location_id) };
         }
       }
 
@@ -4649,6 +4732,10 @@ function displayProductInModal(product) {
           <button class="btn full-width" onclick="saveToShoppingList('${product.id}')" style="height: 60px; font-size: 1.2rem; border-radius: 14px; background: #0f62fe; box-shadow: 0 4px 14px rgba(15,98,254,0.3); transition: transform 0.2s;">
             🛒 Aggiungi alla lista spesa
           </button>
+
+          <button class="btn outline full-width" onclick="openStoreInGoogleMaps('${(product.storeAddress || product.storeName || '').replace(/'/g, "\\'")}')" style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px;">
+            🗺️ Vedi su Google Maps
+          </button>
         </div>
 
       </div>
@@ -5273,14 +5360,24 @@ window.openAddLocationModal = async () => {
 
   const name = prompt("Nome della sede (es: Filiale Sud):");
   if (!name) return;
-  const addr = prompt("Indirizzo completo (Via, CAP, Città):");
+  const addr = prompt("Via e numero civico (es: Via Roma 10):");
   if (!addr) return;
+  const city = prompt("Città della sede (es: Rieti):");
+  if (!city) return;
+  const cap = prompt("CAP della sede (es: 02100):") || "";
 
   const partner = getCurrentPartner();
+  const fullAddress = `${addr.trim()}, ${cap.trim()} ${city.trim()}`.trim();
 
   const { data: newLoc, error } = await supabaseClient
     .from('store_locations')
-    .insert({ store_id: partner.id, name: name.trim(), address: addr.trim() })
+    .insert({
+      store_id: partner.id,
+      name: name.trim(),
+      address: fullAddress,
+      city: city.trim().toLowerCase(),
+      cap: cap.trim()
+    })
     .select()
     .single();
 
@@ -5289,7 +5386,13 @@ window.openAddLocationModal = async () => {
     return toast.error("Errore durante l'aggiunta della sede.");
   }
 
-  partner.locations.push({ id: newLoc.id, name: newLoc.name, address: newLoc.address });
+  // Geocodifica subito la sede sul SUO indirizzo reale (non più su quello del negozio principale)
+  const coords = await geocodeStoreAddress({ id: newLoc.id, address: newLoc.address, city: newLoc.city, name: name.trim() });
+  if (coords) {
+    await supabaseClient.rpc('cache_location_coordinates', { p_location_id: newLoc.id, p_lat: coords.lat, p_lng: coords.lng });
+  }
+
+  partner.locations.push({ id: newLoc.id, name: newLoc.name, address: newLoc.address, city: newLoc.city, cap: newLoc.cap });
   const dataString = JSON.stringify(partner);
   sessionStorage.setItem(SESSION_PARTNER, dataString);
   localStorage.setItem(PARTNER_AUTH_KEY, dataString);
