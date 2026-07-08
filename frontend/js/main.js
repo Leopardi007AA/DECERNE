@@ -2418,6 +2418,13 @@ const storesById = await fetchPublicLocationsMap(storeIds);
         </div>
         <div id="smartSavingsPanel" style="margin-top:10px;"></div>
       </div>
+
+      <div style="margin-top:14px; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;">
+        <p style="font-size:0.85rem; color:#475569; margin-bottom:8px;">📝 Scrivi la tua lista della spesa (un prodotto per riga): ti diciamo in quale negozio conviene prendere ogni cosa.</p>
+        <textarea id="smartListInput" rows="4" placeholder="latte&#10;pane&#10;detersivo piatti" style="width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1; font-family:inherit; margin-bottom:8px; box-sizing:border-box;"></textarea>
+        <button class="btn full-width" onclick="analyzeSmartShoppingList()">Trova i negozi migliori</button>
+        <div id="smartListPanel" style="margin-top:10px;"></div>
+      </div>
     </div>
   `;
 
@@ -2560,6 +2567,147 @@ async function recalculateTrip(currentLat, currentLng) {
     updateTripInfoBar();
   }
 }
+
+function normalizeProductName(s) {
+  return (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function fuzzyMatchOffers(term, offers) {
+  const t = normalizeProductName(term);
+  if (!t) return [];
+  const tWords = t.split(/\s+/).filter(w => w.length > 2);
+  return offers.filter(o => {
+    const p = normalizeProductName(o.product);
+    if (p === t || p.includes(t) || t.includes(p)) return true;
+    return tWords.some(w => p.includes(w));
+  });
+}
+
+window.analyzeSmartShoppingList = async () => {
+  const panel = document.getElementById('smartListPanel');
+  const raw = document.getElementById('smartListInput')?.value || '';
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+
+  if (lines.length === 0) {
+    panel.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Scrivi almeno un prodotto, una riga per prodotto.</p>`;
+    return;
+  }
+  if (!cartUserPos) {
+    panel.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Posizione non disponibile, riprova tra poco.</p>`;
+    return;
+  }
+
+  panel.innerHTML = `<p style="color:#64748b; font-size:0.85rem;">Sto cercando i negozi migliori...</p>`;
+
+  const { data: allActiveOffers, error } = await supabaseClient
+    .from('offers')
+    .select('id, product, price, location_id')
+    .eq('status', 'active');
+
+  if (error || !allActiveOffers) {
+    panel.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Errore nella ricerca. Riprova.</p>`;
+    return;
+  }
+
+  const storesInItineraryIds = new Set(Object.keys(cartStoreMarkers));
+  const assignments = {};
+  const unmatchedItems = [];
+  const storeCache = {};
+
+  async function getStoreWithCoords(locationId) {
+    if (storeCache[locationId]) return storeCache[locationId];
+    let store = (await fetchPublicLocationsMap([locationId]))[locationId];
+    if (store && (store.latitude == null || store.longitude == null)) {
+      const coords = await geocodeStoreAddress(store);
+      if (coords) { store.latitude = coords.lat; store.longitude = coords.lng; }
+    }
+    storeCache[locationId] = store;
+    return store;
+  }
+
+  for (const line of lines) {
+    const matches = fuzzyMatchOffers(line, allActiveOffers);
+
+    if (matches.length === 0) {
+      unmatchedItems.push(line);
+      continue;
+    }
+
+    let best = null, bestScore = Infinity;
+    for (const m of matches) {
+      const inRoute = storesInItineraryIds.has(m.location_id);
+      let distanceKm = 0;
+      if (!inRoute) {
+        const store = await getStoreWithCoords(m.location_id);
+        if (store?.latitude != null) {
+          const route = await fetchRouteCoords(cartUserPos.lat, cartUserPos.lng, store.latitude, store.longitude);
+          distanceKm = route ? route.distanceKm : 50;
+        } else {
+          distanceKm = 50;
+        }
+      }
+      const score = m.price + (inRoute ? 0 : distanceKm * 0.3);
+      if (score < bestScore) { bestScore = score; best = { ...m, inRoute, distanceKm }; }
+    }
+
+    if (!assignments[best.location_id]) {
+      const store = await getStoreWithCoords(best.location_id);
+      assignments[best.location_id] = { store, items: [] };
+    }
+    assignments[best.location_id].items.push({ product: best.product, price: best.price, inRoute: best.inRoute });
+  }
+
+  if (unmatchedItems.length > 0) {
+    const storeEntries = Object.entries(assignments);
+    let hubId = null;
+    if (storeEntries.length > 0) {
+      storeEntries.sort((a, b) => {
+        const aInRoute = storesInItineraryIds.has(a[0]) ? 1 : 0;
+        const bInRoute = storesInItineraryIds.has(b[0]) ? 1 : 0;
+        if (aInRoute !== bInRoute) return bInRoute - aInRoute;
+        return b[1].items.length - a[1].items.length;
+      });
+      hubId = storeEntries[0][0];
+    } else if (storesInItineraryIds.size > 0) {
+      hubId = [...storesInItineraryIds][0];
+    }
+
+    if (hubId) {
+      if (!assignments[hubId]) {
+        const store = await getStoreWithCoords(hubId);
+        assignments[hubId] = { store, items: [] };
+      }
+      unmatchedItems.forEach(line => {
+        assignments[hubId].items.push({ product: line, price: null, noOffer: true });
+      });
+    }
+  }
+
+  const groups = Object.values(assignments).filter(g => g.store);
+  if (groups.length === 0) {
+    panel.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Nessun negozio disponibile al momento per suggerire la lista.</p>`;
+    return;
+  }
+
+  let grandTotal = 0;
+  panel.innerHTML = groups.map(g => {
+    const itemsHtml = g.items.map(it => {
+      if (it.noOffer) {
+        return `<li style="color:#94a3b8;">${it.product} <span style="font-size:0.75rem;">(nessuna offerta attiva, controlla in negozio)</span></li>`;
+      }
+      grandTotal += it.price;
+      return `<li>${it.product} — ${formatPrice(it.price)}</li>`;
+    }).join('');
+    const badge = storesInItineraryIds.has(g.store.id)
+      ? `<span style="font-size:0.75rem; color:#16a34a;">già nel tuo percorso</span>`
+      : `<span style="font-size:0.75rem; color:#b45309;">nuova tappa</span>`;
+    return `
+      <div style="background:white; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; margin-bottom:8px;">
+        <strong>🏪 ${g.store.name}</strong> ${badge}
+        <ul style="margin:6px 0 0 18px; padding:0; font-size:0.85rem;">${itemsHtml}</ul>
+      </div>`;
+  }).join('') + `<p style="font-size:0.85rem; margin-top:6px;"><strong>Totale stimato: ${formatPrice(grandTotal)}</strong></p>`;
+};
 
 async function evaluateSmartSavings() {
   const panel = document.getElementById('smartSavingsPanel');
