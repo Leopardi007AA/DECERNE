@@ -1483,6 +1483,15 @@ function renderProfileTab() {
           </div>
           <p style="font-size:0.75rem; color:#94a3b8; margin-top:6px;">Se cambi l'indirizzo, ricordati di aggiornare anche le coordinate qui sopra.</p>
         </div>
+
+        <div class="input-group">
+          <label>Note Interne / Memo</label>
+          <textarea id="profNotes" rows="3" placeholder="Inserisci note visibili solo a te...">${partner.internalNotes || ''}</textarea>
+        </div>
+
+        <button type="submit" class="btn" style="margin-top: 20px; width: 100%;">Salva Impostazioni Account</button>
+      </form>
+    </div>
   `;
 }
 
@@ -2578,7 +2587,7 @@ async function evaluateSmartSavings() {
     return;
   }
 
-  const storesInItineraryIds = new Set(Object.keys(cartStoreRoutes));
+  const storesInItineraryIds = new Set(Object.keys(cartStoreMarkers));
   const results = [];
 
   for (const [storeId, items] of Object.entries(cartItemsByStoreGlobal)) {
