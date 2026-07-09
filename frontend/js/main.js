@@ -2214,14 +2214,26 @@ async function renderCartContent() {
   // Filtra le offerte non più attive (cestinate/scadute dal negozio)
   const cart = (items || []).map(i => i.offers).filter(o => o && o.status === 'active');
 
+  const smartListHeader = `
+    <div style="display:flex; justify-content:flex-end; padding:10px 10px 4px;">
+      <button onclick="openSmartShoppingListModal()" style="background:linear-gradient(135deg,#2563eb,#1d4ed8); color:white; font-weight:600; border-radius:999px; padding:10px 18px; box-shadow:0 4px 14px rgba(37,99,235,0.35); display:inline-flex; align-items:center; gap:6px; border:none; font-size:0.85rem; cursor:pointer;">
+        📝 Lista della spesa
+      </button>
+    </div>
+  `;
+
   if (cart.length === 0) {
-    content.innerHTML = `<div style="padding:50px; color:#64748b;"><h3>La tua lista è vuota</h3><p>Aggiungi le offerte che ti interessano per trovarle facilmente in negozio.</p></div>`;
+    content.innerHTML = `
+      ${smartListHeader}
+      <div style="padding:50px; color:#64748b;"><h3>La tua lista è vuota</h3><p>Aggiungi le offerte che ti interessano per trovarle facilmente in negozio.</p></div>
+    `;
     return;
   }
 
   const locationsById = await fetchPublicLocationsMap(cart.map(o => o.location_id));
 
   content.innerHTML = `
+    ${smartListHeader}
     <div class="offers-list-container">
       ${cart.map(o => `
         <div class="offer-row">
@@ -2343,13 +2355,20 @@ async function openCartMapView() {
     return;
   }
 
+  await renderMultiStopMap(cart);
+}
+
+async function renderMultiStopMap(cart) {
+  const content = $("#modalContent");
+  content.innerHTML = `<div style="padding:50px; text-align:center; color:#64748b;">Preparazione mappa...</div>`;
+
   const cartItemsByStore = {};
-cart.forEach(o => {
-  if (!cartItemsByStore[o.location_id]) cartItemsByStore[o.location_id] = [];
-  cartItemsByStore[o.location_id].push({ product: o.product, price: o.price, offerId: o.id });
-});
-const storeIds = Object.keys(cartItemsByStore);
-const storesById = await fetchPublicLocationsMap(storeIds);
+  cart.forEach(o => {
+    if (!cartItemsByStore[o.location_id]) cartItemsByStore[o.location_id] = [];
+    cartItemsByStore[o.location_id].push({ product: o.product, price: o.price, offerId: o.id });
+  });
+  const storeIds = Object.keys(cartItemsByStore);
+  const storesById = await fetchPublicLocationsMap(storeIds);
 
   let userPos = null;
   try {
@@ -2418,13 +2437,6 @@ const storesById = await fetchPublicLocationsMap(storeIds);
         </div>
         <div id="smartSavingsPanel" style="margin-top:10px;"></div>
       </div>
-
-      <div style="margin-top:14px; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;">
-        <p style="font-size:0.85rem; color:#475569; margin-bottom:8px;">📝 Scrivi la tua lista della spesa (un prodotto per riga): ti diciamo in quale negozio conviene prendere ogni cosa.</p>
-        <textarea id="smartListInput" rows="4" placeholder="latte&#10;pane&#10;detersivo piatti" style="width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1; font-family:inherit; margin-bottom:8px; box-sizing:border-box;"></textarea>
-        <button class="btn full-width" onclick="analyzeSmartShoppingList()">Trova i negozi migliori</button>
-        <div id="smartListPanel" style="margin-top:10px;"></div>
-      </div>
     </div>
   `;
 
@@ -2446,7 +2458,6 @@ const storesById = await fetchPublicLocationsMap(storeIds);
     cartUserPos = userPos;
 
     (async () => {
-      // Ordina le tappe dalla più vicina alla più lontana, partendo dalla tua posizione
       const visitOrder = computeVisitOrder(userPos.lat, userPos.lng, validStores);
       cartVisitOrder = visitOrder;
 
@@ -2583,21 +2594,58 @@ function fuzzyMatchOffers(term, offers) {
   });
 }
 
-window.analyzeSmartShoppingList = async () => {
-  const panel = document.getElementById('smartListPanel');
+window.smartListLastResults = [];
+
+window.openSmartShoppingListModal = () => {
+  const content = $("#modalContent");
+  content.innerHTML = `
+    <div style="padding:14px;">
+      <button class="btn outline" onclick="renderCartContent()" style="margin-bottom:14px;">← Torna al carrello</button>
+
+      <div style="background:#fffef7; background-image:repeating-linear-gradient(to bottom, transparent, transparent 27px, #e5e0cc 28px); border-radius:6px; box-shadow:0 10px 30px rgba(0,0,0,0.15); padding:24px 24px 24px 42px; position:relative; border:1px solid #e8e2c8;">
+        <div style="position:absolute; left:24px; top:0; bottom:0; width:1px; background:#e8a0a0;"></div>
+
+        <h3 style="margin:0 0 4px; font-size:1.1rem;">📝 La tua lista della spesa</h3>
+        <p style="font-size:0.8rem; color:#8a8570; margin-bottom:14px;">Scrivi un prodotto per riga: cerchiamo tra tutte le offerte attive il negozio più conveniente per ognuno.</p>
+
+        <label style="font-size:0.78rem; color:#6b6650; display:block; margin-bottom:4px;">Consumo carburante (€/km) — facoltativo</label>
+        <input type="number" id="smartListCostPerKm" placeholder="Es: 0.15 (se vuoto, contiamo solo il prezzo più basso)" step="0.01" min="0" style="width:100%; padding:8px; border-radius:6px; border:1px solid #d8d2b8; background:white; margin-bottom:16px; box-sizing:border-box; font-size:0.85rem;">
+
+        <textarea id="smartListInput" rows="6" placeholder="latte&#10;pane&#10;detersivo piatti&#10;..." style="width:100%; background:transparent; border:none; outline:none; resize:vertical; font-family:inherit; font-size:0.95rem; line-height:28px; color:#2d2a1f;"></textarea>
+      </div>
+
+      <button class="btn full-width" onclick="searchSmartShoppingList()" style="margin-top:16px; background:#2563eb; color:white; font-weight:600; border-radius:12px; height:50px; font-size:1rem; border:none; cursor:pointer;">🔍 Trova Offerte</button>
+
+      <div id="smartListResults" style="margin-top:16px;"></div>
+
+      <button id="traceSmartListBtn" onclick="traceSmartListOnMap()" disabled style="margin-top:12px; width:100%; background:#cbd5e1; color:#94a3b8; font-weight:600; border-radius:12px; height:50px; font-size:1rem; cursor:not-allowed; transition:all 0.3s; border:none;">🗺️ Traccia la lista sulla mappa</button>
+    </div>
+  `;
+};
+
+window.searchSmartShoppingList = async () => {
+  const resultsBox = document.getElementById('smartListResults');
+  const traceBtn = document.getElementById('traceSmartListBtn');
   const raw = document.getElementById('smartListInput')?.value || '';
-  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  const lines = [...new Set(raw.split('\n').map(l => l.trim()).filter(Boolean))];
+
+  traceBtn.disabled = true;
+  traceBtn.style.background = '#cbd5e1';
+  traceBtn.style.color = '#94a3b8';
+  traceBtn.style.cursor = 'not-allowed';
+  traceBtn.style.boxShadow = 'none';
+  window.smartListLastResults = [];
 
   if (lines.length === 0) {
-    panel.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Scrivi almeno un prodotto, una riga per prodotto.</p>`;
-    return;
-  }
-  if (!cartUserPos) {
-    panel.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Posizione non disponibile, riprova tra poco.</p>`;
+    resultsBox.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Scrivi almeno un prodotto, una riga per prodotto.</p>`;
     return;
   }
 
-  panel.innerHTML = `<p style="color:#64748b; font-size:0.85rem;">Sto cercando i negozi migliori...</p>`;
+  resultsBox.innerHTML = `<p style="color:#64748b; font-size:0.85rem;">Sto confrontando le offerte...</p>`;
+
+  const costPerKmRaw = document.getElementById('smartListCostPerKm')?.value;
+  const costPerKm = costPerKmRaw ? parseFloat(costPerKmRaw) : 0;
+  const useDistance = !isNaN(costPerKm) && costPerKm > 0;
 
   const { data: allActiveOffers, error } = await supabaseClient
     .from('offers')
@@ -2605,16 +2653,24 @@ window.analyzeSmartShoppingList = async () => {
     .eq('status', 'active');
 
   if (error || !allActiveOffers) {
-    panel.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Errore nella ricerca. Riprova.</p>`;
+    resultsBox.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Errore nella ricerca. Riprova.</p>`;
     return;
   }
 
-  const storesInItineraryIds = new Set(Object.keys(cartStoreMarkers));
-  const assignments = {};
-  const unmatchedItems = [];
-  const storeCache = {};
+  const itemCandidates = lines.map(line => ({ line, matches: fuzzyMatchOffers(line, allActiveOffers) }));
 
-  async function getStoreWithCoords(locationId) {
+  let existingStoreIds = new Set();
+  const userId = state.currentUser?.id;
+  if (userId) {
+    const { data: cartItems } = await supabaseClient
+      .from('shopping_list_items')
+      .select('offers(location_id, status)')
+      .eq('user_id', userId);
+    (cartItems || []).forEach(i => { if (i.offers?.status === 'active' && i.offers.location_id) existingStoreIds.add(i.offers.location_id); });
+  }
+
+  const storeCache = {};
+  async function getStoreCoords(locationId) {
     if (storeCache[locationId]) return storeCache[locationId];
     let store = (await fetchPublicLocationsMap([locationId]))[locationId];
     if (store && (store.latitude == null || store.longitude == null)) {
@@ -2625,88 +2681,123 @@ window.analyzeSmartShoppingList = async () => {
     return store;
   }
 
-  for (const line of lines) {
-    const matches = fuzzyMatchOffers(line, allActiveOffers);
-
-    if (matches.length === 0) {
-      unmatchedItems.push(line);
-      continue;
-    }
-
-    let best = null, bestScore = Infinity;
-    for (const m of matches) {
-      const inRoute = storesInItineraryIds.has(m.location_id);
-      let distanceKm = 0;
-      if (!inRoute) {
-        const store = await getStoreWithCoords(m.location_id);
-        if (store?.latitude != null) {
-          const route = await fetchRouteCoords(cartUserPos.lat, cartUserPos.lng, store.latitude, store.longitude);
-          distanceKm = route ? route.distanceKm : 50;
-        } else {
-          distanceKm = 50;
-        }
-      }
-      const score = m.price + (inRoute ? 0 : distanceKm * 0.3);
-      if (score < bestScore) { bestScore = score; best = { ...m, inRoute, distanceKm }; }
-    }
-
-    if (!assignments[best.location_id]) {
-      const store = await getStoreWithCoords(best.location_id);
-      assignments[best.location_id] = { store, items: [] };
-    }
-    assignments[best.location_id].items.push({ product: best.product, price: best.price, inRoute: best.inRoute });
-  }
-
-  if (unmatchedItems.length > 0) {
-    const storeEntries = Object.entries(assignments);
-    let hubId = null;
-    if (storeEntries.length > 0) {
-      storeEntries.sort((a, b) => {
-        const aInRoute = storesInItineraryIds.has(a[0]) ? 1 : 0;
-        const bInRoute = storesInItineraryIds.has(b[0]) ? 1 : 0;
-        if (aInRoute !== bInRoute) return bInRoute - aInRoute;
-        return b[1].items.length - a[1].items.length;
+  let userPos = null;
+  if (useDistance) {
+    try {
+      userPos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          err => reject(err),
+          { timeout: 15000, maximumAge: 30000, enableHighAccuracy: true }
+        );
       });
-      hubId = storeEntries[0][0];
-    } else if (storesInItineraryIds.size > 0) {
-      hubId = [...storesInItineraryIds][0];
+    } catch (e) {
+      resultsBox.innerHTML = `<p style="color:#b45309; font-size:0.8rem; margin-bottom:8px;">⚠️ Non riesco a rilevare la tua posizione: confronto solo in base al prezzo più basso.</p>`;
     }
+  }
 
-    if (hubId) {
-      if (!assignments[hubId]) {
-        const store = await getStoreWithCoords(hubId);
-        assignments[hubId] = { store, items: [] };
+  if (useDistance && userPos) {
+    const allLocationIds = new Set();
+    itemCandidates.forEach(ic => ic.matches.forEach(m => allLocationIds.add(m.location_id)));
+    for (const locId of allLocationIds) {
+      const store = await getStoreCoords(locId);
+      if (store?.latitude != null) {
+        const route = await fetchRouteCoords(userPos.lat, userPos.lng, store.latitude, store.longitude);
+        store.distanceFromUserKm = route ? route.distanceKm : null;
       }
-      unmatchedItems.forEach(line => {
-        assignments[hubId].items.push({ product: line, price: null, noOffer: true });
+    }
+  }
+
+  function costOf(match, selectedStores) {
+    if (!useDistance || !userPos) return match.price;
+    if (selectedStores.has(match.location_id)) return match.price;
+    const store = storeCache[match.location_id];
+    const d = store?.distanceFromUserKm;
+    return match.price + (d != null ? d * 2 * costPerKm : 0);
+  }
+
+  let selectedStores = new Set(existingStoreIds);
+  let assignment = new Array(itemCandidates.length).fill(null);
+
+  for (let pass = 0; pass < 3; pass++) {
+    let changed = false;
+    itemCandidates.forEach((ic, idx) => {
+      if (ic.matches.length === 0) return;
+      let best = null, bestCost = Infinity;
+      ic.matches.forEach(m => {
+        const c = costOf(m, selectedStores);
+        if (c < bestCost) { bestCost = c; best = m; }
       });
+      if (!assignment[idx] || assignment[idx].location_id !== best.location_id) changed = true;
+      assignment[idx] = best;
+    });
+    const newSelected = new Set(existingStoreIds);
+    assignment.forEach(a => { if (a) newSelected.add(a.location_id); });
+    selectedStores = newSelected;
+    if (!changed && pass > 0) break;
+  }
+
+  const locationIdsToResolve = [...new Set(assignment.filter(Boolean).map(a => a.location_id))];
+  const storesForDisplay = await fetchPublicLocationsMap(locationIdsToResolve);
+
+  const matchedResults = [];
+  resultsBox.innerHTML = itemCandidates.map((ic, idx) => {
+    const match = assignment[idx];
+    if (!match) {
+      return `
+        <div style="padding:10px 14px; border-bottom:1px solid #f0f0f0;">
+          <strong>${ic.line}</strong><br>
+          <span style="font-size:0.85rem; color:#94a3b8;">Nessuna offerta disponibile al momento nelle vicinanze.</span>
+        </div>`;
     }
-  }
-
-  const groups = Object.values(assignments).filter(g => g.store);
-  if (groups.length === 0) {
-    panel.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Nessun negozio disponibile al momento per suggerire la lista.</p>`;
-    return;
-  }
-
-  let grandTotal = 0;
-  panel.innerHTML = groups.map(g => {
-    const itemsHtml = g.items.map(it => {
-      if (it.noOffer) {
-        return `<li style="color:#94a3b8;">${it.product} <span style="font-size:0.75rem;">(nessuna offerta attiva, controlla in negozio)</span></li>`;
-      }
-      grandTotal += it.price;
-      return `<li>${it.product} — ${formatPrice(it.price)}</li>`;
-    }).join('');
-    const badge = storesInItineraryIds.has(g.store.id)
-      ? `<span style="font-size:0.75rem; color:#16a34a;">già nel tuo percorso</span>`
-      : `<span style="font-size:0.75rem; color:#b45309;">nuova tappa</span>`;
+    const storeName = storesForDisplay[match.location_id]?.name || 'Negozio';
+    const alreadyInRoute = existingStoreIds.has(match.location_id);
+    matchedResults.push({ id: match.id, product: match.product, price: match.price, location_id: match.location_id });
     return `
-      <div style="background:white; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; margin-bottom:8px;">
-        <strong>🏪 ${g.store.name}</strong> ${badge}
-        <ul style="margin:6px 0 0 18px; padding:0; font-size:0.85rem;">${itemsHtml}</ul>
+      <div style="padding:10px 14px; border-bottom:1px solid #f0f0f0;">
+        <strong>${ic.line}</strong><br>
+        <span style="font-size:0.9rem;">🏪 ${storeName} — ${formatPrice(match.price)}</span>
+        ${alreadyInRoute ? `<span style="font-size:0.75rem; color:#16a34a; margin-left:6px;">già nel carrello</span>` : ''}
       </div>`;
-  }).join('') + `<p style="font-size:0.85rem; margin-top:6px;"><strong>Totale stimato: ${formatPrice(grandTotal)}</strong></p>`;
+  }).join('');
+
+  window.smartListLastResults = matchedResults;
+
+  if (matchedResults.length > 0) {
+    traceBtn.disabled = false;
+    traceBtn.style.background = 'linear-gradient(135deg,#2563eb,#1d4ed8)';
+    traceBtn.style.color = 'white';
+    traceBtn.style.cursor = 'pointer';
+    traceBtn.style.boxShadow = '0 4px 14px rgba(37,99,235,0.45)';
+  }
+};
+
+window.traceSmartListOnMap = async () => {
+  const results = window.smartListLastResults || [];
+  if (results.length === 0) return;
+
+  const userId = state.currentUser?.id;
+  let realCart = [];
+  if (userId) {
+    const { data: items } = await supabaseClient
+      .from('shopping_list_items')
+      .select('offer_id, offers(id, store_id, location_id, product, price, img_url, status)')
+      .eq('user_id', userId);
+    realCart = (items || []).map(i => i.offers).filter(o => o && o.status === 'active');
+  }
+
+  const merged = [...realCart];
+  const existingIds = new Set(realCart.map(o => o.id));
+  results.forEach(r => {
+    if (!existingIds.has(r.id)) {
+      merged.push({ id: r.id, location_id: r.location_id, product: r.product, price: r.price });
+      existingIds.add(r.id);
+    }
+  });
+
+  if (merged.length === 0) return;
+
+  await renderMultiStopMap(merged);
 };
 
 async function evaluateSmartSavings() {
