@@ -6473,6 +6473,21 @@ function renderApiTab() {
         </div>
       `}
     </div>
+
+    <!-- IMPORTAZIONE CATALOGO VIA CSV (Solo Enterprise) -->
+    ${isEnterprise ? `
+      <div class="card-saas" style="margin-top: 25px;">
+        <h3 style="margin-top:0; font-size: 1rem;">📂 Importazione catalogo (CSV)</h3>
+        <p style="color: #64748b; font-size: 0.85rem;">
+          Non hai un'integrazione tecnica? Carica direttamente l'export del tuo gestionale. La prima volta ti chiediamo di abbinare le colonne, poi lo ricordiamo per i prossimi import con lo stesso formato.
+        </p>
+        <input type="file" id="csvImportInput" accept=".csv" style="display:none;" onchange="handleCsvFileSelect(event)">
+        <button class="btn" style="margin-top: 10px;" onclick="document.getElementById('csvImportInput').click()">Carica file CSV</button>
+        <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 12px;">
+          Massimo 500 righe per file. Una riga senza prezzo originale diventa un annuncio normale, senza badge sconto.
+        </p>
+      </div>
+    ` : ''}
   `;
 }
 
@@ -6546,6 +6561,313 @@ window.copyApiKeyToClipboard = () => {
   navigator.clipboard.writeText(copyText.value);
   toast.info("API Key copiata negli appunti!");
 };
+
+// ==========================================================================
+// IMPORTAZIONE CSV (Enterprise) — stessa logica di filtro/classificazione
+// dell'API partner (/v1/offers), ma eseguita nel browser con la sessione
+// autenticata dello store: rispetta le RLS di Supabase, nessun bypass.
+// ==========================================================================
+
+const CSV_TARGET_FIELDS = [
+  { key: 'product',        label: 'Nome prodotto',                                   required: true,  keywords: ['prodotto', 'product', 'articolo', 'nome'] },
+  { key: 'price',           label: 'Prezzo finale',                                   required: true,  keywords: ['prezzo', 'price', 'importo'] },
+  { key: 'original_price',  label: 'Prezzo originale (vuoto = annuncio senza sconto)', required: false, keywords: ['originale', 'listino', 'pieno', 'original'] },
+  { key: 'category',        label: 'Categoria',                                       required: false, keywords: ['categoria', 'category', 'reparto'] },
+  { key: 'location',        label: 'Sede (nome punto vendita)',                       required: false, keywords: ['sede', 'negozio', 'punto vendita', 'store', 'location'] },
+  { key: 'start_date',      label: 'Data inizio (AAAA-MM-GG)',                        required: false, keywords: ['inizio', 'start'] },
+  { key: 'end_date',        label: 'Data fine (AAAA-MM-GG)',                          required: false, keywords: ['fine', 'scadenza', 'end'] },
+  { key: 'description',     label: 'Descrizione',                                     required: false, keywords: ['descrizione', 'desc', 'note'] },
+  { key: 'img_url',         label: 'URL immagine',                                    required: false, keywords: ['immagine', 'img', 'foto', 'image'] }
+];
+
+function csvSimpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+function getCsvMappingStorageKey(headers) {
+  const partner = getCurrentPartner();
+  const fingerprint = headers.map(h => h.trim().toLowerCase()).sort().join('|');
+  return `decerne_csv_mapping_${partner?.id || 'anon'}_${csvSimpleHash(fingerprint)}`;
+}
+
+function guessMappingFromHeaders(headers) {
+  const mapping = {};
+  CSV_TARGET_FIELDS.forEach(field => {
+    const match = headers.find(h => field.keywords.some(k => h.trim().toLowerCase().includes(k)));
+    if (match) mapping[field.key] = match;
+  });
+  return mapping;
+}
+
+function ensureCsvModalRoot() {
+  let root = document.getElementById('csvImportModalRoot');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'csvImportModalRoot';
+    document.body.appendChild(root);
+  }
+  return root;
+}
+
+window.closeCsvModal = () => {
+  const root = document.getElementById('csvImportModalRoot');
+  if (root) root.innerHTML = '';
+  document.body.style.overflow = '';
+};
+
+window.handleCsvFileSelect = (event) => {
+  const file = event.target.files[0];
+  event.target.value = ''; // permette di ricaricare lo stesso file due volte
+  if (!file) return;
+
+  if (typeof Papa === 'undefined') {
+    return toast.error("Libreria CSV non disponibile: ricarica la pagina e riprova.");
+  }
+
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: (results) => {
+      const headers = results.meta.fields || [];
+      const rows = results.data || [];
+      if (!headers.length || !rows.length) {
+        return toast.error("Il file CSV è vuoto o non è leggibile.");
+      }
+      if (rows.length > 500) {
+        return toast.error("Massimo 500 righe per import. Dividi il file in più parti.");
+      }
+      openCsvMappingModal(headers, rows);
+    },
+    error: (err) => {
+      console.error("Errore parsing CSV:", err);
+      toast.error("Errore nella lettura del file CSV.");
+    }
+  });
+};
+
+function openCsvMappingModal(headers, rows) {
+  const storageKey = getCsvMappingStorageKey(headers);
+  let savedMapping = null;
+  try { savedMapping = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch (e) {}
+  const guessed = savedMapping || guessMappingFromHeaders(headers);
+  const sampleRow = rows[0] || {};
+
+  const root = ensureCsvModalRoot();
+  document.body.style.overflow = 'hidden';
+  root.innerHTML = `
+    <div style="display:flex; position:fixed; inset:0; background:rgba(15,23,42,0.6); align-items:center; justify-content:center; z-index:9999; padding: 20px;">
+      <div style="background:#fff; border-radius:14px; padding:25px; width:min(560px,92vw); max-height:85vh; overflow-y:auto;">
+        <h3 style="margin-top:0;">Abbina le colonne del tuo file</h3>
+        <p style="color:#64748b; font-size:0.85rem;">
+          ${savedMapping ? 'Struttura riconosciuta da un import precedente: controlla e conferma.' : 'Indica a quale campo Decerne corrisponde ogni colonna del tuo file. Lo ricorderemo per i prossimi import con lo stesso formato.'}
+        </p>
+        <div id="csvMappingFields">
+          ${CSV_TARGET_FIELDS.map(f => `
+            <div style="margin-bottom:12px;">
+              <label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:4px;">
+                ${f.label}${f.required ? ' *' : ''}
+              </label>
+              <select data-field="${f.key}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #e2e8f0;">
+                <option value="">-- Non presente nel file --</option>
+                ${headers.map(h => `<option value="${clean(h)}" ${guessed[f.key] === h ? 'selected' : ''}>${clean(h)}</option>`).join('')}
+              </select>
+            </div>
+          `).join('')}
+        </div>
+        <p style="font-size: 0.75rem; color: #94a3b8;">
+          Anteprima prima riga: <code>${clean(JSON.stringify(sampleRow)).slice(0, 200)}</code>
+        </p>
+        <p style="font-size: 0.75rem; color: #94a3b8;">${rows.length} righe trovate nel file.</p>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:15px;">
+          <button class="btn outline" type="button" onclick="closeCsvModal()">Annulla</button>
+          <button class="btn" type="button" id="csvConfirmBtn" onclick="confirmCsvImport('${storageKey}')">Avvia importazione</button>
+        </div>
+      </div>
+    </div>
+  `;
+  root._csvRows = rows; // conserviamo le righe parse-ate per l'import
+}
+
+function readCsvMappingFromForm() {
+  const mapping = {};
+  document.querySelectorAll('#csvMappingFields select[data-field]').forEach(sel => {
+    if (sel.value) mapping[sel.dataset.field] = sel.value;
+  });
+  return mapping;
+}
+
+// Normalizza e classifica una riga CSV con la STESSA logica dell'API partner:
+// senza sconto reale -> annuncio normale (original_price = price).
+function normalizeCsvRow(rawRow, mapping, storeId, locationsByName, defaultLocationId) {
+  const errors = [];
+  const get = (key) => mapping[key] ? String(rawRow[mapping[key]] ?? '').trim() : '';
+
+  const product = get('product');
+  if (!product) errors.push("nome prodotto mancante");
+
+  const price = parseFloat(get('price').replace(',', '.'));
+  if (!Number.isFinite(price) || price <= 0) errors.push("prezzo mancante o non valido");
+
+  const originalRaw = get('original_price');
+  let originalPrice = originalRaw ? parseFloat(originalRaw.replace(',', '.')) : price;
+  if (!Number.isFinite(originalPrice) || originalPrice < price) originalPrice = price;
+
+  let locationId = defaultLocationId;
+  const locationName = get('location');
+  if (locationName) {
+    const match = locationsByName.get(locationName.toLowerCase());
+    if (match) locationId = match;
+    else errors.push(`sede "${locationName}" non trovata tra le sedi registrate`);
+  }
+  if (!locationId) errors.push("sede non specificata e lo store ha più di una sede");
+
+  const today = nowISODate();
+  const startDate = get('start_date') || today;
+  let endDate = get('end_date');
+  if (!endDate) {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    endDate = d.toISOString().slice(0, 10);
+  }
+  if (new Date(endDate) < new Date(startDate)) errors.push("data fine precedente alla data inizio");
+
+  if (errors.length) return { errors };
+
+  const row = {
+    store_id: storeId,
+    location_id: locationId,
+    product,
+    price,
+    original_price: originalPrice,
+    start_date: startDate,
+    end_date: endDate,
+    status: 'active',
+    limited_quantity: false
+  };
+  const category = get('category');
+  if (category) row.category = category;
+  const description = get('description');
+  if (description) row.description = description;
+  const imgUrl = get('img_url');
+  if (imgUrl) row.img_url = imgUrl;
+
+  return { row, isOffer: originalPrice > price };
+}
+
+window.confirmCsvImport = async (storageKey) => {
+  const root = document.getElementById('csvImportModalRoot');
+  const rows = root?._csvRows || [];
+  const mapping = readCsvMappingFromForm();
+
+  if (!mapping.product || !mapping.price) {
+    return toast.error("Devi abbinare almeno 'Nome prodotto' e 'Prezzo finale'.");
+  }
+
+  const partner = getCurrentPartner();
+  if (!partner) return toast.error("Sessione scaduta, effettua nuovamente il login.");
+
+  const allowed = await checkRateLimit(partner.id);
+  if (!allowed) return;
+
+  const btn = document.getElementById('csvConfirmBtn');
+  if (btn) { btn.disabled = true; btn.innerText = "Importazione in corso..."; }
+
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(mapping));
+
+    const locations = partner.locations || [];
+    const locationsByName = new Map(locations.map(l => [l.name.toLowerCase(), l.id]));
+    const defaultLocationId = locations.length === 1 ? locations[0].id : null;
+
+    // Offerte già attive dello store, per il filtro/dedup (aggiorna invece di duplicare)
+    const { data: existingOffers } = await supabaseClient
+      .from('offers')
+      .select('id, product, location_id')
+      .eq('store_id', partner.id)
+      .is('deleted_at', null);
+
+    const existingKey = (product, locationId) => `${product.trim().toLowerCase()}::${locationId}`;
+    const existingMap = new Map((existingOffers || []).map(o => [existingKey(o.product, o.location_id), o.id]));
+
+    const results = { created: 0, updated: 0, offers: 0, annunci: 0, errors: [] };
+    const toInsert = [];
+    const toUpdate = [];
+
+    rows.forEach((rawRow, index) => {
+      const parsed = normalizeCsvRow(rawRow, mapping, partner.id, locationsByName, defaultLocationId);
+      if (parsed.errors) {
+        results.errors.push({ index, product: rawRow[mapping.product] || null, reasons: parsed.errors });
+        return;
+      }
+      const { row, isOffer } = parsed;
+      const existingId = existingMap.get(existingKey(row.product, row.location_id));
+      if (existingId) toUpdate.push({ id: existingId, row, isOffer });
+      else toInsert.push({ row, isOffer });
+    });
+
+    if (toInsert.length) {
+      const { error } = await supabaseClient.from('offers').insert(toInsert.map(i => i.row));
+      if (error) {
+        toInsert.forEach(i => results.errors.push({ index: null, product: i.row.product, reasons: [error.message] }));
+      } else {
+        toInsert.forEach(i => { results.created++; i.isOffer ? results.offers++ : results.annunci++; });
+      }
+    }
+
+    for (const item of toUpdate) {
+      const { error } = await supabaseClient
+        .from('offers')
+        .update({ ...item.row, updated_at: new Date().toISOString() })
+        .eq('id', item.id);
+      if (error) results.errors.push({ index: null, product: item.row.product, reasons: [error.message] });
+      else { results.updated++; item.isOffer ? results.offers++ : results.annunci++; }
+    }
+
+    closeCsvModal();
+    renderCsvImportResults(results);
+    await refreshMyOffers();
+    renderOffers();
+  } catch (err) {
+    console.error("Errore import CSV:", err);
+    toast.error("Errore imprevisto durante l'importazione.");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerText = "Avvia importazione"; }
+  }
+};
+
+function renderCsvImportResults(results) {
+  const root = ensureCsvModalRoot();
+  document.body.style.overflow = 'hidden';
+  const errorsHtml = results.errors.length
+    ? `<div style="max-height:180px; overflow-y:auto; margin-top:10px; text-align:left; background:#fef2f2; border-radius:8px; padding:10px;">
+        ${results.errors.slice(0, 50).map(e => `
+          <div style="font-size:0.78rem; color:#991b1b; margin-bottom:4px;">
+            Riga ${e.index !== null ? e.index + 2 : '-'} (${clean(e.product || 'sconosciuto')}): ${clean(e.reasons.join(', '))}
+          </div>
+        `).join('')}
+        ${results.errors.length > 50 ? `<div style="font-size:0.78rem; color:#991b1b;">...e altri ${results.errors.length - 50} errori.</div>` : ''}
+      </div>`
+    : '';
+
+  root.innerHTML = `
+    <div style="display:flex; position:fixed; inset:0; background:rgba(15,23,42,0.6); align-items:center; justify-content:center; z-index:9999; padding: 20px;">
+      <div style="background:#fff; border-radius:14px; padding:25px; width:min(480px,92vw); max-height:85vh; overflow-y:auto; text-align:center;">
+        <div style="font-size:2rem;">${results.errors.length ? '⚠️' : '✅'}</div>
+        <h3 style="margin: 10px 0;">Importazione completata</h3>
+        <p style="color:#475569; font-size:0.9rem;">
+          ${results.created} nuovi · ${results.updated} aggiornati<br>
+          (${results.offers} offerte con sconto, ${results.annunci} annunci senza sconto)
+        </p>
+        ${results.errors.length ? `<p style="color:#991b1b; font-size:0.85rem;">${results.errors.length} righe scartate:</p>${errorsHtml}` : ''}
+        <button class="btn" style="margin-top:15px;" onclick="closeCsvModal()">Chiudi</button>
+      </div>
+    </div>
+  `;
+}
 
 // GESTIONE CHIUSURA DRAWER CON TASTO ESC
 document.addEventListener('keydown', (e) => {
