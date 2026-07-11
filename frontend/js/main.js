@@ -1235,8 +1235,10 @@ function renderOffersTable(limit = 999) {
     return `<div class="empty-state">Nessuna offerta creata.</div>`;
   }
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   let rows = myOffers.slice(0, limit).map(o => {
-    const isExpired = new Date(o.endDate) < new Date();
+    const isExpired = o.endDate < todayStr; // scade solo il giorno DOPO la data impostata, non da mezzanotte UTC
     const statusClass = isExpired ? 'status-expired' : `status-${o.status}`;
     const statusLabel = isExpired ? 'SCADUTA' : o.status.toUpperCase();
 
@@ -1530,6 +1532,13 @@ window.openProfileGoogleMapsHelper = () => {
   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank', 'noopener');
 };
 
+window.openOnboardingGoogleMapsHelper = () => {
+  const street = document.getElementById("obStreet")?.value || "";
+  const city = document.getElementById("obCity")?.value || "";
+  const query = `${street}, ${city}, Italia`;
+  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank', 'noopener');
+};
+
 window.openStoreInGoogleMaps = (address) => {
   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank', 'noopener');
 };
@@ -1608,13 +1617,6 @@ window.closeOfferModal = () => {
     document.body.style.overflow = '';
   } catch (e) { console.error(e); }
 };
-
-document.addEventListener("DOMContentLoaded", () => {
-  const closeBtn = $("#closeOfferModal");
-  if (closeBtn) {
-      closeBtn.onclick = () => $("#offerModal").style.display = "none";
-  }
-});
 
 async function validateImageUrl(url) {
   if (!url) return { valid: false };
@@ -2212,7 +2214,8 @@ async function renderCartContent() {
   }
 
   // Filtra le offerte non più attive (cestinate/scadute dal negozio)
-  const cart = (items || []).map(i => i.offers).filter(o => o && o.status === 'active');
+  const todayStr = new Date().toISOString().split('T')[0];
+  const cart = (items || []).map(i => i.offers).filter(o => o && o.status === 'active' && o.end_date >= todayStr);
 
   const smartListHeader = `
     <div style="display:flex; justify-content:flex-end; padding:10px 10px 4px;">
@@ -2254,11 +2257,23 @@ async function renderCartContent() {
 }
 
 async function tryGeocodeQuery(query) {
-  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`, {
-    headers: { 'Accept-Language': 'it' }
-  });
-  const data = await res.json();
-  return (data && data[0]) ? { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) } : null;
+  try {
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) return null; // la geocodifica passa dal backend solo per utenti autenticati
+
+    const res = await fetch('https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/geocode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ query })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.lat != null && data.lng != null) ? { lat: data.lat, lng: data.lng } : null;
+  } catch (e) {
+    console.warn("Geocoding fallito:", e);
+    return null;
+  }
 }
 
 // Estrae solo il nome della via, senza numero civico/CAP/città (es: "via porrara 54" -> "via porrara")
@@ -2583,14 +2598,54 @@ function normalizeProductName(s) {
   return (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+function levenshteinDistance(a, b) {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,      // cancellazione
+        dp[i][j - 1] + 1,      // inserimento
+        dp[i - 1][j - 1] + cost // sostituzione
+      );
+    }
+  }
+  return dp[m][n];
+}
+
+// Riduce singolare/plurale e maschile/femminile italiani a una radice comune
+// (es: "detersivo" e "detersivi" diventano entrambi "detersiv")
+function stemItalianWord(w) {
+  if (w.length <= 3) return w;
+  return w.replace(/(zioni|zione)$/, 'zion').replace(/[oaie]$/, '');
+}
+
+function wordsAreSimilar(a, b) {
+  if (a === b) return true;
+  if (a.length < 4 || b.length < 4) return false; // parole troppo corte: evitiamo falsi positivi
+  const stemA = stemItalianWord(a), stemB = stemItalianWord(b);
+  if (stemA === stemB && stemA.length >= 3) return true;
+  // tolleranza refusi, proporzionale alla lunghezza della parola
+  const maxLen = Math.max(a.length, b.length);
+  const threshold = maxLen <= 5 ? 1 : (maxLen <= 9 ? 2 : 3);
+  return levenshteinDistance(a, b) <= threshold;
+}
+
 function fuzzyMatchOffers(term, offers) {
   const t = normalizeProductName(term);
   if (!t) return [];
   const tWords = t.split(/\s+/).filter(w => w.length > 2);
+  if (tWords.length === 0) return [];
   return offers.filter(o => {
     const p = normalizeProductName(o.product);
     if (p === t || p.includes(t) || t.includes(p)) return true;
-    return tWords.some(w => p.includes(w));
+    const pWords = p.split(/\s+/).filter(w => w.length > 2);
+    return tWords.some(tw => pWords.some(pw => wordsAreSimilar(tw, pw)));
   });
 }
 
@@ -2647,10 +2702,13 @@ window.searchSmartShoppingList = async () => {
   const costPerKm = costPerKmRaw ? parseFloat(costPerKmRaw) : 0;
   const useDistance = !isNaN(costPerKm) && costPerKm > 0;
 
+  const today = new Date().toISOString().split('T')[0];
   const { data: allActiveOffers, error } = await supabaseClient
     .from('offers')
     .select('id, product, price, location_id')
-    .eq('status', 'active');
+    .eq('status', 'active')
+    .lte('start_date', today)
+    .gte('end_date', today);
 
   if (error || !allActiveOffers) {
     resultsBox.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Errore nella ricerca. Riprova.</p>`;
@@ -2713,7 +2771,12 @@ window.searchSmartShoppingList = async () => {
     if (selectedStores.has(match.location_id)) return match.price;
     const store = storeCache[match.location_id];
     const d = store?.distanceFromUserKm;
-    return match.price + (d != null ? d * 2 * costPerKm : 0);
+    if (d == null) {
+      // Distanza non calcolabile: NON deve mai vincere per costo "zero".
+      // Penalità forte così l'opzione emerge solo se non esiste alternativa con distanza nota.
+      return match.price + 9999;
+    }
+    return match.price + (d * 2 * costPerKm);
   }
 
   let selectedStores = new Set(existingStoreIds);
@@ -3378,7 +3441,9 @@ function toggleMenu() {
 
 // Nel tuo init() o a fine file, imposta i listener così:
 function setupEventListeners() {
-  // GESTIONE LOGIN AMMINISTRATORE
+  setupManualLocationInput();
+
+ // GESTIONE LOGIN AMMINISTRATORE
  // Gestione Login Admin corretta
  const adminLoginBtn = $("#adminLoginBtn");
  if (adminLoginBtn) {
@@ -3460,7 +3525,9 @@ if (denyBtn) {
   denyBtn.onclick = () => {
     localStorage.setItem("decerne_loc_consent", "denied");
     $("#locationBanner").classList.add("hidden");
-    $("#locationInput").value = "Posizione non impostata";
+    $("#locationInput").value = "";
+    $("#locationInput").focus();
+    toast.error("Nessun problema: scrivi la tua città o il CAP nel campo posizione e premi Invio.");
     renderOffers(); // Ricarica per mostrare tutto
   };
 }
@@ -3880,6 +3947,36 @@ function checkLocationPermission() {
   }
 }
 
+function setupManualLocationInput() {
+  const locInput = $("#locationInput");
+  if (!locInput || locInput.dataset.manualBound) return;
+  locInput.dataset.manualBound = "true";
+
+  const NON_VALID_VALUES = ["Posizione non impostata", "Posizione non disponibile", "Posizione non riconosciuta", "Posizione rilevata"];
+
+  const confirmManualLocation = async () => {
+    const typed = locInput.value.trim();
+    if (!typed || typed.length < 2 || NON_VALID_VALUES.includes(typed)) return;
+
+    // Geocodifica anche il testo scritto a mano, così le funzioni basate sulla
+    // distanza (mappa, lista smart) funzionano pure senza GPS del browser.
+    const coords = await tryGeocodeQuery(`${typed}, Italia`);
+    if (coords) state.manualUserCoords = coords;
+
+    state.currentPage = 1;
+    renderOffers();
+  };
+
+  locInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      locInput.blur();
+      confirmManualLocation();
+    }
+  });
+  locInput.addEventListener('blur', confirmManualLocation);
+}
+
 // Funzione principale di rendering della vista Store
 function renderStoreView() {
   const container = $("#store-app-container");
@@ -4245,7 +4342,7 @@ function renderOnboarding(container) {
           <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-top:10px;">
             <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">
               📍 Facoltativo ma consigliato: le coordinate esatte rendono il tuo negozio localizzabile con precisione sulla mappa dei clienti.
-              <a href="javascript:void(0)" onclick="openGoogleMapsHelper()">Trova le tue coordinate su Google Maps →</a>
+              <a href="javascript:void(0)" onclick="openOnboardingGoogleMapsHelper()">Trova le tue coordinate su Google Maps →</a>
             </p>
             <div class="form-row">
               <div class="input-group">
