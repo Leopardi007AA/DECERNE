@@ -6424,32 +6424,63 @@ function renderApiTab() {
       
       ${partner.plan === 'Enterprise' ? `
         <!-- VISUALIZZAZIONE COMPLETA: Solo Enterprise -->
-        <div style="margin-top: 20px; background: #1e293b; border-radius: 12px; padding: 20px; font-family: 'Courier New', monospace; font-size: 0.85rem;">
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; margin-top: 15px; font-size: 0.8rem; color: #1e3a8a;">
+          <strong>Base URL:</strong> https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/offers<br>
+          <strong>Autenticazione:</strong> header <code>x-api-key</code> con la chiave qui sopra (nessun altro header richiesto)
+        </div>
+        <div style="margin-top: 15px; background: #1e293b; border-radius: 12px; padding: 20px; font-family: 'Courier New', monospace; font-size: 0.8rem;">
           
-          <div style="margin-bottom: 20px;">
+          <div style="margin-bottom: 22px;">
             <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
               <span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">GET</span>
-              <span style="color: #e2e8f0; font-weight: bold;">/v1/offers</span>
+              <span style="color: #e2e8f0; font-weight: bold;">/offers</span>
+              <span style="color: #64748b; font-size: 0.7rem;">(piano Professional+)</span>
             </div>
-            <div style="color: #94a3b8; margin-left: 55px;">Recupera la lista di tutte le tue offerte attive.</div>
+            <div style="color: #94a3b8; margin-left: 55px;">Recupera la lista delle tue offerte/annunci attivi.</div>
+            <pre style="color: #94a3b8; margin: 8px 0 0 55px; white-space: pre-wrap;">curl "https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/offers" \
+  -H "x-api-key: LA_TUA_API_KEY"</pre>
           </div>
 
-          <div style="margin-bottom: 20px;">
+          <div style="margin-bottom: 22px;">
             <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
               <span style="background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">POST</span>
-              <span style="color: #e2e8f0; font-weight: bold;">/v1/offers</span>
+              <span style="color: #e2e8f0; font-weight: bold;">/offers</span>
+              <span style="color: #64748b; font-size: 0.7rem;">(piano Enterprise)</span>
             </div>
-            <div style="color: #94a3b8; margin-left: 55px;">Crea una nuova offerta (singola o massiva).</div>
+            <div style="color: #94a3b8; margin-left: 55px;">
+              Crea o aggiorna prodotti (singolo oggetto oppure { "items": [...] }, max 500 per richiesta).
+              Senza "original_price" (o uguale a "price") diventa un annuncio normale, senza sconto mostrato.
+              Con "original_price" maggiore di "price" diventa un'offerta con badge sconto.
+            </div>
+            <pre style="color: #94a3b8; margin: 8px 0 0 55px; white-space: pre-wrap;">curl -X POST "https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/offers" \
+  -H "x-api-key: LA_TUA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "product": "Pasta De Cecco 500g",
+    "price": 0.99,
+    "original_price": 1.49,
+    "location_id": "uuid-della-tua-sede",
+    "category": "Dispensa"
+  }'</pre>
+            <div style="color: #64748b; margin: 6px 0 0 55px; font-size: 0.72rem;">
+              Campi obbligatori: "product", "price". "location_id" può essere omesso solo se hai una sola sede registrata. Se ometti le date, l'annuncio parte oggi e scade dopo 30 giorni.
+            </div>
           </div>
 
           <div style="margin-bottom: 10px;">
             <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
               <span style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">DELETE</span>
-              <span style="color: #e2e8f0; font-weight: bold;">/v1/offers/{id}</span>
+              <span style="color: #e2e8f0; font-weight: bold;">/offers/{id}</span>
+              <span style="color: #64748b; font-size: 0.7rem;">(piano Enterprise)</span>
             </div>
-            <div style="color: #94a3b8; margin-left: 55px;">Rimuove definitivamente un'offerta dal sistema.</div>
+            <div style="color: #94a3b8; margin-left: 55px;">Rimuove (soft delete) un'offerta o annuncio dal sistema.</div>
+            <pre style="color: #94a3b8; margin: 8px 0 0 55px; white-space: pre-wrap;">curl -X DELETE "https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/offers/ID_OFFERTA" \
+  -H "x-api-key: LA_TUA_API_KEY"</pre>
           </div>
         </div>
+        <p style="font-size: 0.72rem; color: #94a3b8; margin-top: 10px;">
+          Limite: 120 richieste al minuto per chiave. Massimo 500 prodotti per singola chiamata POST.
+        </p>
       ` : `
         <!-- VISUALIZZAZIONE LIMITATA: Professional o altri piani -->
         <div style="margin-top: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
