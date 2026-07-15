@@ -214,21 +214,9 @@
   </div>
 </div>
 
-    <section id="admin-view" class="view hidden">
-      <h2>Area Admin</h2>
-      <div id="admin-login" class="card">
-        <input id="adminEmail" type="email" placeholder="Email admin" />
-        <input id="adminPassword" type="password" placeholder="Password admin" />
-        <button id="adminLoginBtn" class="btn">Accedi</button>
-      </div>
-      <div id="admin-panel" class="card hidden">
-        <button id="adminLogoutBtn" class="btn outline">Logout</button>
-        <button class="btn outline" onclick="renderAdminTrash()">Gestisci Cestino</button>
-        <button class="btn outline" onclick="renderAdminAudit()">Visualizza Log</button>
-        <button class="btn outline" onclick="renderAdminHistory()">Registro Modifiche</button>
-        <div id="adminOffers" class="grid"></div>
-      </div>
-    </section>
+<section id="spiral-view" class="view hidden">
+  <iframe id="spiralFrame" src="chi-siamo.html" title="DECERNE" style="width:100%; height:100vh; border:0; display:block;"></iframe>
+</section>
   </main>
 
   <footer class="site-footer">
@@ -243,7 +231,7 @@
     <ul class="nav-menu">
       <li id="navModeUser" class="active">🏠 Home Utenti</li>
       <li id="navModeStore">🏪 Area Partner</li>
-      <li id="navModeAdmin">🛡️ Pannello Admin</li>
+      <li id="navModeSpiral">🌀 Chi Siamo?</li>
     </ul>
   
     <div class="drawer-spacer"></div>

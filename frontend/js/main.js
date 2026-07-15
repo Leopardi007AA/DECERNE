@@ -908,22 +908,20 @@ function setMode(mode) {
     
     state.mode = mode;
 
-    // Elementi UI
     const userView = $("#user-view");
     const storeView = $("#store-view");
-    const adminView = $("#admin-view");
+    const chisiamoView = $("#chisiamo-view");
     const controls = $("#controls");
 
     if(userView) userView.classList.toggle("hidden", mode !== "user");
     if(storeView) storeView.classList.toggle("hidden", mode !== "store");
-    if(adminView) adminView.classList.toggle("hidden", mode !== "admin");
+    if(chisiamoView) chisiamoView.classList.toggle("hidden", mode !== "chisiamo");
     if(controls) controls.classList.toggle("hidden", mode !== "user");
 
-    // Aggiorna menu laterale
     $$(".nav-menu li").forEach(li => li.classList.remove("active"));
     if(mode === 'user' && $("#navModeUser")) $("#navModeUser").classList.add("active");
     if(mode === 'store' && $("#navModeStore")) $("#navModeStore").classList.add("active");
-    if(mode === 'admin' && $("#navModeAdmin")) $("#navModeAdmin").classList.add("active");
+    if(mode === 'chisiamo' && $("#navModeChiSiamo")) $("#navModeChiSiamo").classList.add("active");
     
     if(mode === 'store') renderStoreView();
 
@@ -1950,10 +1948,8 @@ async function restoreUserSession() {
       return;
     }
 
-    const [{ data: profile, error: profileError }, { data: adminRow }] = await Promise.all([
-      supabaseClient.from('profiles').select('name, surname, city, cap').eq('id', session.user.id).single(),
-      supabaseClient.from('admins').select('auth_user_id').eq('auth_user_id', session.user.id).maybeSingle()
-    ]);
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles').select('name, surname, city, cap').eq('id', session.user.id).single();
 
     if (profileError) console.error("Errore recupero profilo:", profileError);
 
@@ -1964,7 +1960,7 @@ async function restoreUserSession() {
       cognome: profile?.surname || '',
       citta: profile?.city || '',
       cap: profile?.cap || '',
-      role: adminRow ? 'admin' : 'customer'
+      role: 'customer'
     };
   } catch (e) {
     console.error("Errore ripristino sessione utente:", e);
@@ -3443,50 +3439,6 @@ function toggleMenu() {
 function setupEventListeners() {
   setupManualLocationInput();
 
- // GESTIONE LOGIN AMMINISTRATORE
- // Gestione Login Admin corretta
- const adminLoginBtn = $("#adminLoginBtn");
- if (adminLoginBtn) {
-   adminLoginBtn.onclick = async () => {
-     const emailField = $("#adminEmail");
-     const passField = $("#adminPassword");
-     if (!emailField || !passField) return;
- 
-     const email = emailField.value.trim().toLowerCase();
-     const pass = passField.value;
- 
-     const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
- 
-     if (error || !data.user) {
-       return toast.error("Credenziali amministratore errate.");
-     }
- 
-     const { data: adminRow } = await supabaseClient
-       .from('admins')
-       .select('auth_user_id')
-       .eq('auth_user_id', data.user.id)
-       .maybeSingle();
- 
-     if (!adminRow) {
-       await supabaseClient.auth.signOut();
-       return toast.error("Questo account non ha i permessi di amministratore.");
-     }
- 
-     state.currentUser = {
-       id: data.user.id,
-       email: data.user.email,
-       nome: 'Admin',
-       cognome: '',
-       role: 'admin'
-     };
- 
-     $("#admin-login").classList.add("hidden");
-     $("#admin-panel").classList.remove("hidden");
-     updateDrawerUI();
-     toast.success("Modalità Amministratore Attiva");
-   };
- }
-
   // Menu Hamburger
   const menuBtn = $("#menuBtn");
   if (menuBtn) {
@@ -3529,20 +3481,6 @@ if (denyBtn) {
     $("#locationInput").focus();
     toast.error("Nessun problema: scrivi la tua città o il CAP nel campo posizione e premi Invio.");
     renderOffers(); // Ricarica per mostrare tutto
-  };
-}
-
-const adminLogoutBtn = $("#adminLogoutBtn");
-if (adminLogoutBtn) {
-  adminLogoutBtn.onclick = () => {
-    try {
-      logoutUser(); // Riutilizza la funzione esistente che pulisce localStorage
-      $("#admin-panel").classList.add("hidden");
-      $("#admin-login").classList.remove("hidden");
-      setMode('user'); // Riporta l'admin alla home utenti
-    } catch (e) {
-      console.error(e);
-    }
   };
 }
 
@@ -3820,7 +3758,7 @@ async function init() {
   // 4. Configura Navigazione Modalità (Navbar click)
   if($("#navModeUser")) $("#navModeUser").onclick = () => setMode("user");
   if($("#navModeStore")) $("#navModeStore").onclick = () => setMode("store");
-  if($("#navModeAdmin")) $("#navModeAdmin").onclick = () => setMode("admin");
+  if($("#navModeChiSiamo")) $("#navModeChiSiamo").onclick = () => setMode("chisiamo");
 
   // 5. Configura Ricerca e Filtri della Homepage
   const searchInput = document.getElementById("searchInput");
@@ -5231,102 +5169,6 @@ window.restoreOffer = async (id) => {
   toast.success("Offerta ripristinata con successo!");
   await refreshMyOffers();
   await refreshMyTrash();
-};
-
-// Funzione da chiamare nel pannello Admin
-// Queste funzioni richiedono un vero login admin collegato a Supabase
-// (oggi il pannello admin è solo un controllo password nel browser, le
-// regole di sicurezza del database non lo riconoscono). Le ricostruiremo
-// quando avremo un'autenticazione admin reale.
-window.renderAdminTrash = () => {
-  const container = $("#adminOffers");
-  container.innerHTML = `
-    <div style='padding:40px; color:#64748b; text-align:center;'>
-      🔒 Funzione non ancora disponibile: richiede un'autenticazione admin reale collegata a Supabase.
-    </div>
-  `;
-};
-
-window.permanentDelete = (id) => {
-  toast.error("Funzione non disponibile: richiede autenticazione admin reale.");
-};
-
-window.emptyTrash = () => {
-  toast.error("Funzione non disponibile: richiede autenticazione admin reale.");
-};
-
-window.renderAdminAudit = async () => {
-  const container = $("#adminOffers");
-  container.innerHTML = `<p style="padding:20px; color:#64748b;">Caricamento audit log...</p>`;
-
-  // NB: come il registro modifiche, finché l'auth admin resta quella "legacy"
-  // (Punto 5), questa query restituirà sempre vuoto: la RLS di SELECT
-  // richiede un auth.uid() reale presente nella tabella "admins".
-  const { data: logs, error } = await supabaseClient
-    .from('audit_logs')
-    .select('actor, action, target, created_at')
-    .order('created_at', { ascending: false })
-    .limit(100);
-
-  if (error) {
-    console.error("Errore caricamento audit log:", error);
-    container.innerHTML = `<p style="padding:20px; color:#64748b;">Errore nel caricamento dell'audit log.</p>`;
-    return;
-  }
-
-  let html = `<h3>🛡️ Audit Log & Sicurezza</h3>
-              <table class="offer-table">
-                <thead><tr><th>Data</th><th>Store ID</th><th>Evento</th><th>Dettagli</th></tr></thead><tbody>`;
-
-  (logs || []).forEach(l => {
-    const isAlert = l.action === "RATE_LIMIT_BLOCK";
-    html += `<tr style="${isAlert ? 'background:#fff5f5; color:#c53030;' : ''}">
-      <td>${new Date(l.created_at).toLocaleTimeString()}</td>
-      <td>${l.actor}</td>
-      <td><strong>${l.action}</strong></td>
-      <td>${l.target}</td>
-    </tr>`;
-  });
-
-  html += "</tbody></table>";
-  container.innerHTML = html;
-};
-
-window.renderAdminHistory = async () => {
-  const container = $("#adminOffers");
-  container.innerHTML = `<p style="padding:20px; color:#64748b;">Caricamento registro...</p>`;
-
-  // NB: finché l'auth admin resta quella "legacy" (Punto 5), questa query
-  // restituirà sempre vuoto: la RLS richiede un auth.uid() reale presente
-  // nella tabella "admins".
-  const { data: rows, error } = await supabaseClient
-    .from('offer_history')
-    .select('offer_id, change_note, changed_at')
-    .order('changed_at', { ascending: false })
-    .limit(200);
-
-  if (error) {
-    console.error("Errore caricamento registro modifiche:", error);
-    container.innerHTML = `<p style="padding:20px; color:#64748b;">Errore nel caricamento del registro.</p>`;
-    return;
-  }
-
-  let html = `<h3>📜 Registro Modifiche Globale</h3>
-              <table class="offer-table">
-                <thead><tr><th>Data</th><th>Partner</th><th>Prodotto ID</th><th>Modifica</th></tr></thead><tbody>`;
-
-  (rows || []).forEach(r => {
-    const [field, oldValue, newValue, modifiedBy] = r.change_note.split('::');
-    html += `<tr>
-      <td>${new Date(r.changed_at).toLocaleString()}</td>
-      <td>${modifiedBy}</td>
-      <td><small>${r.offer_id}</small></td>
-      <td><strong>${field}</strong>: ${oldValue} ➔ ${newValue}</td>
-    </tr>`;
-  });
-
-  html += "</tbody></table>";
-  container.innerHTML = html;
 };
 
 function getCountdownText(endDate) {
