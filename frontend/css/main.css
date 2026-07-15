@@ -216,6 +216,19 @@ body {
   box-shadow: var(--shadow);
 }
 
+/* Vista Chi Siamo: a tutto schermo, sopra la navbar del sito */
+#chisiamo-view {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  background: #020617;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
+  max-width: none;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
