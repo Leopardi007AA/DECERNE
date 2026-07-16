@@ -1013,7 +1013,7 @@ body {
   border: none;
   cursor: pointer;
   padding: 5px;
-  z-index: 2000; /* Sopra la Navbar stessa */
+  z-index: 4001; /* Sopra la navbar */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1045,7 +1045,7 @@ body {
   align-items: center;
   padding: 0 24px;
   color: white;
-  z-index: 1300; /* Sopra il drawer, sotto i popup */
+  z-index: 1550; /* Sopra il drawer (1500), sotto i popup (1600) */
 }
 
 /* POPUP A TUTTO SCHERMO: Coprono anche la navbar */
@@ -1096,28 +1096,6 @@ body {
   color: var(--primary); 
   border-left-color: var(--primary); 
 }
-
-/* ICONA HAMBURGER / X */
-.hamburger-btn {
-  z-index: 4001; /* Sopra la navbar */
-  width: 40px; height: 40px;
-}
-
-.hamburger-icon {
-  width: 22px; height: 14px;
-  position: relative;
-  display: flex; flex-direction: column; justify-content: space-between;
-}
-
-.hamburger-icon span {
-  display: block; height: 2px; width: 100%;
-  background-color: white; border-radius: 2px;
-  transition: 0.3s;
-}
-
-.hamburger-btn.open span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
-.hamburger-btn.open span:nth-child(2) { opacity: 0; }
-.hamburger-btn.open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 
 #overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5);
@@ -1431,7 +1409,7 @@ hr {
   position: fixed;
   top: 20px;
   right: 20px;
-  z-index: 1400;
+  z-index: 99999;
   display: flex;
   flex-direction: column;
   gap: 10px;

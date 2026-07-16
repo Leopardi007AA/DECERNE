@@ -2203,7 +2203,7 @@ async function renderCartContent() {
 
   const { data: items, error } = await supabaseClient
     .from('shopping_list_items')
-    .select('offer_id, offers(id, store_id, location_id, product, price, img_url, status)')
+    .select('offer_id, offers(id, store_id, location_id, product, price, img_url, status, end_date)')
     .eq('user_id', userId);
 
   if (error) {
@@ -2237,19 +2237,19 @@ async function renderCartContent() {
   content.innerHTML = `
     ${smartListHeader}
     <div class="offers-list-container">
-      ${cart.map(o => `
-        <div class="offer-row">
-          <img src="${getSafeImageUrl(o.img_url)}" style="width:60px; height:60px; object-fit:cover; margin:10px; border-radius:8px;">
-          <div class="product-info" style="padding:10px;">
-            <div class="product-details">
-              <div class="store-name">${locationsById[o.location_id]?.name || ""}</div>
-              <h3 style="font-size:0.95rem;">${o.product}</h3>
-              <div class="price-tag" style="font-size:1rem;">${formatPrice(o.price)}</div>
-            </div>
-            <button class="btn danger" onclick="removeFromCart('${o.id}')" style="padding:5px 10px; font-size:0.8rem;">Rimuovi</button>
+    ${cart.map(o => `
+      <div class="offer-row" onclick="closeFullPageModal(); openProductDetail('${o.id}')" style="cursor:pointer;">
+        <img src="${getSafeImageUrl(o.img_url)}" style="width:60px; height:60px; object-fit:cover; margin:10px; border-radius:8px;">
+        <div class="product-info" style="padding:10px;">
+          <div class="product-details">
+            <div class="store-name">${locationsById[o.location_id]?.name || ""}</div>
+            <h3 style="font-size:0.95rem;">${o.product}</h3>
+            <div class="price-tag" style="font-size:1rem;">${formatPrice(o.price)}</div>
           </div>
+          <button class="btn danger" onclick="event.stopPropagation(); removeFromCart('${o.id}')" style="padding:5px 10px; font-size:0.8rem;">Rimuovi</button>
         </div>
-      `).join('')}
+      </div>
+    `).join('')}
       <button class="btn full-width" onclick="openCartMapView()" style="margin-top:20px; background:#2563eb; color:white; font-weight:600;">📍 Segui nella mappa fino ai negozi</button>
     </div>
   `;
