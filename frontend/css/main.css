@@ -41,6 +41,7 @@ body {
   font-weight: 800;
   font-size: 22px;
   letter-spacing: 1px;
+  cursor: pointer;
 }
 .logo-dot { color: #00f2ff; }
 
@@ -255,7 +256,7 @@ body {
   background: #fff;
   padding: 80px 0 20px 0;
   transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 1200;
+  z-index: 1500; /* Sopra #chisiamo-view (1400) così è visibile anche da quella pagina */
   box-shadow: -5px 0 15px rgba(0,0,0,0.1);
   display: flex;
   flex-direction: column;
@@ -291,7 +292,7 @@ body {
   inset: 0;
   background: rgba(0,0,0,0.5);
   display: none;
-  z-index: 1000;
+  z-index: 1450;
 }
 
 .site-footer {
@@ -1067,7 +1068,7 @@ body {
   background: #fff;
   padding: 80px 0 20px 0; /* Spazio per la navbar in alto */
   transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 1200;
+  z-index: 1500; /* Sopra #chisiamo-view (1400) così è visibile anche da quella pagina */
   box-shadow: -5px 0 15px rgba(0,0,0,0.1);
 }
 
@@ -1120,7 +1121,7 @@ body {
 
 #overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-  display: none; z-index: 1000;
+  display: none; z-index: 1450;
 }
 
 .price-container {
@@ -1909,3 +1910,81 @@ hr {
 ::-webkit-scrollbar-track { background: #f1f5f9; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ============================================================
+   DRAWER - VARIANTE SCURA (usata sopra la pagina "Chi Siamo")
+   Stesso menu, stesse funzioni: cambia solo la grafica per
+   restare in tema con lo sfondo scuro di quella pagina.
+   ============================================================ */
+   #drawer.drawer-dark {
+    background: rgba(2, 6, 23, 0.97);
+    backdrop-filter: blur(20px);
+    box-shadow: -5px 0 25px rgba(34, 211, 238, 0.15);
+    border-left: 1px solid rgba(34, 211, 238, 0.15);
+  }
+  
+  #drawer.drawer-dark .drawer-header h3 {
+    color: #fff;
+  }
+  
+  #drawer.drawer-dark .nav-menu li {
+    color: rgba(255, 255, 255, 0.65);
+    border-bottom: 1px solid rgba(34, 211, 238, 0.08);
+    border-left-color: transparent;
+  }
+  
+  #drawer.drawer-dark .nav-menu li:hover {
+    background: rgba(34, 211, 238, 0.08);
+    color: #22d3ee;
+  }
+  
+  #drawer.drawer-dark .nav-menu li.active {
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(14, 165, 233, 0.18));
+    color: #22d3ee;
+    border-left-color: #22d3ee;
+  }
+  
+  #drawer.drawer-dark hr {
+    border-top: 1px solid rgba(34, 211, 238, 0.12);
+  }
+  
+  #drawer.drawer-dark .drawer-profile-card {
+    background: rgba(34, 211, 238, 0.06);
+    border: 1px solid rgba(34, 211, 238, 0.18);
+  }
+  
+  #drawer.drawer-dark .drawer-profile-card:hover {
+    background: rgba(34, 211, 238, 0.1);
+    border-color: #22d3ee;
+    box-shadow: 0 4px 14px rgba(34, 211, 238, 0.15);
+  }
+  
+  #drawer.drawer-dark .mini-avatar {
+    background: linear-gradient(135deg, #22d3ee, #0ea5e9);
+    color: #020617;
+  }
+  
+  #drawer.drawer-dark .user-name {
+    color: #fff;
+  }
+  
+  #drawer.drawer-dark .user-email {
+    color: rgba(255, 255, 255, 0.5);
+  }
+  
+  #drawer.drawer-dark .drawer-auth .btn {
+    background: linear-gradient(135deg, #22d3ee, #0ea5e9);
+    color: #020617;
+    box-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
+  }
+  
+  #drawer.drawer-dark .drawer-auth .btn.outline {
+    background: transparent;
+    border: 2px solid rgba(34, 211, 238, 0.4);
+    color: #22d3ee;
+  }
+  
+  #drawer.drawer-dark .drawer-auth .btn.outline:hover {
+    background: rgba(34, 211, 238, 0.08);
+    border-color: #22d3ee;
+  }

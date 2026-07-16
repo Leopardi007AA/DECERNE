@@ -925,6 +925,9 @@ function setMode(mode) {
     
     if(mode === 'store') renderStoreView();
 
+    // Grafica del drawer: scura quando siamo su "Chi Siamo", normale altrove
+    if($("#drawer")) $("#drawer").classList.toggle("drawer-dark", mode === "chisiamo");
+
     closeDrawer();
     window.scrollTo(0,0);
   } catch (e) {
@@ -3438,6 +3441,9 @@ function toggleMenu() {
 // Nel tuo init() o a fine file, imposta i listener così:
 function setupEventListeners() {
   setupManualLocationInput();
+
+  // Logo DECERNE: ricarica la pagina
+  if($("#logoBtn")) $("#logoBtn").onclick = () => window.location.reload();
 
   // Menu Hamburger
   const menuBtn = $("#menuBtn");

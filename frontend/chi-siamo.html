@@ -45,6 +45,16 @@
       border-bottom: 1px solid rgba(34, 211, 238, 0.08);
     }
     
+    .dc-navbar-side {
+      flex: 1 1 0;
+      display: flex;
+      align-items: center;
+    }
+    
+    .dc-navbar-side.dc-navbar-side-right {
+      justify-content: flex-end;
+    }
+    
     .dc-logo {
       font-size: 1.6rem;
       font-weight: 800;
@@ -53,6 +63,7 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       text-shadow: 0 0 40px rgba(34, 211, 238, 0.3);
+      cursor: pointer;
     }
     
     .dc-nav-links {
@@ -73,22 +84,27 @@
       text-shadow: 0 0 12px var(--cyan-glow);
     }
     
-    .dc-login {
-      padding: 9px 24px;
-      background: linear-gradient(135deg, var(--cyan), var(--blue-mid));
-      border: none;
-      border-radius: 999px;
-      font-weight: 700;
-      font-size: 0.85rem;
-      color: #000;
+    .dc-hamburger {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
+      width: 40px;
+      height: 40px;
+      background: rgba(34, 211, 238, 0.08);
+      border: 1px solid rgba(34, 211, 238, 0.2);
+      border-radius: 10px;
       cursor: pointer;
-      box-shadow: 0 0 20px var(--cyan-glow);
-      transition: all 0.3s;
+      padding: 0;
     }
     
-    .dc-login:hover {
-      box-shadow: 0 0 35px rgba(34, 211, 238, 0.6);
-      transform: translateY(-1px);
+    .dc-hamburger span {
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: var(--cyan);
+      border-radius: 2px;
     }
     
     /* Hero */
@@ -714,16 +730,67 @@
         trackRef.current?.scrollIntoView({ behavior: 'smooth' });
       };
       
+      const isMobileNav = viewportWidth <= 768;
+      
+      // La pagina Chi Siamo vive normalmente dentro l'iframe di index.html:
+      // quando possibile deleghiamo le azioni alle funzioni globali della pagina
+      // principale (setMode/openDrawer), altrimenti ripieghiamo su una navigazione diretta.
+      const parentWin = (window.parent && window.parent !== window) ? window.parent : null;
+      
+      const handleLogoClick = () => {
+        window.location.reload();
+      };
+      
+      const goToParentMode = (mode) => {
+        try {
+          if (parentWin && typeof parentWin.setMode === 'function') {
+            parentWin.setMode(mode);
+            return;
+          }
+        } catch (e) {}
+        window.location.href = 'index.html';
+      };
+      
+      const handleOfferteClick = () => goToParentMode('user');
+      const handleNegoziClick = () => goToParentMode('store');
+      const handleChiSiamoClick = () => goToParentMode('chisiamo');
+      
+      const handleHamburgerClick = () => {
+        try {
+          if (parentWin && typeof parentWin.openDrawer === 'function') {
+            parentWin.openDrawer();
+            return;
+          }
+        } catch (e) {}
+        window.location.href = 'index.html';
+      };
+      
       return (
         <div className="dc-app">
           <nav className="dc-navbar">
-            <div className="dc-logo">DECERNE</div>
-            <div className="dc-nav-links">
-              <span>Offerte</span>
-              <span>Negozi</span>
-              <span>Chi Siamo</span>
+            <div className="dc-navbar-side">
+              {isMobileNav ? (
+                <button className="dc-hamburger" onClick={handleHamburgerClick} aria-label="Apri menu">
+                  <span></span><span></span><span></span>
+                </button>
+              ) : (
+                <div className="dc-logo" onClick={handleLogoClick}>DECERNE</div>
+              )}
             </div>
-            <button className="dc-login">Accedi</button>
+            
+            {!isMobileNav && (
+              <div className="dc-nav-links">
+                <span onClick={handleOfferteClick}>Offerte</span>
+                <span onClick={handleNegoziClick}>Negozi</span>
+                <span onClick={handleChiSiamoClick}>Chi Siamo</span>
+              </div>
+            )}
+            
+            <div className="dc-navbar-side dc-navbar-side-right">
+              {isMobileNav && (
+                <div className="dc-logo" onClick={handleLogoClick}>DECERNE</div>
+              )}
+            </div>
           </nav>
           
           <section className="dc-hero">
