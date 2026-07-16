@@ -105,6 +105,19 @@
       height: 2px;
       background: var(--cyan);
       border-radius: 2px;
+      transition: transform 0.3s, opacity 0.3s;
+    }
+    
+    .dc-hamburger.open span:nth-child(1) {
+      transform: translateY(7px) rotate(45deg);
+    }
+    
+    .dc-hamburger.open span:nth-child(2) {
+      opacity: 0;
+    }
+    
+    .dc-hamburger.open span:nth-child(3) {
+      transform: translateY(-7px) rotate(-45deg);
     }
     
     /* Hero */
@@ -678,6 +691,18 @@
       const rafRef = useRef(null);
       const [progress, setProgress] = useState(0);
       const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+      const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+      
+      useEffect(() => {
+        const onMessage = (event) => {
+          const data = event.data;
+          if (data && data.source === 'decerne' && data.type === 'drawerState') {
+            setIsDrawerOpen(!!data.open);
+          }
+        };
+        window.addEventListener('message', onMessage);
+        return () => window.removeEventListener('message', onMessage);
+      }, []);
       
       const handleScroll = useCallback(() => {
         if (rafRef.current) return;
@@ -757,8 +782,12 @@
       
       const handleHamburgerClick = () => {
         try {
-          if (parentWin && typeof parentWin.openDrawer === 'function') {
-            parentWin.openDrawer();
+          if (parentWin && typeof parentWin.openDrawer === 'function' && typeof parentWin.closeDrawer === 'function') {
+            if (isDrawerOpen) {
+              parentWin.closeDrawer();
+            } else {
+              parentWin.openDrawer();
+            }
             return;
           }
         } catch (e) {}
@@ -769,13 +798,7 @@
         <div className="dc-app">
           <nav className="dc-navbar">
             <div className="dc-navbar-side">
-              {isMobileNav ? (
-                <button className="dc-hamburger" onClick={handleHamburgerClick} aria-label="Apri menu">
-                  <span></span><span></span><span></span>
-                </button>
-              ) : (
-                <div className="dc-logo" onClick={handleLogoClick}>DECERNE</div>
-              )}
+              <div className="dc-logo" onClick={handleLogoClick}>DECERNE</div>
             </div>
             
             {!isMobileNav && (
@@ -788,7 +811,9 @@
             
             <div className="dc-navbar-side dc-navbar-side-right">
               {isMobileNav && (
-                <div className="dc-logo" onClick={handleLogoClick}>DECERNE</div>
+                <button className={`dc-hamburger${isDrawerOpen ? ' open' : ''}`} onClick={handleHamburgerClick} aria-label="Apri menu">
+                  <span></span><span></span><span></span>
+                </button>
               )}
             </div>
           </nav>

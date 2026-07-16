@@ -78,7 +78,7 @@ body {
   position: fixed;
   inset: 0;
   background: white;
-  z-index: 1300; 
+  z-index: 1600; 
   display: none;
   flex-direction: column;
 }
@@ -1053,7 +1053,7 @@ body {
   position: fixed;
   inset: 0;
   background: white;
-  z-index: 1300; 
+  z-index: 1600; 
   display: none;
   flex-direction: column;
 }
@@ -1566,8 +1566,8 @@ hr {
 }
 
 .full-page-modal {
-  /* Assicuriamoci che i popup siano sopra tutto */
-  z-index: 1300 !important;
+  /* Assicuriamoci che i popup siano sopra tutto, inclusa la pagina Chi Siamo (1400) e il drawer (1500) */
+  z-index: 1600 !important;
 }
 
 .btn.disabled, .btn:disabled {
@@ -1987,4 +1987,37 @@ hr {
   #drawer.drawer-dark .drawer-auth .btn.outline:hover {
     background: rgba(34, 211, 238, 0.08);
     border-color: #22d3ee;
+  }
+
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+  }
+  
+  .drawer-close-btn {
+    background: transparent;
+    border: none;
+    font-size: 1.8rem;
+    line-height: 1;
+    color: #64748b;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 8px;
+    transition: all 0.2s;
+  }
+  
+  .drawer-close-btn:hover {
+    background: #f0f4ff;
+    color: var(--primary);
+  }
+  
+  #drawer.drawer-dark .drawer-close-btn {
+    color: rgba(255, 255, 255, 0.6);
+  }
+  
+  #drawer.drawer-dark .drawer-close-btn:hover {
+    background: rgba(34, 211, 238, 0.1);
+    color: #22d3ee;
   }

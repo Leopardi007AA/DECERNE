@@ -227,6 +227,7 @@
   <div id="drawer">
     <div class="drawer-header">
       <h3>Menu</h3>
+      <button id="drawerCloseBtn" class="drawer-close-btn" aria-label="Chiudi menu">&times;</button>
     </div>
     <ul class="nav-menu">
       <li id="navModeUser" class="active">🏠 Home Utenti</li>
@@ -249,8 +250,8 @@
 
   <!-- Tasti Login/Reg (Scompaiono se loggato) -->
   <div class="drawer-auth" id="drawerAuthButtons">
-    <button class="btn" onclick="openFullPageModal('profile')">Accedi</button>
-    <button class="btn outline" onclick="openFullPageModal('profile'); showRegisterForm();">Registrati</button>
+    <button class="btn" onclick="openProfileFromDrawer()">Accedi</button>
+    <button class="btn outline" onclick="openRegisterFromDrawer()">Registrati</button>
   </div>
 
   </div>

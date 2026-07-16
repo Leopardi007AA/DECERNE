@@ -3370,6 +3370,17 @@ function openFullPageModal(type) {
   }
 }
 
+function openProfileFromDrawer() {
+  if (state.mode === 'chisiamo') setMode('user');
+  openFullPageModal('profile');
+}
+
+function openRegisterFromDrawer() {
+  if (state.mode === 'chisiamo') setMode('user');
+  openFullPageModal('profile');
+  showRegisterForm();
+}
+
 async function validateRegistration() {
   const email = document.getElementById("regEmail").value.trim();
   const pass = document.getElementById("regPass").value;
@@ -3413,8 +3424,8 @@ function openDrawer() {
     $("#drawer").style.right = "0";
     $("#overlay").style.display = "block";
     $("#menuBtn").classList.add("open");
-    // BLOCCA SCORRIMENTO
     document.body.style.overflow = 'hidden';
+    notifyChiSiamoDrawerState(true);
   } catch (e) { console.error(e); }
 }
 
@@ -3423,9 +3434,18 @@ function closeDrawer() {
     $("#drawer").style.right = "-320px";
     $("#overlay").style.display = "none";
     $("#menuBtn").classList.remove("open");
-    // RIPRISTINA SCORRIMENTO
     document.body.style.overflow = '';
+    notifyChiSiamoDrawerState(false);
   } catch (e) { console.error(e); }
+}
+
+function notifyChiSiamoDrawerState(isOpen) {
+  try {
+    const frame = $("#chiSiamoFrame");
+    if (frame && frame.contentWindow) {
+      frame.contentWindow.postMessage({ source: 'decerne', type: 'drawerState', open: isOpen }, '*');
+    }
+  } catch (e) {}
 }
 
 // UNICA funzione per gestire il tasto Hamburger/X
@@ -3444,6 +3464,9 @@ function setupEventListeners() {
 
   // Logo DECERNE: ricarica la pagina
   if($("#logoBtn")) $("#logoBtn").onclick = () => window.location.reload();
+
+  // "X" di chiusura dentro il drawer
+  if($("#drawerCloseBtn")) $("#drawerCloseBtn").onclick = closeDrawer;
 
   // Menu Hamburger
   const menuBtn = $("#menuBtn");
@@ -5053,7 +5076,7 @@ function updateDrawerUI() {
     if (emailLabel) emailLabel.textContent = user.email;
     
     // Rendi la card cliccabile per aprire le impostazioni profilo
-    if (profileCard) profileCard.onclick = () => openFullPageModal('profile');
+    if (profileCard) profileCard.onclick = () => openProfileFromDrawer();
   } else {
     // Se non loggato: mostra bottoni login, nasconde profilo
     if (profileCard) profileCard.classList.add("hidden");
