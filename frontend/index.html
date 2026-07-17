@@ -59,6 +59,14 @@
     </div>
   </div>
 
+  <!-- POPUP INFO NEGOZIO (aperto dal nome del negozio nel dettaglio offerta) -->
+  <div id="storeInfoOverlay" class="store-info-overlay hidden" onclick="if(event.target === this) closeStoreInfoPopup()">
+    <div class="store-info-card">
+      <button class="store-info-close" onclick="closeStoreInfoPopup()" aria-label="Chiudi">&times;</button>
+      <div id="storeInfoContent"></div>
+    </div>
+  </div>
+
   <main id="app" class="container">
     <!-- SEARCH BAR / FILTERS (Visibili solo in modalità utente) -->
     <section class="controls" id="controls">
@@ -227,7 +235,7 @@
   <div id="drawer">
     <div class="drawer-header">
       <h3>Menu</h3>
-      <button id="drawerCloseBtn" class="drawer-close-btn" aria-label="Chiudi menu">&times;</button>
+      
     </div>
     <ul class="nav-menu">
       <li id="navModeUser" class="active">🏠 Home Utenti</li>

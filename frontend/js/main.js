@@ -945,7 +945,7 @@ async function fetchPublicStoresMap(storeIds) {
 
   const { data, error } = await supabaseClient
     .from('public_stores')
-    .select('id, name, city, cap, address, plan')
+    .select('id, name, city, cap, address, plan, logo_url, phone, hours')
     .in('id', uniqueIds);
 
   if (error) console.error("Errore caricamento dati negozi pubblici:", error);
@@ -3425,6 +3425,7 @@ function openDrawer() {
     $("#overlay").style.display = "block";
     $("#menuBtn").classList.add("open");
     document.body.style.overflow = 'hidden';
+    document.body.classList.add('drawer-open');
     notifyChiSiamoDrawerState(true);
   } catch (e) { console.error(e); }
 }
@@ -3435,6 +3436,7 @@ function closeDrawer() {
     $("#overlay").style.display = "none";
     $("#menuBtn").classList.remove("open");
     document.body.style.overflow = '';
+    document.body.classList.remove('drawer-open');
     notifyChiSiamoDrawerState(false);
   } catch (e) { console.error(e); }
 }
@@ -4999,12 +5001,24 @@ function displayProductInModal(product) {
     : '';
 
   title.innerText = "Dettaglio Offerta";
+  // Rende disponibili i dati del negozio al popup informazioni (aperto cliccando sul nome)
+  window.__currentOfferStoreInfo = {
+    name: product.storeName,
+    address: product.storeAddress,
+    city: product.storeCity,
+    cap: product.storeCap,
+    logo: product.storeLogo,
+    phone: product.storePhone,
+    hours: product.storeHours,
+    plan: product.plan
+  };
+
   content.innerHTML = `
     <div class="detail-container" style="max-width: 900px; margin: 0 auto; text-align: left;">
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 30px; align-items: start;">
         
         <!-- Contenitore Immagine: Grande, Pieno e Arrotondato -->
-        <div style="position: relative; width: 100%; height: 450px; background: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
+        <div class="detail-image-container" style="position: relative; width: 100%; background: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
           <img src="${getSafeImageUrl(product.img)}" 
                style="width: 100%; height: 100%; object-fit: cover; display: block;" 
                alt="${product.product}">
@@ -5022,7 +5036,7 @@ function displayProductInModal(product) {
           <h1 style="margin: 15px 0 10px 0; color: #1e293b; font-size: 2.2rem; line-height: 1.2;">${product.product}</h1>
           
           <p style="color: #64748b; font-size: 1rem; margin-bottom: 25px; line-height: 1.5;">
-            🏪 Punto vendita: <strong style="color:#1e293b;">${product.storeName}</strong>${verifiedBadge}<br>
+            🏪 Punto vendita: <strong class="store-name-link" style="color:#0f62fe; cursor:pointer; text-decoration:underline;" onclick="showStoreInfoPopup(window.__currentOfferStoreInfo)">${product.storeName}</strong>${verifiedBadge}<br>
             📍 <span style="font-size: 0.9rem;">${product.storeAddress}</span>
           </p>
           
@@ -5041,7 +5055,7 @@ function displayProductInModal(product) {
             <p style="line-height: 1.6; color: #475569; font-size: 1.05rem;">${product.description || 'Nessuna descrizione aggiuntiva fornita dal punto vendita.'}</p>
           </div>
           
-          <button class="btn full-width" onclick="saveToShoppingList('${product.id}')" style="height: 60px; font-size: 1.2rem; border-radius: 14px; background: #0f62fe; box-shadow: 0 4px 14px rgba(15,98,254,0.3); transition: transform 0.2s;">
+          <button class="btn full-width detail-btn-cart" onclick="saveToShoppingList('${product.id}')" style="height: 60px; font-size: 1.2rem; border-radius: 14px; background: #0f62fe; box-shadow: 0 4px 14px rgba(15,98,254,0.3); transition: transform 0.2s;">
             🛒 Aggiungi alla lista spesa
           </button>
 
@@ -5055,6 +5069,43 @@ function displayProductInModal(product) {
   `;
   modal.style.display = "flex";
 }
+
+// Popup con le informazioni pubbliche del negozio (aperto cliccando sul nome nel dettaglio offerta)
+window.showStoreInfoPopup = (store) => {
+  const overlay = $("#storeInfoOverlay");
+  const infoContent = $("#storeInfoContent");
+  if (!overlay || !infoContent || !store) return;
+
+  const row = (icon, label, value) => `
+    <div class="store-info-row">
+      <div class="store-info-row-icon">${icon}</div>
+      <div>
+        <div class="store-info-row-label">${label}</div>
+        <div class="store-info-row-value${value ? '' : ' missing'}">${value || 'Non specificato dal negozio'}</div>
+      </div>
+    </div>`;
+
+  const addressLine = [store.address, [store.cap, store.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  const isVerified = store.plan === 'Professional' || store.plan === 'Enterprise';
+
+  infoContent.innerHTML = `
+    ${store.logo ? `<img src="${getSafeImageUrl(store.logo)}" class="store-info-logo" alt="${store.name}">` : ''}
+    <div class="store-info-name">${store.name || 'Supermercato'}</div>
+    ${isVerified ? `<span class="store-info-plan-badge"><span style="color:#0f62fe; font-weight:800; font-size:0.8rem;">✓ Negozio Verificato</span></span>` : ''}
+    ${row('📍', 'Indirizzo', addressLine)}
+    ${row('📞', 'Telefono', store.phone)}
+    ${row('🕒', 'Orari', store.hours)}
+  `;
+
+  overlay.classList.remove("hidden");
+  document.body.style.overflow = 'hidden';
+};
+
+window.closeStoreInfoPopup = () => {
+  const overlay = $("#storeInfoOverlay");
+  if (overlay) overlay.classList.add("hidden");
+  document.body.style.overflow = '';
+};
 
 // 1. Funzione per aggiornare la UI del Drawer in base al login
 function updateDrawerUI() {
@@ -5518,6 +5569,9 @@ window.openProductDetail = async (id) => {
     storeCity: store.city || "",
     storeCap: store.cap || "",
     storeAddress: store.address || "",
+    storeLogo: store.logo_url || "",
+    storePhone: store.phone || "",
+    storeHours: store.hours || "",
     plan: store.plan || "Starter"
   };
 
