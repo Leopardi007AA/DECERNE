@@ -27,23 +27,24 @@ body {
   position: fixed;
   top: 0; left: 0; right: 0;
   height: 70px;
-  background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+  background-color: var(--primary); /* Colore solido invece del gradiente */
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 24px;
   color: white;
   z-index: 1050;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  box-shadow: var(--shadow); /* Ombra più morbida */
 }
 
 .logo {
-  font-weight: 800;
-  font-size: 22px;
-  letter-spacing: 1px;
+  font-family: 'Montserrat', sans-serif; /* Nuovo font per il logo */
+  font-weight: 700;
+  font-size: 24px;
+  letter-spacing: 0.5px;
   cursor: pointer;
 }
-.logo-dot { color: #00f2ff; }
+.logo-dot { color: #FFD700; } /* Colore più caldo per il punto */
 
 .nav-icons {
   display: flex;

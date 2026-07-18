@@ -5634,7 +5634,7 @@ function renderLocationsTab() {
                 `<button class="btn outline" style="padding: 5px 10px; font-size: 0.75rem; white-space: nowrap;" onclick="setPrimaryLocation(${index})">Imposta Principale</button>`
               }
             </div>
-            <input type="text" id="locAddr_${index}" value="${loc.address || ''}" placeholder="Via e numero civico">
+            <input type="text" id="locAddr_${index}" value="${extractStreetFromAddress(loc.address, loc.cap, loc.city) || ''}" placeholder="Via e numero civico">
             <div style="display: flex; gap: 10px;">
               <input type="text" id="locCity_${index}" value="${loc.city || ''}" placeholder="Città" style="flex: 1;">
               <input type="text" id="locCap_${index}" value="${loc.cap || ''}" placeholder="CAP" style="width: 100px;">
