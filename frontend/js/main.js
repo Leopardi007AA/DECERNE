@@ -94,6 +94,14 @@ const PLAN_LEVELS = {
   'Enterprise': 5
 };
 
+// Ordine dei piani, dal più basso al più alto — usato per calcolare "il prossimo piano" da proporre in upgrade
+const PLAN_ORDER = ['Starter', 'Standard', 'Professional', 'Enterprise'];
+function getNextPlan(currentPlan) {
+  const idx = PLAN_ORDER.indexOf(currentPlan);
+  if (idx === -1 || idx === PLAN_ORDER.length - 1) return null; // piano sconosciuto o già al vertice (Enterprise)
+  return PLAN_ORDER[idx + 1];
+}
+
 /**
  * Sistema di controllo centralizzato per i permessi.
  * @param {string} requiredPlan - Il piano minimo richiesto (es: 'Professional')
@@ -717,7 +725,8 @@ async function refreshMyOffers() {
     img: r.img_url,
     status: r.status,
     views: r.views,
-    opens: r.opens
+    opens: r.opens,
+    location_id: r.location_id  // FIX: serve per "Miglior sede" e per l'export CSV nella Dashboard Generale
   }));
 
   storeData.offers = myOffersCache;
@@ -1271,8 +1280,8 @@ function renderOffersTable(limit = 999) {
         <td><strong style="color:var(--primary);">${formatPrice(o.price)}</strong></td>
         <td style="font-size:0.8rem;">${o.endDate}</td>
         <td>
-          <button class="btn outline" style="padding:5px 10px" onclick="editOffer('${o.id}')">✏️</button>
-          <button class="btn danger" style="padding:5px 10px" onclick="deleteOffer('${o.id}')">🗑️</button>
+          <button class="btn outline" style="padding:5px 10px" onclick="editOffer('${o.id}')">${PANEL_ICONS.pencil}</button>
+          <button class="btn danger" style="padding:5px 10px" onclick="deleteOffer('${o.id}')">${PANEL_ICONS.trash}</button>
         </td>
       </tr>
     `;
@@ -1294,28 +1303,21 @@ function renderSubTab() {
   const sub = partner?.subscription || storeData.subscription;
   const plan = partner?.plan || sub.plan;
   const status = sub.status || 'trial';
-  
+
   let statusContent = '';
   let actionButtons = '';
 
-  // --- 1. LOGICA PIANO PROFESSIONAL ---
   if (plan === 'Professional' && status === 'active') {
     const renewalDate = new Date(sub.renewalDate);
-    const now = new Date();
-    const diffTime = renewalDate - now;
-    const daysToRenewal = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const daysToRenewal = Math.ceil((renewalDate - new Date()) / (1000 * 60 * 60 * 24));
 
-    // Banner rosso di allerta per Professional (Negli ultimi 5 giorni)
-    let urgencyBanner = "";
-    if (daysToRenewal <= 5) {
-      urgencyBanner = `
-        <div style="background: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 12px; animation: pulse 2s infinite;">
-          <span style="font-size: 1.2rem;">🚨</span> Il tuo piano Professional sta per scadere – rinnova ora per mantenere la priorità assoluta e le sedi extra.
-        </div>`;
-    }
+    let urgencyBanner = daysToRenewal <= 5 ? `
+      <div class="renewal-alert banner-pulse">
+        <span class="banner-ico">${PANEL_ICONS.alert}</span> Il tuo piano Professional sta per scadere – rinnova ora per mantenere la priorità assoluta e le sedi extra.
+      </div>` : "";
 
     statusContent = `
-      <div class="card plan-active" style="border-left: 5px solid #6929c4;">
+      <div class="card accent-purple">
         ${urgencyBanner}
         <span class="status-badge" style="background: #f3e8ff; color: #6929c4;">PIANO PROFESSIONAL</span>
         <h3 style="margin-top: 10px;">Stato: Abbonamento Attivo</h3>
@@ -1333,19 +1335,17 @@ function renderSubTab() {
       <button class="btn outline" onclick="storeData.step='pricing'; renderStoreView();">Gestisci Piani</button>`;
   }
 
-  // --- 2. LOGICA PIANO STANDARD (Esistente) ---
   else if (plan === 'Standard' && status === 'active') {
     const renewalDate = new Date(sub.renewalDate);
-    const diffTime = renewalDate - new Date();
-    const daysToRenewal = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const daysToRenewal = Math.ceil((renewalDate - new Date()) / (1000 * 60 * 60 * 24));
 
     let warningBanner = daysToRenewal <= 5 ? `
-      <div style="background: #fff7ed; border: 1px solid #f97316; color: #9a3412; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
-        <span>⚠️</span> Il tuo piano sta per scadere – rinnova ora.
+      <div class="renewal-alert" style="background:#fff7ed; border-color:#f97316; color:#9a3412;">
+        <span class="banner-ico">${PANEL_ICONS.alert}</span> Il tuo piano sta per scadere – rinnova ora.
       </div>` : "";
 
     statusContent = `
-      <div class="card plan-active">
+      <div class="card">
         ${warningBanner}
         <span class="status-badge status-active">ABBONAMENTO ATTIVO</span>
         <h3>Piano: Standard</h3>
@@ -1355,37 +1355,67 @@ function renderSubTab() {
     actionButtons = `<button class="btn" onclick="activatePlan('Standard')">Rinnova Ora</button>`;
   }
 
-  // --- 3. LOGICA TRIAL O EXPIRED (Esistente) ---
+  else if (plan === 'Enterprise' && status === 'active') {
+    const renewalDate = new Date(sub.renewalDate);
+    const daysToRenewal = Math.ceil((renewalDate - new Date()) / (1000 * 60 * 60 * 24));
+
+    let urgencyBanner = daysToRenewal <= 7 ? `
+      <div class="renewal-alert banner-pulse">
+        <span class="banner-ico">${PANEL_ICONS.alert}</span> Il tuo piano Enterprise sta per scadere – rinnova ora per mantenere l'account manager dedicato.
+      </div>` : "";
+
+    statusContent = `
+      <div class="card accent-blue">
+        ${urgencyBanner}
+        <span class="status-badge" style="background: #dbeafe; color: #1e40af;">PIANO ENTERPRISE</span>
+        <h3 style="margin-top: 10px;">Stato: Abbonamento Attivo</h3>
+        <p>Data di rinnovo: <strong>${renewalDate.toLocaleDateString()}</strong></p>
+        <p>Giorni rimanenti: <strong style="font-size: 1.2rem; ${daysToRenewal <= 7 ? 'color: #ef4444;' : 'color: #1e40af;'}">${daysToRenewal}</strong></p>
+        <ul style="font-size: 0.8rem; color: #64748b; margin-top: 10px; padding-left: 20px;">
+          <li>Account manager dedicato</li>
+          <li>SLA di risposta entro 4 ore</li>
+          <li>Export dati ed integrazioni su misura</li>
+        </ul>
+      </div>`;
+
+    actionButtons = `<button class="btn" style="background: #1e40af;" onclick="activatePlan('Enterprise')">Rinnova Enterprise</button>`;
+  }
+
   else if (status === 'trial' || status === 'expired') {
     const isExpired = status === 'expired';
+    const nextPlan = getNextPlan(plan);
     statusContent = `
       <div class="card ${isExpired ? 'trial-expired' : 'trial-active'}" style="${isExpired ? 'border-color: #ef4444; background: #fff5f5;' : ''}">
         <span class="status-badge ${isExpired ? 'status-expired' : 'status-trial'}">${isExpired ? 'SCADUTO' : 'PROVA GRATUITA'}</span>
         <h3>Piano: ${plan}</h3>
         <p>${isExpired ? 'Le tue offerte sono state messe in pausa.' : `Hai ancora <strong>${sub.daysLeft} giorni</strong> di prova.`}</p>
       </div>`;
-    actionButtons = `<button class="btn" onclick="storeData.step='pricing'; renderStoreView();">${isExpired ? 'Riattiva ora' : 'Upgrade a Standard'}</button>`;
+    actionButtons = isExpired
+      ? `<button class="btn" onclick="storeData.step='pricing'; renderStoreView();">Riattiva ora</button>`
+      : (nextPlan ? `<button class="btn" onclick="storeData.step='pricing'; renderStoreView();">Upgrade a ${nextPlan}</button>` : '');
   }
 
-  // --- 4. LOGICA STARTER ---
   else {
+    const nextPlan = getNextPlan(plan);
     statusContent = `
-      <div class="card plan-active">
+      <div class="card">
         <span class="status-badge status-active">ATTIVO</span>
-        <h3>Piano: Starter</h3>
-        <p>Limiti: 10 offerte attive. Nessuna funzione avanzata.</p>
+        <h3>Piano: ${plan}</h3>
+        <p>${plan === 'Starter' ? 'Limiti: 10 offerte attive. Nessuna funzione avanzata.' : ''}</p>
       </div>`;
-    actionButtons = `<button class="btn outline" onclick="storeData.step='pricing'; renderStoreView();">Passa a Standard</button>`;
+    actionButtons = nextPlan
+      ? `<button class="btn outline" onclick="storeData.step='pricing'; renderStoreView();">Passa a ${nextPlan}</button>`
+      : '';
   }
 
   return `
     <div class="subscription-tab">
       ${getSubscriptionBanner()}
       <header class="tab-header">
-        <h2>Il tuo Abbonamento</h2>
+        <h2>${PANEL_ICONS.card} Il tuo Abbonamento</h2>
       </header>
       ${statusContent}
-      <div style="margin-top: 25px; display: flex; gap: 10px;">
+      <div style="margin-top: 25px; display: flex; gap: 10px; flex-wrap:wrap;">
         ${actionButtons}
       </div>
     </div>
@@ -1402,7 +1432,7 @@ function renderProfileTab() {
 
   return `
     <header class="tab-header">
-      <h2>⚙️ Impostazioni Account</h2>
+      <h2>${PANEL_ICONS.settings} Impostazioni Account</h2>
     </header>
     
     <div class="card-saas">
@@ -1593,7 +1623,7 @@ window.openOfferModal = (offer = null) => {
     // Mostra il selettore solo se ci sono più sedi
     locContainer.classList.remove("hidden");
     locSelect.innerHTML = locations.map((loc, idx) => `
-      <option value="${idx}" ${offer && offer.locationIdx == idx ? 'selected' : ''}>
+      <option value="${idx}" ${offer && offer.location_id === loc.id ? 'selected' : ''}>
         ${loc.name} (${loc.address})
       </option>
     `).join('');
@@ -4115,9 +4145,9 @@ if (partner) {
     if (currentPlan === planName) {
       return `<button class="btn full-width disabled" disabled>Piano Attuale</button>`;
     }
-    
-    // 2. Caso: Il partner è Starter e guarda Standard o Professional
-    if (partner && currentPlan === 'Starter' && (planName === 'Standard' || planName === 'Professional')) {
+
+    // 2. Caso: Il partner è loggato e sta guardando un piano superiore al suo (upgrade diretto, no trial)
+    if (partner && PLAN_LEVELS[currentPlan] < PLAN_LEVELS[planName]) {
       return `<button class="btn full-width" onclick="activatePlan('${planName}')">Attiva ${planName}</button>`;
     }
 
@@ -4591,6 +4621,32 @@ async function handleOnboardingSubmit(step) {
   }
 }
 
+// Set di icone SVG minimali (linea, currentColor) per il Pannello Partner — sostituiscono le emoji
+const PANEL_ICONS = {
+  home: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/></svg>`,
+  tag: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M12.6 3H5a2 2 0 0 0-2 2v7.6a2 2 0 0 0 .59 1.41l9 9a2 2 0 0 0 2.82 0l7.6-7.6a2 2 0 0 0 0-2.82l-9-9A2 2 0 0 0 12.6 3Z"/><circle cx="8.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/></svg>`,
+  pin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M12 21s-7-6.1-7-11.5A7 7 0 0 1 19 9.5C19 14.9 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.4"/></svg>`,
+  trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M10 11v6M14 11v6"/></svg>`,
+  chart: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M4 20V10"/><path d="M11 20V4"/><path d="M18 20v-7"/><path d="M3 20h18"/></svg>`,
+  plug: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M9 3v4M15 3v4"/><path d="M6 7h12v4a6 6 0 0 1-12 0Z"/><path d="M12 17v4"/></svg>`,
+  users: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="8" r="2.4"/><path d="M16 14.2c2.3.5 4 2.5 4 5.8"/></svg>`,
+  card: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/><path d="M6 14.5h4"/></svg>`,
+  settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>`,
+  logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>`,
+  flame: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 2c1 3-3 4-3 8a3 3 0 0 0 6 0c0-1.5-1-2-1-3.5 1.5 1 3 3 3 5.5a5 5 0 1 1-10 0c0-4 3-5 5-10Z"/></svg>`,
+  cursor: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M9 4l10 4.5-4 1.5 3 5-2 1-3-5-2.5 3.5z"/></svg>`,
+  key: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M19 4l2 2"/></svg>`,
+  headset: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M4 13v-1a8 8 0 0 1 16 0v1"/><rect x="3" y="13" width="4" height="6" rx="1.5"/><rect x="17" y="13" width="4" height="6" rx="1.5"/><path d="M20 19v1a3 3 0 0 1-3 3h-3"/></svg>`,
+  alert: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M12 3 22 20H2Z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/></svg>`,
+  userCircle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 19a6 6 0 0 1 11 0"/></svg>`,
+  download: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 20h16"/></svg>`,
+  trophy: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M7 4h10v4a5 5 0 0 1-10 0Z"/><path d="M7 5H4a3 3 0 0 0 3 4"/><path d="M17 5h3a3 3 0 0 1-3 4"/><path d="M12 13v3"/><path d="M9 20h6"/><path d="M10 16.5h4v1.8a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1Z"/></svg>`,
+  bulb: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.2.9 2.1h5.2c0-.9.3-1.6.9-2.1A6 6 0 0 0 12 3Z"/></svg>`,
+  lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>`,
+  folder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>`,
+  pencil: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`
+};
+
 // MODIFICA: renderDashboard più sicura
 function renderDashboard(container) {
   const partner = getCurrentPartner();
@@ -4600,25 +4656,25 @@ function renderDashboard(container) {
     <div class="store-dashboard">
       <aside class="store-sidebar">
         <div class="sidebar-title">PANNELLO PARTNER</div>
-        <button class="store-nav-btn ${storeData.activeTab === 'home' ? 'active' : ''}" onclick="switchStoreTab('home')">🏠 Panoramica</button>
-        <button class="store-nav-btn ${storeData.activeTab === 'offers' ? 'active' : ''}" onclick="switchStoreTab('offers')">🏷️ Le mie Offerte</button>
-        <button class="store-nav-btn ${storeData.activeTab === 'locations' ? 'active' : ''}" onclick="switchStoreTab('locations')">📍 Gestione Sedi</button>
-        <button class="store-nav-btn ${storeData.activeTab === 'trash' ? 'active' : ''}" onclick="switchStoreTab('trash')">🗑️ Cestino</button>
+        <button class="store-nav-btn ${storeData.activeTab === 'home' ? 'active' : ''}" onclick="switchStoreTab('home')">${PANEL_ICONS.home} Panoramica</button>
+        <button class="store-nav-btn ${storeData.activeTab === 'offers' ? 'active' : ''}" onclick="switchStoreTab('offers')">${PANEL_ICONS.tag} Le mie Offerte</button>
+        <button class="store-nav-btn ${storeData.activeTab === 'locations' ? 'active' : ''}" onclick="switchStoreTab('locations')">${PANEL_ICONS.pin} Gestione Sedi</button>
+        <button class="store-nav-btn ${storeData.activeTab === 'trash' ? 'active' : ''}" onclick="switchStoreTab('trash')">${PANEL_ICONS.trash} Cestino</button>
         ${(() => {
           const p = getCurrentPartner();
           const plan = p?.plan || 'Starter';
           const isPro = plan === 'Professional' || plan === 'Enterprise';
           const isEnt = plan === 'Enterprise';
           return `
-            ${isEnt ? `<button class="store-nav-btn ${storeData.activeTab === 'general' ? 'active' : ''}" onclick="switchStoreTab('general')">📊 Dashboard Generale</button>` : ''}
-            ${isPro ? `<button class="store-nav-btn ${storeData.activeTab === 'api' ? 'active' : ''}" onclick="switchStoreTab('api')">🔌 Integrazione API</button>` : ''}
-            ${isEnt ? `<button class="store-nav-btn ${storeData.activeTab === 'team' ? 'active' : ''}" onclick="switchStoreTab('team')">👥 Team</button>` : ''}
+            ${isEnt ? `<button class="store-nav-btn ${storeData.activeTab === 'general' ? 'active' : ''}" onclick="switchStoreTab('general')">${PANEL_ICONS.chart} Dashboard Generale</button>` : ''}
+            ${isPro ? `<button class="store-nav-btn ${storeData.activeTab === 'api' ? 'active' : ''}" onclick="switchStoreTab('api')">${PANEL_ICONS.plug} Integrazione API</button>` : ''}
+            ${isEnt ? `<button class="store-nav-btn ${storeData.activeTab === 'team' ? 'active' : ''}" onclick="switchStoreTab('team')">${PANEL_ICONS.users} Team</button>` : ''}
           `;
         })()}
-        <button class="store-nav-btn ${storeData.activeTab === 'sub' ? 'active' : ''}" onclick="switchStoreTab('sub')">💳 Abbonamento</button>
-        <button class="store-nav-btn ${storeData.activeTab === 'profile' ? 'active' : ''}" onclick="switchStoreTab('profile')">⚙️ Impostazioni</button>
-        <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid #eee;">
-          <button class="store-nav-btn" onclick="logoutPartner()" style="color: #ef4444; width: 100%; text-align: left;">🚪 Esci</button>
+        <button class="store-nav-btn ${storeData.activeTab === 'sub' ? 'active' : ''}" onclick="switchStoreTab('sub')">${PANEL_ICONS.card} Abbonamento</button>
+        <button class="store-nav-btn ${storeData.activeTab === 'profile' ? 'active' : ''}" onclick="switchStoreTab('profile')">${PANEL_ICONS.settings} Impostazioni</button>
+        <div class="sidebar-footer">
+          <button class="store-nav-btn" onclick="logoutPartner()" style="color: #ef4444; width: 100%; text-align: left;">${PANEL_ICONS.logout} Esci</button>
         </div>
       </aside>
       <main class="store-content" id="active-tab-content"></main>
@@ -4646,7 +4702,6 @@ function renderHomeTab() {
   const isProfessional = plan === 'Professional' || plan === 'Enterprise';
   const isStandardOrHigher = ['Standard', 'Professional', 'Enterprise'].includes(plan);
 
-  // 1. CALCOLO METRICHE (comuni a tutti i piani)
   const totalViews = myOffers.reduce((acc, o) => acc + (o.views || 0), 0);
   const totalOpens = myOffers.reduce((acc, o) => acc + (o.opens || 0), 0);
   const avgCtr = totalViews > 0 ? ((totalOpens / totalViews) * 100).toFixed(1) : "0.0";
@@ -4672,12 +4727,13 @@ function renderHomeTab() {
     }
   }
 
-  // 2. STATISTICHE BASE — sempre visibili, anche su Starter
-  const basicStatsHTML = `
+  // Le Visualizzazioni sono la metrica più importante: card "hero" più grande
+  const heroStatHTML = `
     <div class="stats-grid-saas">
-      <div class="stat-card-saas">
+      <div class="stat-card-saas primary">
         <div class="label">Visualizzazioni Totali</div>
         <div class="value" style="color: var(--primary);">${totalViews}</div>
+        <small style="color:#64748b;">Quante volte è comparsa una tua offerta</small>
       </div>
       <div class="stat-card-saas">
         <div class="label">Aperture Dettaglio</div>
@@ -4686,47 +4742,44 @@ function renderHomeTab() {
     </div>
   `;
 
-  // 3. STATISTICHE AVANZATE — solo Standard e superiori
   const advancedStatsHTML = isStandardOrHigher ? `
-    <div class="stats-grid-saas" style="margin-top: 20px;">
-      <div class="stat-card-saas" style="border-top: 4px solid #6366f1;">
+    <div class="stats-grid-saas" style="margin-top: 16px;">
+      <div class="stat-card-saas accent-indigo">
         <div class="label">CTR Medio</div>
         <div class="value" style="color: #6366f1;">${avgCtr}%</div>
       </div>
-      <div class="stat-card-saas" style="border-top: 4px solid #f59e0b;">
-        <div class="label">🔥 Migliore Offerta</div>
+      <div class="stat-card-saas accent-amber">
+        <div class="label">${PANEL_ICONS.flame} Migliore Offerta</div>
         <div class="value" style="font-size: 1.2rem;">${bestOffer.product}</div>
         <small style="color: #f59e0b; font-weight: 700;">Sconto: ${bestOffer.val}</small>
       </div>
-      <div class="stat-card-saas" style="border-top: 4px solid #10b981;">
-        <div class="label">🖱️ Più cliccata</div>
+      <div class="stat-card-saas accent-emerald">
+        <div class="label">${PANEL_ICONS.cursor} Più cliccata</div>
         <div class="value" style="font-size: 1.2rem;">${mostClicked.product}</div>
         <small style="color: #10b981; font-weight: 700;">${mostClicked.val} click</small>
       </div>
     </div>
   ` : `
-    <div class="card-saas" style="text-align:center; padding: 30px; margin-top: 20px;">
+    <div class="card-saas" style="text-align:center; padding: 30px; margin-top: 16px;">
       <p style="margin-bottom: 12px;">Sblocca CTR, Migliore Offerta e classifica click con il piano Standard o superiore.</p>
       <button class="btn outline" onclick="switchStoreTab('sub')">Scopri i vantaggi</button>
     </div>
   `;
 
-  // 4. EXTRA — solo Professional/Enterprise
   const professionalExtras = isProfessional ? `
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+    <div class="dual-card-row" style="margin-top: 16px;">
       <div class="card-saas" style="border-left: 4px solid #6929c4;">
-        <h3 style="color: #6929c4;">🔑 API Key</h3>
-        <input type="text" value="${partner.apiKey || ''}" readonly style="width:100%; padding:8px; margin: 10px 0; border-radius:6px; border:1px solid #ddd; font-family:monospace; font-size:0.8rem;">
+        <h3 style="color: #6929c4; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.key} API Key</h3>
+        <input type="text" value="${partner.apiKey || ''}" readonly style="width:100%; padding:8px; margin: 10px 0; border-radius:10px; border:1px solid #ddd; font-family:monospace; font-size:0.8rem;">
         <button class="btn" style="background:#6929c4; padding:5px 15px;" onclick="navigator.clipboard.writeText('${partner.apiKey || ''}'); toast.success('API Key copiata!')">Copia</button>
       </div>
       <div class="card-saas" style="border-left: 4px solid #10b981; background: #f0fdf4;">
-        <h3 style="color: #166534;">🎧 Supporto Prioritario</h3>
+        <h3 style="color: #166534; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.headset} Supporto Prioritario</h3>
         <p style="font-size: 0.8rem; margin: 10px 0;">Email: <strong>support@decerne.it</strong><br>Risposta: <strong>&lt; 24h</strong></p>
       </div>
     </div>
   ` : "";
 
-  // 5. RITORNO UNICO
   return `
     ${getSubscriptionBanner()}
     <header class="tab-header">
@@ -4734,10 +4787,10 @@ function renderHomeTab() {
         <span class="badge-plan plan-${plan.toLowerCase()}">${plan}</span>
         <h2 style="margin-top:10px">Benvenuto, ${partner.name}</h2>
       </div>
-      <button class="btn" onclick="handleNewOfferClick()">+ Crea prima offerta</button>
+      <button class="btn" onclick="handleNewOfferClick()">${myOffers.length === 0 ? '+ Crea prima offerta' : '+ Aggiungi Offerta'}</button>
     </header>
 
-    ${basicStatsHTML}
+    ${heroStatHTML}
     ${advancedStatsHTML}
     ${professionalExtras}
 
@@ -4848,7 +4901,7 @@ function renderStatsTab() {
         </div>
         <div class="lock-overlay">
           <div class="lock-card">
-            <div class="lock-icon">🔒</div>
+            <div class="lock-icon">${PANEL_ICONS.lock}</div>
             <h3>Statistiche Avanzate</h3>
             <p>Passa al piano <strong>Standard</strong> per monitorare l'efficacia delle tue offerte in tempo reale.</p>
             <button class="btn" onclick="switchStoreTab('sub')">Sblocca Ora</button>
@@ -4906,13 +4959,13 @@ function renderTrashTab() {
 
   if (trash.length === 0) {
     return `
-      <h2>🗑️ Cestino</h2>
+      <h2>${PANEL_ICONS.trash} Cestino</h2>
       <p style="color:#64748b; margin-top:20px;">Il cestino è vuoto.</p>
     `;
   }
 
   return `
-    <h2>🗑️ Cestino</h2>
+    <h2>${PANEL_ICONS.trash} Cestino</h2>
     <p style="color:#64748b; margin-bottom:20px;">Le offerte eliminate restano qui finché non le ripristini.</p>
     <table class="offer-table">
       <thead><tr><th>Prodotto</th><th>Eliminato il</th><th>Azioni</th></tr></thead>
@@ -5398,7 +5451,6 @@ function getSubscriptionBanner() {
   const plan = partner.plan || 'Starter';
   const today = new Date();
 
-  // --- 1. STATO: ENTERPRISE IN SCADENZA (<= 7 GIORNI) ---
   if (plan === 'Enterprise' && sub.status === 'active' && sub.renewalDate) {
     const renewalDate = new Date(sub.renewalDate);
     const diffTime = renewalDate - today;
@@ -5406,50 +5458,42 @@ function getSubscriptionBanner() {
 
     if (daysLeft <= 7 && daysLeft >= 0) {
       return `
-        <div class="upgrade-banner" style="background: #fee2e2; border: 2px solid #ef4444; color: #b91c1c; padding: 15px 20px; border-radius: 12px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; animation: pulse 2s infinite; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);">
-          <div style="flex: 1;">
-            <strong style="font-size: 1rem; display: flex; align-items: center; gap: 8px;">
-              🚨 Attenzione: Scadenza Imminente
-            </strong>
-            <p style="margin: 5px 0 0 0; font-size: 0.9rem; line-height: 1.4;">
-              Il tuo piano <strong>Enterprise</strong> scadrà tra <strong>${daysLeft} ${daysLeft === 1 ? 'giorno' : 'giorni'}</strong>. 
-              Rinnova ora per mantenere l'account manager dedicato e la gestione illimitata delle sedi.
-            </p>
+        <div class="upgrade-banner banner-danger banner-pulse">
+          <div style="flex: 1; display:flex; align-items:flex-start; gap:12px;">
+            <span class="banner-ico">${PANEL_ICONS.alert}</span>
+            <div>
+              <strong style="font-size: 1rem;">Attenzione: Scadenza Imminente</strong>
+              <p style="margin: 5px 0 0 0; font-size: 0.9rem; line-height: 1.4;">
+                Il tuo piano <strong>Enterprise</strong> scadrà tra <strong>${daysLeft} ${daysLeft === 1 ? 'giorno' : 'giorni'}</strong>.
+                Rinnova ora per mantenere l'account manager dedicato e la gestione illimitata delle sedi.
+              </p>
+            </div>
           </div>
-          <button class="btn" style="background: #ef4444; color: white; white-space: nowrap; margin-left: 20px;" 
-                  onclick="activatePlan('Enterprise')">
-            Rinnova Ora
-          </button>
+          <button class="btn" style="background: #ef4444; color: white; white-space: nowrap;" onclick="activatePlan('Enterprise')">Rinnova Ora</button>
         </div>`;
     }
   }
 
-  // --- 2. STATO: TRIAL SCADUTO (Banner Rosso) ---
   if (sub.status === 'expired') {
     return `
-      <div class="upgrade-banner" style="background: #fee2e2; border: 2px solid #ef4444; color: #b91c1c; padding: 25px; border-radius: 16px; margin-bottom: 30px;">
-        <div style="display: flex; flex-direction: column; gap: 15px;">
-          <p style="margin: 0; font-size: 1rem; line-height: 1.6;">
-            <strong>⚠️ Il tuo periodo di prova è terminato.</strong><br>
-            Le tue offerte sono state messe in pausa. Attiva un piano per riprendere la pubblicazione.
-          </p>
-          <button class="btn" style="background: #ef4444; color: white; width: fit-content;" 
-                  onclick="storeData.step='pricing'; renderStoreView();">
-            Vedi Piani
-          </button>
-        </div>
+      <div class="upgrade-banner banner-danger" style="flex-direction: column; align-items: flex-start; gap: 15px;">
+        <p style="margin: 0; font-size: 1rem; line-height: 1.6; display:flex; align-items:flex-start; gap:10px;">
+          <span class="banner-ico">${PANEL_ICONS.alert}</span>
+          <span><strong>Il tuo periodo di prova è terminato.</strong><br>Le tue offerte sono state messe in pausa. Attiva un piano per riprendere la pubblicazione.</span>
+        </p>
+        <button class="btn" style="background: #ef4444; color: white; width: fit-content;" onclick="storeData.step='pricing'; renderStoreView();">Vedi Piani</button>
       </div>`;
   }
 
-  // --- 3. STATO: TRIAL ATTIVO (Banner Blu) ---
   if (sub.status === 'trial') {
+    const nextPlan = getNextPlan(plan);
     return `
-      <div class="upgrade-banner" style="background: #eff6ff; border: 1px solid #3b82f6; color: #1e40af; padding: 15px 20px; border-radius: 12px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center;">
+      <div class="upgrade-banner banner-info">
         <div>
           <strong>Trial ${plan.toUpperCase()}: ${sub.daysLeft} giorni rimanenti</strong>
           <small style="display: block; opacity: 0.8;">Sblocca tutte le funzionalità senza limiti.</small>
         </div>
-        <button class="btn" style="background: #3b82f6;" onclick="storeData.step='pricing'; renderStoreView();">Passa a Standard</button>
+        ${nextPlan ? `<button class="btn" style="background: #3b82f6;" onclick="storeData.step='pricing'; renderStoreView();">Passa a ${nextPlan}</button>` : ''}
       </div>`;
   }
 
@@ -5610,7 +5654,7 @@ function renderLocationsTab() {
 
   return `
     <header class="tab-header">
-      <h2>📍 Gestione Punti Vendita</h2>
+      <h2>${PANEL_ICONS.pin} Gestione Punti Vendita</h2>
       ${isProfessional ? 
         `<button class="btn" onclick="openAddLocationModal()">+ Aggiungi Sede</button>` : 
         `<span class="badge-plan plan-starter">Piano Starter: 1 Sede inclusa</span>`
@@ -5852,7 +5896,7 @@ function renderImportTab() {
       ${!isProfessional ? `
         <div class="lock-overlay">
           <div class="lock-card">
-            <div class="lock-icon">⚡</div>
+            <div class="lock-icon">${PANEL_ICONS.lock}</div>
             <h3>Velocizza il tuo lavoro</h3>
             <p>Il piano <strong>Professional</strong> ti permette di importare centinaia di offerte via codice o file senza caricarle una per una.</p>
             <button class="btn" onclick="switchStoreTab('sub')">Passa a Professional</button>
@@ -5939,23 +5983,21 @@ function renderGeneralDashboardTab() {
   const locations = partner.locations || [];
   const isEnterprise = partner.plan === 'Enterprise';
 
-  // 1. CALCOLO METRICHE AGGREGATE
   const totalViews = myOffers.reduce((acc, o) => acc + (o.views || 0), 0);
   const totalClicks = myOffers.reduce((acc, o) => acc + (o.opens || 0), 0);
   const avgCtr = totalViews > 0 ? ((totalClicks / totalViews) * 100).toFixed(2) : "0.00";
   const activeOffersCount = myOffers.filter(o => o.status === 'active').length;
   const activeLocCount = locations.length || 1;
 
-  // 2. CALCOLO MIGLIOR SEDE (per visualizzazioni)
   let bestLocName = "Dati insufficienti";
   let maxLocViews = -1;
 
   if (locations.length > 0) {
-    locations.forEach((loc, index) => {
+    locations.forEach((loc) => {
       const viewsForThisLoc = myOffers
-        .filter(o => o.locationIdx == index)
+        .filter(o => o.location_id === loc.id)
         .reduce((acc, o) => acc + (o.views || 0), 0);
-      
+
       if (viewsForThisLoc > maxLocViews && viewsForThisLoc > 0) {
         maxLocViews = viewsForThisLoc;
         bestLocName = loc.name;
@@ -5963,94 +6005,70 @@ function renderGeneralDashboardTab() {
     });
   }
 
-  // 3. TEMPLATE HTML
   const html = `
     <header class="tab-header">
-  <div>
-    <h2 style="color: var(--blue-900); margin:0;">📊 Dashboard Generale</h2>
-  </div>
-  <div style="display: flex; gap: 10px;">
-    <!-- EXPORT CSV: Solo Enterprise -->
-    ${partner.plan === 'Enterprise' ? `
-      <button class="btn outline" onclick="exportOffersToCSV()">📥 Esporta dati CSV</button>
-    ` : ''}
-    <button class="btn" onclick="handleNewOfferClick()">+ Nuova Offerta</button>
-  </div>
-</header>
+      <div><h2>${PANEL_ICONS.chart} Dashboard Generale</h2></div>
+      <div style="display: flex; gap: 10px;">
+        ${partner.plan === 'Enterprise' ? `<button class="btn outline" onclick="exportOffersToCSV()">${PANEL_ICONS.download} Esporta dati CSV</button>` : ''}
+        <button class="btn" onclick="handleNewOfferClick()">+ Nuova Offerta</button>
+      </div>
+    </header>
 
-    <!-- GRIGLIA STATISTICHE -->
     <div class="stats-grid-saas">
-      <div class="stat-card-saas" style="border-top: 4px solid #3b82f6;">
+      <div class="stat-card-saas accent-blue">
         <div class="label">Offerte Attive</div>
         <div class="value">${activeOffersCount}</div>
         <small>Su ${myOffers.length} totali</small>
       </div>
-      <div class="stat-card-saas" style="border-top: 4px solid #10b981;">
+      <div class="stat-card-saas accent-emerald">
         <div class="label">Visualizzazioni</div>
         <div class="value">${totalViews.toLocaleString()}</div>
         <small>Impressioni totali</small>
       </div>
-      <div class="stat-card-saas" style="border-top: 4px solid #f59e0b;">
+      <div class="stat-card-saas accent-amber">
         <div class="label">Click (Aperture)</div>
         <div class="value">${totalClicks.toLocaleString()}</div>
         <small>Interazioni dirette</small>
       </div>
-      <div class="stat-card-saas" style="border-top: 4px solid #6366f1;">
+      <div class="stat-card-saas accent-indigo">
         <div class="label">CTR Medio</div>
         <div class="value">${avgCtr}%</div>
         <small>Efficacia offerte</small>
       </div>
     </div>
 
-    <!-- SEZIONE PERFORMANCE SEDI E GRAFICO -->
-    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 20px; margin-top: 20px;">
-      
-      <!-- CARD ACCOUNT MANAGER (SOLO ENTERPRISE) -->
-        ${isEnterprise ? `
-          <div class="card-saas" style="border-left: 4px solid #1e40af; background: #f0f7ff; padding: 20px;">
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-              <div style="font-size: 1.8rem;">👤</div>
-              <h3 style="margin: 0; color: #1e40af; font-size: 1rem;">Account Manager Dedicato</h3>
-            </div>
-            <p style="margin: 5px 0; font-size: 0.85rem; color: #1e293b;">
-              Email: <strong>enterprise@decerne.it</strong>
-            </p>
-            <div style="display: inline-block; margin-top: 8px; background: #dbeafe; color: #1e40af; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">
-              ⏱️ SLA: Risposta entro 4 ore
-            </div>
+    <div class="general-dash-grid">
+      ${isEnterprise ? `
+        <div class="card-saas accent-blue" style="background: #f0f7ff;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+            <span class="round-ico" style="color:#1e40af;">${PANEL_ICONS.userCircle}</span>
+            <h3 style="margin: 0; color: #1e40af; font-size: 1rem;">Account Manager Dedicato</h3>
           </div>
-        ` : ''}
+          <p style="margin: 5px 0; font-size: 0.85rem; color: #1e293b;">Email: <strong>enterprise@decerne.it</strong></p>
+          <div style="display: inline-block; margin-top: 8px; background: #dbeafe; color: #1e40af; padding: 3px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">SLA: Risposta entro 4 ore</div>
+        </div>
+      ` : ''}
 
-      <!-- BOX GRAFICO -->
       <div class="card-saas" style="padding: 25px;">
         <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 1rem; color: #475569;">Trend Interazioni (Ultimi 7 giorni)</h3>
-        <div style="width: 100%; height: 250px;">
-          <canvas id="generalStatsCanvas"></canvas>
-        </div>
+        <div style="width: 100%; height: 250px;"><canvas id="generalStatsCanvas"></canvas></div>
       </div>
 
-      <!-- BOX MIGLIOR SEDE -->
       <div style="display: flex; flex-direction: column; gap: 20px;">
-        <div class="card-saas" style="border-left: 4px solid #6929c4; background: #fdfaff; flex: 1; display: flex; flex-direction: column; justify-content: center;">
-          <div class="label" style="color: #6929c4; font-weight: 700; margin-bottom: 10px;">🏆 MIGLIOR SEDE</div>
+        <div class="card-saas accent-purple" style="background: #fdfaff; flex: 1; display: flex; flex-direction: column; justify-content: center;">
+          <div class="label" style="color: #6929c4; font-weight: 700; margin-bottom: 10px; display:flex; align-items:center; gap:6px;">${PANEL_ICONS.trophy} MIGLIOR SEDE</div>
           <div style="font-size: 1.2rem; font-weight: 800; color: #1e293b;">${bestLocName}</div>
           <small style="color: #64748b; margin-top: 5px;">Sedi totali: ${activeLocCount}</small>
         </div>
-        
         <div class="card-saas" style="background: #f1f5f9; flex: 1; display: flex; flex-direction: column; justify-content: center;">
-           <div class="label" style="color: #475569; font-weight: 700; margin-bottom: 5px;">CONSIGLIO PRO</div>
-           <p style="font-size: 0.75rem; color: #64748b; margin: 0; line-height: 1.4;">
-             Le offerte nella sede "${bestLocName}" stanno performando meglio. Considera di replicare la strategia dei prezzi di questa sede anche sulle altre.
-           </p>
+           <div class="label" style="color: #475569; font-weight: 700; margin-bottom: 5px; display:flex; align-items:center; gap:6px;">${PANEL_ICONS.bulb} CONSIGLIO PRO</div>
+           <p style="font-size: 0.75rem; color: #64748b; margin: 0; line-height: 1.4;">Le offerte nella sede "${bestLocName}" stanno performando meglio. Considera di replicare la strategia dei prezzi di questa sede anche sulle altre.</p>
         </div>
       </div>
-
     </div>
   `;
 
-  // Renderizziamo il grafico dopo che l'HTML è stato inserito nel DOM
   setTimeout(() => drawGeneralChart(totalClicks), 100);
-
   return html;
 }
 
@@ -6153,7 +6171,7 @@ window.exportOffersToCSV = () => {
       : 0;
 
     // Recupero nome sede
-    const locName = locations[o.locationIdx]?.name || "Sede Principale";
+    const locName = locations.find(l => l.id === o.location_id)?.name || "Sede Principale";
 
     // Pulizia testi (evita che virgole nel nome prodotto rompano il CSV)
     const safeProduct = `"${o.product.replace(/"/g, '""')}"`;
@@ -6213,7 +6231,7 @@ function renderTeamTab() {
   const titleGroup = document.createElement("div");
   const h2 = document.createElement("h2");
   h2.style.color = "var(--blue-900)";
-  h2.textContent = "👥 Utenti Aziendali"; // Metodo sicuro
+  h2.innerHTML = PANEL_ICONS.users + ' Utenti Aziendali'; // Stringa statica, non input utente: sicuro
   const pDesc = document.createElement("p");
   pDesc.style.fontSize = "0.85rem";
   pDesc.style.color = "#64748b";
@@ -6449,7 +6467,7 @@ function renderApiTab() {
   return `
     <header class="tab-header">
       <div>
-        <h2 style="color: var(--blue-900);">🔌 Integrazione API</h2>
+        <h2 style="color: var(--blue-900);">${PANEL_ICONS.plug} Integrazione API</h2>
         <p style="color: #64748b; font-size: 0.85rem;">Utilizza queste chiavi per collegare i tuoi sistemi interni a Decerne.</p>
       </div>
       <span class="badge-plan ${isEnterprise ? 'plan-enterprise' : 'plan-professional'}">${partner.plan}</span>
@@ -6547,7 +6565,7 @@ function renderApiTab() {
 
           <!-- Lock per API avanzate -->
           <div style="text-align: center; padding: 20px; background: #fff; border-radius: 8px; border: 1px dashed #cbd5e1;">
-            <div style="font-size: 1.5rem; margin-bottom: 10px;">🔒</div>
+            <div style="display:flex; justify-content:center; margin-bottom: 10px; color:#94a3b8;">${PANEL_ICONS.lock}</div>
             <p style="color: #475569; font-size: 0.85rem; font-weight: 600; margin: 0;">Automazione avanzata (POST/DELETE)</p>
             <p style="color: #64748b; font-size: 0.8rem; margin: 5px 0 15px 0;">Le API di scrittura e cancellazione massiva sono riservate ai partner Enterprise.</p>
             <button class="btn outline" style="font-size: 0.75rem; padding: 6px 12px;" onclick="switchStoreTab('sub')">Upgrade a Enterprise</button>
@@ -6559,7 +6577,7 @@ function renderApiTab() {
     <!-- IMPORTAZIONE CATALOGO VIA CSV (Solo Enterprise) -->
     ${isEnterprise ? `
       <div class="card-saas" style="margin-top: 25px;">
-        <h3 style="margin-top:0; font-size: 1rem;">📂 Importazione catalogo (CSV)</h3>
+        <h3 style="margin-top:0; font-size: 1rem; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.folder} Importazione catalogo (CSV)</h3>
         <p style="color: #64748b; font-size: 0.85rem;">
           Non hai un'integrazione tecnica? Carica direttamente l'export del tuo gestionale. La prima volta ti chiediamo di abbinare le colonne, poi lo ricordiamo per i prossimi import con lo stesso formato.
         </p>

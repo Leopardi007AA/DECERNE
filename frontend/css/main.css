@@ -2177,3 +2177,155 @@ hr {
   color: #94a3b8;
   font-style: italic;
 }
+
+/* ============================================================
+   RESTYLE PANNELLO PARTNER — box organici, gerarchia visiva
+   ============================================================ */
+   :root {
+    --panel-radius-a: 28px 14px 30px 12px;
+    --panel-radius-b: 16px 30px 14px 26px;
+    --panel-shadow-soft: 0 2px 8px rgba(15, 23, 42, 0.06), 0 10px 24px rgba(15, 23, 42, 0.05);
+    --panel-shadow-hover: 0 6px 16px rgba(15, 23, 42, 0.09), 0 16px 32px rgba(15, 23, 42, 0.08);
+    --panel-border-soft: rgba(15, 23, 42, 0.07);
+  }
+  
+  /* --- Layout generale pannello --- */
+  .store-dashboard { grid-template-columns: 260px 1fr; }
+  
+  .store-sidebar {
+    border-right: none;
+    padding: 20px 14px;
+    background: linear-gradient(180deg, #fbfdff, #f4f7fb);
+    border-radius: var(--panel-radius-a);
+    box-shadow: var(--panel-shadow-soft);
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .sidebar-title { display: flex; align-items: center; gap: 8px; padding: 6px 12px 18px; }
+  
+  .sidebar-footer {
+    margin-top: auto;
+    padding-top: 18px;
+    border-top: 1px solid var(--panel-border-soft);
+  }
+  
+  .store-nav-btn {
+    border-radius: 14px 22px 14px 22px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    font-size: 0.92rem;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+  }
+  .store-nav-btn svg { flex-shrink: 0; opacity: 0.75; }
+  .store-nav-btn:hover { background: #eef2ff; color: var(--primary-dark); transform: translateX(2px); }
+  .store-nav-btn.active {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(15, 98, 254, 0.25);
+  }
+  .store-nav-btn.active svg { opacity: 1; }
+  
+  @media (max-width: 900px) {
+    .store-sidebar { border-radius: 20px; flex-direction: row; flex-wrap: nowrap; }
+    .sidebar-footer { margin-top: 0; padding-top: 0; border-top: none; }
+  }
+  
+  /* --- Box contenuto: linee curve "stonate" invece di riquadri netti --- */
+  .card {
+    padding: 22px 24px;
+    border: 1px solid var(--panel-border-soft);
+    border-radius: var(--panel-radius-a);
+    background: #fff;
+    box-shadow: var(--panel-shadow-soft);
+  }
+  
+  .card-saas {
+    padding: 22px 24px;
+    border: 1px solid var(--panel-border-soft);
+    border-radius: var(--panel-radius-b);
+    background: #fff;
+    box-shadow: var(--panel-shadow-soft);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .card-saas:hover { box-shadow: var(--panel-shadow-hover); transform: translateY(-2px); }
+  
+  /* --- Statistiche: gerarchia visiva --- */
+  .stats-grid-saas { gap: 18px; }
+  .stat-card-saas {
+    border-radius: var(--panel-radius-b);
+    box-shadow: var(--panel-shadow-soft);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+  }
+  .stat-card-saas:hover { transform: translateY(-3px); box-shadow: var(--panel-shadow-hover); }
+  .stat-card-saas .label { display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.4px; }
+  
+  /* La metrica più importante prende più spazio e risalto */
+  .stat-card-saas.primary {
+    grid-column: span 2;
+    background: linear-gradient(135deg, #eff6ff, #ffffff);
+    border-color: rgba(15, 98, 254, 0.18);
+  }
+  .stat-card-saas.primary .value { font-size: 2.6rem; }
+  @media (max-width: 640px) { .stat-card-saas.primary { grid-column: span 1; } }
+  
+  /* Accenti colore riutilizzabili */
+  .stat-card-saas.accent-blue, .card-saas.accent-blue { border-top: 4px solid #3b82f6; }
+  .stat-card-saas.accent-emerald, .card-saas.accent-emerald { border-top: 4px solid #10b981; }
+  .stat-card-saas.accent-amber, .card-saas.accent-amber { border-top: 4px solid #f59e0b; }
+  .stat-card-saas.accent-indigo, .card-saas.accent-indigo { border-top: 4px solid #6366f1; }
+  .stat-card-saas.accent-purple, .card-saas.accent-purple { border-top: 4px solid #6929c4; }
+  .card.accent-purple { border-left: 5px solid #6929c4; }
+  .card.accent-blue { border-left: 5px solid #1e40af; }
+  
+  .dual-card-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 700px) { .dual-card-row { grid-template-columns: 1fr; } }
+  
+  .general-dash-grid { display: grid; grid-template-columns: 1fr 300px; gap: 20px; margin-top: 20px; }
+  @media (max-width: 900px) { .general-dash-grid { grid-template-columns: 1fr; } }
+  
+  .round-ico svg { width: 28px; height: 28px; }
+  
+  /* --- Intestazioni tab --- */
+  .tab-header h2 { display: flex; align-items: center; gap: 10px; margin: 0; }
+  
+  /* --- Banner abbonamento --- */
+  .upgrade-banner {
+    padding: 16px 20px;
+    border-radius: var(--panel-radius-a);
+    margin-bottom: 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--panel-shadow-soft);
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .upgrade-banner.banner-danger { background: #fee2e2; border: 2px solid #ef4444; color: #b91c1c; }
+  .upgrade-banner.banner-info { background: #eff6ff; border: 1px solid #3b82f6; color: #1e40af; }
+  .upgrade-banner .banner-ico { flex-shrink: 0; margin-top: 2px; }
+  .banner-pulse { animation: pulse 2s infinite; }
+  
+  .renewal-alert {
+    background: #fee2e2;
+    border: 1px solid #ef4444;
+    color: #b91c1c;
+    padding: 14px 16px;
+    border-radius: 16px 8px 16px 8px;
+    margin-bottom: 18px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  /* --- Badge & pill --- */
+  .badge-plan { border-radius: 999px; display: inline-flex; align-items: center; gap: 5px; }
+  .status-badge { border-radius: 999px; }
+  
+  /* --- Lock card (funzioni premium bloccate) --- */
+  .lock-icon { font-size: initial; display: flex; align-items: center; justify-content: center; color: var(--primary); margin-bottom: 12px; }
+  .lock-card { border-radius: var(--panel-radius-a); }
