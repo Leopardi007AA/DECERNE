@@ -61,6 +61,7 @@
       letter-spacing: 0.05em;
       background: linear-gradient(135deg, #fff 0%, var(--cyan) 50%, var(--blue-mid) 100%);
       -webkit-background-clip: text;
+      background-clip: text;
       -webkit-text-fill-color: transparent;
       text-shadow: 0 0 40px rgba(34, 211, 238, 0.3);
       cursor: pointer;
@@ -179,6 +180,7 @@
       margin-bottom: 28px;
       background: linear-gradient(180deg, #fff 0%, #a5f3fc 40%, var(--blue-mid) 100%);
       -webkit-background-clip: text;
+      background-clip: text;
       -webkit-text-fill-color: transparent;
       letter-spacing: -0.02em;
     }
@@ -904,7 +906,7 @@
                       <div className="dc-slide-theme">{THEME_LABEL[step.tema]}</div>
                       <h3>{step.titolo}</h3>
                       <p>{step.testo}</p>
-                      {step.tema === "cta" && <button className="dc-cta-btn">Scopri i piani per il tuo negozio</button>}
+                      {step.tema === "cta" && <button className="dc-cta-btn" onClick={() => goToParentMode('store')}>Scopri i piani per il tuo negozio</button>}
                     </div>
                   );
                 })}

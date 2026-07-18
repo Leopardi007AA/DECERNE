@@ -343,6 +343,7 @@ body {
   
   /* Hack per forzare Chrome/Safari a tagliare perfettamente l'immagine */
   -webkit-mask-image: -webkit-radial-gradient(white, black);
+  mask-image: radial-gradient(white, black);
 }
 
 .product-img {
