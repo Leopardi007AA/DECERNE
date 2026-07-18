@@ -2066,13 +2066,13 @@ hr {
   height: 450px; /* Desktop/tablet: dimensione attuale */
 }
 
+.detail-btn-cart {
+  margin-bottom: 16px; /* Distanza dal pulsante "Vedi su Google Maps", su tutte le dimensioni di schermo */
+}
+
 @media (max-width: 600px) {
   .detail-image-container {
     height: 220px; /* Più piccola da mobile, non sembra più sproporzionata */
-  }
-
-  .detail-btn-cart {
-    margin-bottom: 16px; /* Un po' più di distanza dal pulsante "Vedi su Google Maps" solo da mobile */
   }
 }
 

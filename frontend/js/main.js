@@ -481,7 +481,7 @@ window.loginPartnerAction = async (email, pass) => {
       hours: storeRow.hours || "",
       internalNotes: storeRow.internal_notes || "",
       apiKey: storeRow.api_key || "",
-      locations: (locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address })),
+      locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary }))),
       plan: storeRow.plan,
       subscription: {
         plan: storeRow.plan,
@@ -958,7 +958,7 @@ async function fetchPublicLocationsMap(locationIds) {
 
   const { data, error } = await supabaseClient
     .from('public_store_locations')
-    .select('location_id, store_id, location_name, store_name, address, city, cap, latitude, longitude, plan')
+    .select('location_id, store_id, location_name, store_name, address, city, cap, latitude, longitude, plan, is_primary, phone, hours, logo_url')
     .in('location_id', uniqueIds);
 
   if (error) console.error("Errore caricamento dati sedi negozio:", error);
@@ -966,14 +966,27 @@ async function fetchPublicLocationsMap(locationIds) {
   return Object.fromEntries((data || []).map(l => [l.location_id, {
     id: l.location_id,
     store_id: l.store_id,
+    storeName: l.store_name,
+    locationName: l.location_name,
     name: (l.location_name && l.location_name !== 'Sede Principale') ? `${l.store_name} (${l.location_name})` : l.store_name,
     address: l.address,
     city: l.city,
     cap: l.cap,
     latitude: l.latitude != null ? parseFloat(l.latitude) : null,
     longitude: l.longitude != null ? parseFloat(l.longitude) : null,
-    plan: l.plan
+    plan: l.plan,
+    isPrimary: l.is_primary,
+    phone: l.phone || "",
+    hours: l.hours || "",
+    logo: l.logo_url || ""
   }]));
+}
+
+// Riordina le sedi di un negozio mettendo sempre quella principale in prima posizione,
+// così il resto del codice (form nuova offerta, badge "PRINCIPALE", ecc.) può continuare
+// a considerare l'indice 0 come sede principale.
+function sortLocationsPrimaryFirst(locations) {
+  return [...(locations || [])].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
 }
 
 async function renderOffers(page = state.currentPage, pageSize = state.pageSize) {
@@ -1002,12 +1015,13 @@ async function renderOffers(page = state.currentPage, pageSize = state.pageSize)
       return;
     }
 
-    const storesById = await fetchPublicStoresMap((rows || []).map(r => r.store_id));
+    const locationsById = await fetchPublicLocationsMap((rows || []).map(r => r.location_id));
 
     // Riportiamo ogni riga nello stesso formato "appiattito" che il resto del
-    // codice si aspetta già (storeName, storeCity, ecc. invece di stores.name)
+    // codice si aspetta già (storeName, storeCity, ecc.), presi dalla SEDE esatta
+    // dell'offerta e non da un indirizzo generico del negozio.
     const allOffers = (rows || []).map(r => {
-      const store = storesById[r.store_id] || {};
+      const loc = locationsById[r.location_id] || {};
       return {
         id: r.id,
         product: r.product,
@@ -1019,11 +1033,11 @@ async function renderOffers(page = state.currentPage, pageSize = state.pageSize)
         description: r.description,
         img: r.img_url,
         status: r.status,
-        storeName: store.name || "",
-        storeCity: store.city ? store.city.toLowerCase() : "",
-        storeCap: store.cap || "",
-        storeAddress: store.address || "",
-        plan: store.plan || "Starter"
+        storeName: loc.name || "",
+        storeCity: loc.city ? loc.city.toLowerCase() : "",
+        storeCap: loc.cap || "",
+        storeAddress: loc.address || "",
+        plan: loc.plan || "Starter"
       };
     });
 
@@ -2065,7 +2079,10 @@ async function finalizeStoreRegistration(authUserId) {
       .insert({
         store_id: storeRow.id,
         name: "Sede Principale",
-        address: d.fullAddress
+        address: d.fullAddress,
+        city: d.city,
+        cap: d.cap,
+        is_primary: true
       })
       .select()
       .single();
@@ -2081,7 +2098,7 @@ async function finalizeStoreRegistration(authUserId) {
       phone: storeRow.phone || "",
       hours: "",
       internalNotes: storeRow.internal_notes || "",
-      locations: [{ id: locationRow.id, name: "Sede Principale", address: d.fullAddress }],
+      locations: [{ id: locationRow.id, name: "Sede Principale", address: d.fullAddress, city: d.city, cap: d.cap, isPrimary: true }],
       plan: storeRow.plan,
       subscription: {
         plan: storeRow.plan,
@@ -3309,17 +3326,17 @@ function renderSearchModal() {
       return;
     }
 
-    const storesById = await fetchPublicStoresMap((rows || []).map(r => r.store_id));
+    const locationsById = await fetchPublicLocationsMap((rows || []).map(r => r.location_id));
 
     const allOffers = (rows || []).map(r => {
-      const store = storesById[r.store_id] || {};
+      const loc = locationsById[r.location_id] || {};
       return {
         id: r.id,
         product: r.product,
         price: r.price,
         img: r.img_url,
-        storeName: store.name || "",
-        storeCity: store.city ? store.city.toLowerCase() : ""
+        storeName: loc.name || "",
+        storeCity: loc.city ? loc.city.toLowerCase() : ""
       };
     });
 
@@ -3699,7 +3716,7 @@ async function refreshPartnerSession(storeId) {
       hours: storeRow.hours || "",
       internalNotes: storeRow.internal_notes || "",
       apiKey: storeRow.api_key || "",
-      locations: (locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address })),
+      locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary }))),
       plan: storeRow.plan,
     subscription: {
       plan: storeRow.plan,
@@ -4519,7 +4536,10 @@ async function handleOnboardingSubmit(step) {
         .insert({
           store_id: storeRow.id,
           name: "Sede Principale",
-          address: fullAddress
+          address: fullAddress,
+          city: storeData.tempReg.city,
+          cap: storeData.tempReg.cap,
+          is_primary: true
         })
         .select()
         .single();
@@ -4535,7 +4555,7 @@ async function handleOnboardingSubmit(step) {
         phone: storeRow.phone || "",
         hours: "",
         internalNotes: storeRow.internal_notes || "",
-        locations: [{ id: locationRow.id, name: "Sede Principale", address: fullAddress }],
+        locations: [{ id: locationRow.id, name: "Sede Principale", address: fullAddress, city: storeData.tempReg.city, cap: storeData.tempReg.cap, isPrimary: true }],
         plan: storeRow.plan,
         subscription: {
           plan: storeRow.plan,
@@ -5085,7 +5105,7 @@ window.showStoreInfoPopup = (store) => {
       </div>
     </div>`;
 
-  const addressLine = [store.address, [store.cap, store.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    const addressLine = store.address || '';
   const isVerified = store.plan === 'Professional' || store.plan === 'Enterprise';
 
   infoContent.innerHTML = `
@@ -5550,10 +5570,12 @@ window.openProductDetail = async (id) => {
     return;
   }
 
-  const storesById = await fetchPublicStoresMap([row.store_id]);
-  const store = storesById[row.store_id] || {};
+  const locationsById = await fetchPublicLocationsMap([row.location_id]);
+  const loc = locationsById[row.location_id] || {};
 
-  // Stesso formato "appiattito" usato dalla griglia, per compatibilità col modal
+  // Stesso formato "appiattito" usato dalla griglia, per compatibilità col modal.
+  // Indirizzo/città/CAP arrivano ora dalla SEDE esatta dell'offerta (non più da un
+  // indirizzo generico del negozio); telefono/orari/logo restano a livello negozio.
   const product = {
     id: row.id,
     product: row.product,
@@ -5565,14 +5587,14 @@ window.openProductDetail = async (id) => {
     description: row.description,
     img: row.img_url,
     status: row.status,
-    storeName: store.name || "",
-    storeCity: store.city || "",
-    storeCap: store.cap || "",
-    storeAddress: store.address || "",
-    storeLogo: store.logo_url || "",
-    storePhone: store.phone || "",
-    storeHours: store.hours || "",
-    plan: store.plan || "Starter"
+    storeName: loc.name || "",
+    storeCity: loc.city || "",
+    storeCap: loc.cap || "",
+    storeAddress: loc.address || "",
+    storeLogo: loc.logo || "",
+    storePhone: loc.phone || "",
+    storeHours: loc.hours || "",
+    plan: loc.plan || "Starter"
   };
 
   displayProductInModal(product);
@@ -5598,20 +5620,29 @@ function renderLocationsTab() {
     <div class="card-saas">
       <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 20px;">
         Configura gli indirizzi fisici dei tuoi supermercati. I clienti vedranno le offerte in base alla vicinanza a queste sedi.
+        La sede principale è quella selezionata di default quando pubblichi una nuova offerta.
       </p>
 
       <div id="locationsContainer" style="display: flex; flex-direction: column; gap: 12px;">
         ${locations.map((loc, index) => `
-          <div class="card" style="display: flex; gap: 15px; padding: 15px; background: #f8fafc; border: 1px solid #e2e8f0; align-items: center;">
-            <div style="font-size: 1.5rem;">🏠</div>
-            <div style="flex: 1;">
-              <div style="font-weight: 800; color: #1e293b;">${loc.name}</div>
-              <div style="font-size: 0.85rem; color: #64748b;">${loc.address}</div>
+          <div class="card" style="display: flex; flex-direction: column; gap: 10px; padding: 15px; background: #f8fafc; border: 1px solid #e2e8f0;">
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <div style="font-size: 1.5rem;">🏠</div>
+              <input type="text" id="locName_${index}" value="${loc.name || ''}" placeholder="Nome sede" style="flex: 1; font-weight: 800;">
+              ${loc.isPrimary ? 
+                `<span style="font-size: 0.7rem; font-weight: 800; color: #10b981; background: #dcfce7; padding: 4px 8px; border-radius: 4px; white-space: nowrap;">PRINCIPALE</span>` : 
+                `<button class="btn outline" style="padding: 5px 10px; font-size: 0.75rem; white-space: nowrap;" onclick="setPrimaryLocation(${index})">Imposta Principale</button>`
+              }
             </div>
-            ${index === 0 ? 
-              `<span style="font-size: 0.7rem; font-weight: 800; color: #10b981; background: #dcfce7; padding: 4px 8px; border-radius: 4px;">PRINCIPALE</span>` : 
-              `<button class="btn danger" style="padding: 5px 10px;" onclick="removeLocation(${index})">Rimuovi</button>`
-            }
+            <input type="text" id="locAddr_${index}" value="${loc.address || ''}" placeholder="Via e numero civico">
+            <div style="display: flex; gap: 10px;">
+              <input type="text" id="locCity_${index}" value="${loc.city || ''}" placeholder="Città" style="flex: 1;">
+              <input type="text" id="locCap_${index}" value="${loc.cap || ''}" placeholder="CAP" style="width: 100px;">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+              ${(!loc.isPrimary && locations.length > 1) ? `<button class="btn danger" style="padding: 5px 10px;" onclick="removeLocation(${index})">Rimuovi</button>` : ''}
+              <button class="btn" style="padding: 5px 15px;" onclick="saveLocationEdit(${index})">Salva Sede</button>
+            </div>
           </div>
         `).join('')}
       </div>
@@ -5662,7 +5693,8 @@ window.openAddLocationModal = async () => {
     await supabaseClient.rpc('cache_location_coordinates', { p_location_id: newLoc.id, p_lat: coords.lat, p_lng: coords.lng });
   }
 
-  partner.locations.push({ id: newLoc.id, name: newLoc.name, address: newLoc.address, city: newLoc.city, cap: newLoc.cap });
+  partner.locations.push({ id: newLoc.id, name: newLoc.name, address: newLoc.address, city: newLoc.city, cap: newLoc.cap, isPrimary: false });
+  partner.locations = sortLocationsPrimaryFirst(partner.locations);
   const dataString = JSON.stringify(partner);
   sessionStorage.setItem(SESSION_PARTNER, dataString);
   localStorage.setItem(PARTNER_AUTH_KEY, dataString);
@@ -5673,11 +5705,15 @@ window.openAddLocationModal = async () => {
 };
 
 window.removeLocation = (index) => {
-  showConfirm("Eliminare questa sede? Le offerte collegate potrebbero non essere più accurate.", async () => {
-    const partner = getCurrentPartner();
-    const loc = partner.locations[index];
-    if (!loc || !loc.id) return toast.error("Sede non valida.");
+  const partner = getCurrentPartner();
+  const loc = partner.locations[index];
+  if (!loc || !loc.id) return toast.error("Sede non valida.");
 
+  if (loc.isPrimary && partner.locations.length > 1) {
+    return toast.error("Questa è la sede principale: impostane un'altra come principale prima di rimuoverla.");
+  }
+
+  showConfirm("Eliminare questa sede? Le offerte collegate potrebbero non essere più accurate.", async () => {
     const { error } = await supabaseClient
       .from('store_locations')
       .delete()
@@ -5697,6 +5733,96 @@ window.removeLocation = (index) => {
     toast.success("Sede rimossa.");
     renderStoreView();
   });
+};
+
+// Imposta una sede diversa come principale (usata come default per le nuove offerte
+// e per l'indirizzo mostrato quando non è specificata una sede precisa).
+window.setPrimaryLocation = (index) => {
+  const partner = getCurrentPartner();
+  const loc = partner.locations[index];
+  if (!loc || !loc.id) return toast.error("Sede non valida.");
+  if (loc.isPrimary) return;
+
+  showConfirm(`Impostare "${loc.name}" come sede principale?`, async () => {
+    const { error: clearError } = await supabaseClient
+      .from('store_locations')
+      .update({ is_primary: false })
+      .eq('store_id', partner.id);
+
+    if (clearError) {
+      console.error("Errore aggiornamento sede principale:", clearError);
+      return toast.error("Errore durante l'aggiornamento della sede principale.");
+    }
+
+    const { error: setError } = await supabaseClient
+      .from('store_locations')
+      .update({ is_primary: true })
+      .eq('id', loc.id);
+
+    if (setError) {
+      console.error("Errore aggiornamento sede principale:", setError);
+      return toast.error("Errore durante l'aggiornamento della sede principale.");
+    }
+
+    partner.locations.forEach(l => { l.isPrimary = (l.id === loc.id); });
+    partner.locations = sortLocationsPrimaryFirst(partner.locations);
+    const dataString = JSON.stringify(partner);
+    sessionStorage.setItem(SESSION_PARTNER, dataString);
+    localStorage.setItem(PARTNER_AUTH_KEY, dataString);
+    state.currentStore = partner;
+
+    toast.success("Sede principale aggiornata.");
+    renderStoreView();
+  });
+};
+
+// Salva le modifiche a nome/indirizzo/città/CAP di una sede già esistente,
+// disponibile per qualunque piano (anche Starter con una sola sede).
+window.saveLocationEdit = async (index) => {
+  const partner = getCurrentPartner();
+  const loc = partner.locations[index];
+  if (!loc || !loc.id) return toast.error("Sede non valida.");
+
+  const name = clean(document.getElementById(`locName_${index}`)?.value || "");
+  const addr = clean(document.getElementById(`locAddr_${index}`)?.value || "");
+  const city = clean(document.getElementById(`locCity_${index}`)?.value || "").trim().toLowerCase();
+  const cap = clean(document.getElementById(`locCap_${index}`)?.value || "").trim();
+
+  if (!name || !addr || !city) {
+    return toast.error("Nome, indirizzo e città sono obbligatori.");
+  }
+
+  const fullAddress = `${addr}, ${cap} ${city}`.trim();
+  const addressChanged = fullAddress !== loc.address;
+
+  const { data: updatedLoc, error } = await supabaseClient
+    .from('store_locations')
+    .update({ name, address: fullAddress, city, cap })
+    .eq('id', loc.id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Errore salvataggio sede:", error);
+    return toast.error("Errore durante il salvataggio della sede.");
+  }
+
+  // Se l'indirizzo è cambiato, ricalcola le coordinate sulla nuova posizione reale
+  if (addressChanged) {
+    const coords = await geocodeStoreAddress({ id: updatedLoc.id, address: updatedLoc.address, city: updatedLoc.city, name });
+    if (coords) {
+      await supabaseClient.rpc('cache_location_coordinates', { p_location_id: updatedLoc.id, p_lat: coords.lat, p_lng: coords.lng });
+    }
+  }
+
+  partner.locations[index] = { ...loc, name: updatedLoc.name, address: updatedLoc.address, city: updatedLoc.city, cap: updatedLoc.cap };
+  const dataString = JSON.stringify(partner);
+  sessionStorage.setItem(SESSION_PARTNER, dataString);
+  localStorage.setItem(PARTNER_AUTH_KEY, dataString);
+  state.currentStore = partner;
+
+  toast.success("Sede aggiornata.");
+  renderStoreView();
 };
 
 function renderImportTab() {
