@@ -489,7 +489,7 @@ window.loginPartnerAction = async (email, pass) => {
       hours: storeRow.hours || "",
       internalNotes: storeRow.internal_notes || "",
       apiKey: storeRow.api_key || "",
-      locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary }))),
+      locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary, latitude: l.latitude, longitude: l.longitude }))),
       plan: storeRow.plan,
       subscription: {
         plan: storeRow.plan,
@@ -1542,17 +1542,17 @@ window.openOfferModal = (offer = null) => {
   const locations = partner.locations || [];
 
   if (locations.length > 1) {
-    // Mostra il selettore solo se ci sono più sedi
     locContainer.classList.remove("hidden");
-    locSelect.innerHTML = locations.map((loc, idx) => `
-      <option value="${idx}" ${offer && offer.location_id === loc.id ? 'selected' : ''}>
+    locSelect.innerHTML = locations.map((loc) => `
+      <option value="${loc.id}" ${offer && offer.location_id === loc.id ? 'selected' : ''}>
         ${loc.name} (${loc.address})
       </option>
     `).join('');
   } else {
-    // Nascondi se c'è solo una sede (quella predefinita)
+    // FIX: Anche se c'è una sola sede, dobbiamo usare il suo ID reale, non "0"
     locContainer.classList.add("hidden");
-    locSelect.innerHTML = `<option value="0">Sede Principale</option>`;
+    const defaultLoc = locations[0] || { id: null, name: "Sede Principale" };
+    locSelect.innerHTML = `<option value="${defaultLoc.id}">${defaultLoc.name}</option>`;
   }
 
   if (offer) {
@@ -1648,10 +1648,10 @@ $("#offerForm").onsubmit = async (e) => {
 
     // Recupera location_id dal select
     const locationSelect = $("#offLocation");
-    const locationIdx = locationSelect ? parseInt(locationSelect.value) : 0;
-    const locationId = partner.locations && partner.locations[locationIdx] 
-      ? partner.locations[locationIdx].id 
-      : null;
+        // Recupera location_id direttamente dal valore del select
+        const locationId = $("#offLocation") ? $("#offLocation").value : null;
+
+
 
     const offerFields = {
       product: nome,
@@ -2274,18 +2274,24 @@ async function geocodeStoreAddress(store) {
       }
     }
 
-    // Tentativo 3 (ultimo ripiego): solo la città. Segnato chiaramente come approssimativo, mai spacciato per preciso
-    coords = await tryGeocodeQuery(`${store.city}, Italia`);
-    if (coords) {
-      console.warn(`Indirizzo non trovato su OpenStreetMap per "${store.name}", uso solo la città (posizione approssimativa).`);
-      // NON salviamo in cache questo livello di approssimazione: se OSM aggiunge la via in futuro, va ritentato il livello preciso
-      return { ...coords, approximate: true, cityOnly: true };
-    }
+        // Tentativo 3 (ultimo ripiego): solo la città.
+        coords = await tryGeocodeQuery(`${store.city}, Italia`);
+        if (coords) {
+          console.warn(`Indirizzo non trovato per "${store.name}", uso solo la città.`);
+          // Se vuoi un avviso a schermo senza bloccare il codice, usa .info:
+          if (typeof toast !== 'undefined' && toast.info) {
+            toast.info(`Nota: Per "${store.name}" è stata trovata solo la posizione della città.`);
+          }
+          return { ...coords, approximate: true, cityOnly: true };
+        }
+    
   } catch (e) {
     console.warn("Geocoding fallito per negozio:", store.id, e);
   }
   return null;
 }
+
+
 
 async function fetchRouteCoords(fromLat, fromLng, toLat, toLng) {
   try {
@@ -5851,7 +5857,17 @@ window.saveLocationEdit = async (index) => {
     }
   }
 
-  partner.locations[index] = { ...loc, name: updatedLoc.name, address: updatedLoc.address, city: updatedLoc.city, cap: updatedLoc.cap };
+    // Aggiorna anche le coordinate nella memoria locale
+    partner.locations[index] = { 
+      ...loc, 
+      name: updatedLoc.name, 
+      address: updatedLoc.address, 
+      city: updatedLoc.city, 
+      cap: updatedLoc.cap,
+      latitude: updatedLoc.latitude, // Aggiunto
+      longitude: updatedLoc.longitude // Aggiunto
+    };
+  
   const dataString = JSON.stringify(partner);
   sessionStorage.setItem(SESSION_PARTNER, dataString);
   localStorage.setItem(PARTNER_AUTH_KEY, dataString);
