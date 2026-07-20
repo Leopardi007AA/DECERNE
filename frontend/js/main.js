@@ -542,29 +542,6 @@ window.saveStoreProfile = async (e) => {
 
     const addressChanged = newFullAddress !== currentPartner.address;
 
-    const latDeg = document.getElementById("profLatDeg")?.value;
-    const latMin = document.getElementById("profLatMin")?.value;
-    const latSec = document.getElementById("profLatSec")?.value;
-    const latDir = document.getElementById("profLatDir")?.value;
-    const lngDeg = document.getElementById("profLngDeg")?.value;
-    const lngMin = document.getElementById("profLngMin")?.value;
-    const lngSec = document.getElementById("profLngSec")?.value;
-    const lngDir = document.getElementById("profLngDir")?.value;
-
-    let coordUpdate = {};
-    const coordsProvided = latDeg?.trim() || lngDeg?.trim();
-    let latVal, lngVal;
-    if (coordsProvided) {
-      latVal = dmsToDecimal(latDeg, latMin, latSec, latDir);
-      lngVal = dmsToDecimal(lngDeg, lngMin, lngSec, lngDir);
-      if (isNaN(latVal) || isNaN(lngVal) || latVal < -90 || latVal > 90 || lngVal < -180 || lngVal > 180) {
-        return toast.error("Coordinate non valide. Controlla gradi, primi e secondi inseriti.");
-      }
-      coordUpdate = { latitude: latVal, longitude: lngVal };
-    }
-
-    const coordsChanged = coordsProvided && (latVal !== currentPartner.latitude || lngVal !== currentPartner.longitude);
-
     const { data: storeRow, error } = await supabaseClient
       .from('stores')
       .update({
@@ -575,8 +552,7 @@ window.saveStoreProfile = async (e) => {
         internal_notes: clean(notesInput?.value || ""),
         address: newFullAddress,
         city: newCity || currentPartner.city,
-        cap: newCap || currentPartner.cap,
-        ...coordUpdate
+        cap: newCap || currentPartner.cap
       })
       .eq('id', currentPartner.id)
       .select()
@@ -608,8 +584,8 @@ window.saveStoreProfile = async (e) => {
     localStorage.setItem(PARTNER_AUTH_KEY, dataString);
     state.currentStore = updatedStore;
 
-    if (addressChanged && !coordsChanged) {
-      toast.success("Profilo salvato! Hai cambiato l'indirizzo: ricordati di aggiornare anche le coordinate per la mappa.");
+    if (addressChanged) {
+      toast.success("Profilo salvato! Hai cambiato l'indirizzo: ricordati di controllare le coordinate della sede in \"Gestione Sedi\".");
     } else {
       toast.success("Profilo salvato!");
     }
@@ -1427,9 +1403,6 @@ function renderProfileTab() {
   const partner = getCurrentPartner();
   if (!partner) return '';
 
-  const latDMS = decimalToDMS(partner.latitude, true);
-  const lngDMS = decimalToDMS(partner.longitude, false);
-
   return `
     <header class="tab-header">
       <h2>${PANEL_ICONS.settings} Impostazioni Account</h2>
@@ -1487,50 +1460,6 @@ function renderProfileTab() {
           </div>
         </div>
 
-        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-top:10px;">
-          <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">
-            📍 Coordinate esatte del negozio (formato tipo 42°24'55.2"N 12°51'18.8"E, come mostrato da Google Maps).
-            <a href="javascript:void(0)" onclick="openProfileGoogleMapsHelper()">Trova le tue coordinate su Google Maps →</a>
-          </p>
-          <label style="font-size:0.75rem; color:#64748b;">Latitudine</label>
-          <div class="form-row" style="align-items:flex-end;">
-            <div class="input-group" style="flex:1;">
-              <input type="number" id="profLatDeg" min="0" max="90" placeholder="Gradi (42)" value="${latDMS.deg}">
-            </div>
-            <div class="input-group" style="flex:1;">
-              <input type="number" id="profLatMin" min="0" max="59" placeholder="Primi (24)" value="${latDMS.min}">
-            </div>
-            <div class="input-group" style="flex:1;">
-              <input type="number" id="profLatSec" min="0" max="59.99" step="0.1" placeholder="Secondi (55.2)" value="${latDMS.sec}">
-            </div>
-            <div class="input-group" style="flex:0.6;">
-              <select id="profLatDir">
-                <option value="N" ${latDMS.dir === 'N' ? 'selected' : ''}>N</option>
-                <option value="S" ${latDMS.dir === 'S' ? 'selected' : ''}>S</option>
-              </select>
-            </div>
-          </div>
-          <label style="font-size:0.75rem; color:#64748b; margin-top:8px; display:block;">Longitudine</label>
-          <div class="form-row" style="align-items:flex-end;">
-            <div class="input-group" style="flex:1;">
-              <input type="number" id="profLngDeg" min="0" max="180" placeholder="Gradi (12)" value="${lngDMS.deg}">
-            </div>
-            <div class="input-group" style="flex:1;">
-              <input type="number" id="profLngMin" min="0" max="59" placeholder="Primi (51)" value="${lngDMS.min}">
-            </div>
-            <div class="input-group" style="flex:1;">
-              <input type="number" id="profLngSec" min="0" max="59.99" step="0.1" placeholder="Secondi (18.8)" value="${lngDMS.sec}">
-            </div>
-            <div class="input-group" style="flex:0.6;">
-              <select id="profLngDir">
-                <option value="E" ${lngDMS.dir === 'E' ? 'selected' : ''}>E</option>
-                <option value="W" ${lngDMS.dir === 'W' ? 'selected' : ''}>O</option>
-              </select>
-            </div>
-          </div>
-          <p style="font-size:0.75rem; color:#94a3b8; margin-top:6px;">Se cambi l'indirizzo, ricordati di aggiornare anche le coordinate qui sopra.</p>
-        </div>
-
         <div class="input-group">
           <label>Note Interne / Memo</label>
           <textarea id="profNotes" rows="3" placeholder="Inserisci note visibili solo a te...">${partner.internalNotes || ''}</textarea>
@@ -1569,13 +1498,6 @@ function dmsToDecimal(deg, min, sec, dir) {
   if (dir === 'S' || dir === 'W') decimal = -decimal;
   return decimal;
 }
-
-window.openProfileGoogleMapsHelper = () => {
-  const street = document.getElementById("profStreet")?.value || "";
-  const city = document.getElementById("profCity")?.value || "";
-  const query = `${street}, ${city}, Italia`;
-  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank', 'noopener');
-};
 
 window.openOnboardingGoogleMapsHelper = () => {
   const street = document.getElementById("obStreet")?.value || "";
@@ -2117,6 +2039,10 @@ async function finalizeStoreRegistration(authUserId) {
       .select()
       .single();
 
+    // Geocodifica subito l'indirizzo obbligatorio inserito in registrazione, così la sede
+    // ha da subito delle coordinate reali (l'utente potrà comunque affinarle a mano in seguito).
+    const initialCoords = await geocodeStoreAddress({ id: locationRow.id, address: d.fullAddress, city: d.city, name: "Sede Principale" });
+
     const newStore = {
       id: storeRow.id,
       email: storeRow.email,
@@ -2128,7 +2054,7 @@ async function finalizeStoreRegistration(authUserId) {
       phone: storeRow.phone || "",
       hours: "",
       internalNotes: storeRow.internal_notes || "",
-      locations: [{ id: locationRow.id, name: "Sede Principale", address: d.fullAddress, city: d.city, cap: d.cap, isPrimary: true }],
+      locations: [{ id: locationRow.id, name: "Sede Principale", address: d.fullAddress, city: d.city, cap: d.cap, isPrimary: true, latitude: initialCoords?.lat ?? null, longitude: initialCoords?.lng ?? null }],
       plan: storeRow.plan,
       subscription: {
         plan: storeRow.plan,
@@ -3746,7 +3672,7 @@ async function refreshPartnerSession(storeId) {
       hours: storeRow.hours || "",
       internalNotes: storeRow.internal_notes || "",
       apiKey: storeRow.api_key || "",
-      locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary }))),
+      locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary, latitude: l.latitude != null ? parseFloat(l.latitude) : null, longitude: l.longitude != null ? parseFloat(l.longitude) : null }))),
       plan: storeRow.plan,
     subscription: {
       plan: storeRow.plan,
@@ -4574,6 +4500,10 @@ async function handleOnboardingSubmit(step) {
         .select()
         .single();
 
+      // Geocodifica subito l'indirizzo obbligatorio inserito in registrazione, così la sede
+      // ha da subito delle coordinate reali (l'utente potrà comunque affinarle a mano in seguito).
+      const initialCoords = await geocodeStoreAddress({ id: locationRow.id, address: fullAddress, city: storeData.tempReg.city, name: "Sede Principale" });
+
       const newStore = {
         id: storeRow.id,
         email: storeRow.email,
@@ -4585,7 +4515,7 @@ async function handleOnboardingSubmit(step) {
         phone: storeRow.phone || "",
         hours: "",
         internalNotes: storeRow.internal_notes || "",
-        locations: [{ id: locationRow.id, name: "Sede Principale", address: fullAddress, city: storeData.tempReg.city, cap: storeData.tempReg.cap, isPrimary: true }],
+        locations: [{ id: locationRow.id, name: "Sede Principale", address: fullAddress, city: storeData.tempReg.city, cap: storeData.tempReg.cap, isPrimary: true, latitude: initialCoords?.lat ?? null, longitude: initialCoords?.lng ?? null }],
         plan: storeRow.plan,
         subscription: {
           plan: storeRow.plan,
@@ -4644,7 +4574,8 @@ const PANEL_ICONS = {
   bulb: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.2.9 2.1h5.2c0-.9.3-1.6.9-2.1A6 6 0 0 0 12 3Z"/></svg>`,
   lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>`,
   folder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>`,
-  pencil: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`
+  pencil: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`,
+  target: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`
 };
 
 // MODIFICA: renderDashboard più sicura
@@ -5261,7 +5192,7 @@ function showToast(message, type) {
 }
 
 // Nuova funzione per le Conferme in stile Toast
-function showConfirm(message, onConfirm) {
+function showConfirm(message, onConfirm, confirmColor = '#ff3b30') {
   const overlay = document.createElement("div");
   overlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9999; display:flex; align-items:flex-end; justify-content:center; padding-bottom:30px;";
   
@@ -5272,7 +5203,7 @@ function showConfirm(message, onConfirm) {
     <p style="margin-bottom:20px; font-weight:600; color:#161616;">${message}</p>
     <div style="display:flex; gap:10px;">
       <button id="confirmNo" class="btn outline" style="flex:1">Annulla</button>
-      <button id="confirmYes" class="btn" style="flex:1; background:#ff3b30">Conferma</button>
+      <button id="confirmYes" class="btn" style="flex:1; background:${confirmColor}">Conferma</button>
     </div>
   `;
   
@@ -5650,6 +5581,7 @@ function renderLocationsTab() {
 
   const plan = partner.plan || 'Starter';
   const isProfessional = ['Professional', 'Enterprise'].includes(plan);
+  const canSetCoords = PLAN_LEVELS[plan] >= PLAN_LEVELS['Standard'];
   const locations = partner.locations || [];
 
   return `
@@ -5661,42 +5593,102 @@ function renderLocationsTab() {
       }
     </header>
 
-    <div class="card-saas">
-      <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 20px;">
+    <div class="card-saas" style="margin-bottom: 20px;">
+      <p style="font-size: 0.9rem; color: #64748b; margin: 0;">
         Configura gli indirizzi fisici dei tuoi supermercati. I clienti vedranno le offerte in base alla vicinanza a queste sedi.
         La sede principale è quella selezionata di default quando pubblichi una nuova offerta.
       </p>
+    </div>
 
-      <div id="locationsContainer" style="display: flex; flex-direction: column; gap: 12px;">
-        ${locations.map((loc, index) => `
-          <div class="card" style="display: flex; flex-direction: column; gap: 10px; padding: 15px; background: #f8fafc; border: 1px solid #e2e8f0;">
-            <div style="display: flex; gap: 10px; align-items: center;">
-              <div style="font-size: 1.5rem;">🏠</div>
-              <input type="text" id="locName_${index}" value="${loc.name || ''}" placeholder="Nome sede" style="flex: 1; font-weight: 800;">
-              ${loc.isPrimary ? 
-                `<span style="font-size: 0.7rem; font-weight: 800; color: #10b981; background: #dcfce7; padding: 4px 8px; border-radius: 4px; white-space: nowrap;">PRINCIPALE</span>` : 
-                `<button class="btn outline" style="padding: 5px 10px; font-size: 0.75rem; white-space: nowrap;" onclick="setPrimaryLocation(${index})">Imposta Principale</button>`
+    <div id="locationsContainer" style="display: flex; flex-direction: column; gap: 16px;">
+      ${locations.map((loc, index) => {
+        const latDMS = decimalToDMS(loc.latitude, true);
+        const lngDMS = decimalToDMS(loc.longitude, false);
+
+        return `
+          <div class="card-saas ${loc.isPrimary ? 'accent-emerald' : 'accent-blue'}" style="padding: 22px;">
+            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
+              <span class="round-ico" style="color: ${loc.isPrimary ? '#10b981' : '#0f62fe'}; background: ${loc.isPrimary ? '#dcfce7' : '#eff6ff'}; width: 42px; height: 42px; border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">${PANEL_ICONS.pin}</span>
+              <input type="text" id="locName_${index}" value="${loc.name || ''}" placeholder="Nome sede" style="flex: 1; font-weight: 800; font-size: 1.05rem; border: none; background: transparent; padding: 4px 0;">
+              ${loc.isPrimary ?
+                `<span style="font-size: 0.7rem; font-weight: 800; color: #10b981; background: #dcfce7; padding: 6px 12px; border-radius: 999px; white-space: nowrap;">★ PRINCIPALE</span>` :
+                `<button class="btn outline" style="padding: 6px 14px; font-size: 0.75rem; white-space: nowrap; border-radius: 999px;" onclick="setPrimaryLocation(${index})">Imposta Principale</button>`
               }
             </div>
-            <input type="text" id="locAddr_${index}" value="${extractStreetFromAddress(loc.address, loc.cap, loc.city) || ''}" placeholder="Via e numero civico">
-            <div style="display: flex; gap: 10px;">
-              <input type="text" id="locCity_${index}" value="${loc.city || ''}" placeholder="Città" style="flex: 1;">
-              <input type="text" id="locCap_${index}" value="${loc.cap || ''}" placeholder="CAP" style="width: 100px;">
+
+            <div class="form-row" style="gap: 10px;">
+              <div class="input-group" style="flex: 2;">
+                <label>Indirizzo</label>
+                <input type="text" id="locAddr_${index}" value="${extractStreetFromAddress(loc.address, loc.cap, loc.city) || ''}" placeholder="Via e numero civico">
+              </div>
+              <div class="input-group" style="flex: 1.2;">
+                <label>Città</label>
+                <input type="text" id="locCity_${index}" value="${loc.city || ''}" placeholder="Città">
+              </div>
+              <div class="input-group" style="flex: 0 0 90px;">
+                <label>CAP</label>
+                <input type="text" id="locCap_${index}" value="${loc.cap || ''}" placeholder="00000">
+              </div>
             </div>
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
-              ${(!loc.isPrimary && locations.length > 1) ? `<button class="btn danger" style="padding: 5px 10px;" onclick="removeLocation(${index})">Rimuovi</button>` : ''}
-              <button class="btn" style="padding: 5px 15px;" onclick="saveLocationEdit(${index})">Salva Sede</button>
+
+            <div style="margin-top: 16px; padding: 16px; background: #f8fafc; border: 1px solid var(--panel-border-soft); border-radius: var(--panel-radius-b);">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="color: #0f62fe;">${PANEL_ICONS.target}</span>
+                <strong style="font-size: 0.78rem; color: #334155; text-transform: uppercase; letter-spacing: 0.4px;">Coordinate GPS</strong>
+                ${!canSetCoords ? `<span class="badge-plan plan-standard" style="margin-left: auto;">Piano Standard+</span>` : ''}
+              </div>
+
+              ${!canSetCoords ? `
+                <p style="font-size: 0.8rem; color: #64748b; margin: 8px 0 0;">Passa al piano Standard o superiore per impostare la posizione esatta di questa sede sulla mappa.</p>
+              ` : `
+                <p style="font-size: 0.78rem; color: #64748b; margin: 10px 0;">
+                  Formato come su Google Maps (es. 42°24'55.2"N 12°51'18.8"E).
+                  <a href="javascript:void(0)" onclick="openLocationGoogleMapsHelper(${index})">Trova le coordinate →</a>
+                </p>
+                <label style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase;">Latitudine</label>
+                <div class="form-row" style="gap: 8px; margin: 4px 0 10px; align-items: flex-end;">
+                  <div class="input-group" style="flex: 1;"><input type="number" id="locLatDeg_${index}" min="0" max="90" placeholder="Gradi" value="${latDMS.deg}"></div>
+                  <div class="input-group" style="flex: 1;"><input type="number" id="locLatMin_${index}" min="0" max="59" placeholder="Primi" value="${latDMS.min}"></div>
+                  <div class="input-group" style="flex: 1;"><input type="number" id="locLatSec_${index}" min="0" max="59.99" step="0.1" placeholder="Secondi" value="${latDMS.sec}"></div>
+                  <div class="input-group" style="flex: 0.6;">
+                    <select id="locLatDir_${index}">
+                      <option value="N" ${latDMS.dir === 'N' ? 'selected' : ''}>N</option>
+                      <option value="S" ${latDMS.dir === 'S' ? 'selected' : ''}>S</option>
+                    </select>
+                  </div>
+                </div>
+                <label style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase;">Longitudine</label>
+                <div class="form-row" style="gap: 8px; margin: 4px 0 12px; align-items: flex-end;">
+                  <div class="input-group" style="flex: 1;"><input type="number" id="locLngDeg_${index}" min="0" max="180" placeholder="Gradi" value="${lngDMS.deg}"></div>
+                  <div class="input-group" style="flex: 1;"><input type="number" id="locLngMin_${index}" min="0" max="59" placeholder="Primi" value="${lngDMS.min}"></div>
+                  <div class="input-group" style="flex: 1;"><input type="number" id="locLngSec_${index}" min="0" max="59.99" step="0.1" placeholder="Secondi" value="${lngDMS.sec}"></div>
+                  <div class="input-group" style="flex: 0.6;">
+                    <select id="locLngDir_${index}">
+                      <option value="E" ${lngDMS.dir === 'E' ? 'selected' : ''}>E</option>
+                      <option value="W" ${lngDMS.dir === 'W' ? 'selected' : ''}>O</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="text-align: right;">
+                  <button class="btn outline" style="padding: 7px 16px; font-size: 0.8rem; border-radius: 999px;" onclick="saveLocationCoordinates(${index})">Salva Coordinate</button>
+                </div>
+              `}
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--panel-border-soft);">
+              ${(!loc.isPrimary && locations.length > 1) ? `<button class="btn danger" style="padding: 8px 16px; border-radius: 999px;" onclick="removeLocation(${index})">Rimuovi</button>` : ''}
+              <button class="btn" style="padding: 8px 20px; border-radius: 999px;" onclick="saveLocationEdit(${index})">Salva Sede</button>
             </div>
           </div>
-        `).join('')}
-      </div>
-
-      ${!isProfessional ? `
-        <div style="margin-top: 25px; padding: 15px; background: #eff6ff; border-radius: 12px; border: 1px solid #bfdbfe; font-size: 0.85rem; color: #1e40af;">
-          🚀 <strong>Vuoi gestire più punti vendita?</strong> Passa al piano Professional per sbloccare la gestione multi-sede e pubblicare offerte per tutte le tue filiali.
-        </div>
-      ` : ''}
+        `;
+      }).join('')}
     </div>
+
+    ${!isProfessional ? `
+      <div class="upgrade-banner banner-info" style="margin-top: 20px;">
+        <div>🚀 <strong>Vuoi gestire più punti vendita?</strong> Passa al piano Professional per sbloccare la gestione multi-sede e pubblicare offerte per tutte le tue filiali.</div>
+      </div>
+    ` : ''}
   `;
 }
 
@@ -5817,7 +5809,7 @@ window.setPrimaryLocation = (index) => {
 
     toast.success("Sede principale aggiornata.");
     renderStoreView();
-  });
+  }, '#0f62fe');
 };
 
 // Salva le modifiche a nome/indirizzo/città/CAP di una sede già esistente,
@@ -5866,6 +5858,57 @@ window.saveLocationEdit = async (index) => {
   state.currentStore = partner;
 
   toast.success("Sede aggiornata.");
+  renderStoreView();
+};
+
+window.openLocationGoogleMapsHelper = (index) => {
+  const street = document.getElementById(`locAddr_${index}`)?.value || "";
+  const city = document.getElementById(`locCity_${index}`)?.value || "";
+  const query = `${street}, ${city}, Italia`;
+  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank', 'noopener');
+};
+
+// Salva le coordinate GPS di una singola sede (funzione riservata al piano Standard e superiori).
+window.saveLocationCoordinates = async (index) => {
+  if (!checkPermission('Standard')) return;
+
+  const partner = getCurrentPartner();
+  const loc = partner.locations[index];
+  if (!loc || !loc.id) return toast.error("Sede non valida.");
+
+  const latDeg = document.getElementById(`locLatDeg_${index}`)?.value;
+  const latMin = document.getElementById(`locLatMin_${index}`)?.value;
+  const latSec = document.getElementById(`locLatSec_${index}`)?.value;
+  const latDir = document.getElementById(`locLatDir_${index}`)?.value;
+  const lngDeg = document.getElementById(`locLngDeg_${index}`)?.value;
+  const lngMin = document.getElementById(`locLngMin_${index}`)?.value;
+  const lngSec = document.getElementById(`locLngSec_${index}`)?.value;
+  const lngDir = document.getElementById(`locLngDir_${index}`)?.value;
+
+  if (!latDeg?.trim() || !lngDeg?.trim()) {
+    return toast.error("Inserisci almeno i gradi di latitudine e longitudine.");
+  }
+
+  const latVal = dmsToDecimal(latDeg, latMin, latSec, latDir);
+  const lngVal = dmsToDecimal(lngDeg, lngMin, lngSec, lngDir);
+
+  if (isNaN(latVal) || isNaN(lngVal) || latVal < -90 || latVal > 90 || lngVal < -180 || lngVal > 180) {
+    return toast.error("Coordinate non valide. Controlla gradi, primi e secondi inseriti.");
+  }
+
+  const { error } = await supabaseClient.rpc('cache_location_coordinates', { p_location_id: loc.id, p_lat: latVal, p_lng: lngVal });
+  if (error) {
+    console.error("Errore salvataggio coordinate sede:", error);
+    return toast.error("Errore durante il salvataggio delle coordinate.");
+  }
+
+  partner.locations[index] = { ...loc, latitude: latVal, longitude: lngVal };
+  const dataString = JSON.stringify(partner);
+  sessionStorage.setItem(SESSION_PARTNER, dataString);
+  localStorage.setItem(PARTNER_AUTH_KEY, dataString);
+  state.currentStore = partner;
+
+  toast.success("Coordinate della sede aggiornate.");
   renderStoreView();
 };
 
@@ -6039,7 +6082,7 @@ function renderGeneralDashboardTab() {
 
     <div class="general-dash-grid">
       ${isEnterprise ? `
-        <div class="card-saas accent-blue" style="background: #f0f7ff;">
+        <div class="card-saas accent-blue" style="background: #f0f7ff; grid-column: 1 / -1;">
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
             <span class="round-ico" style="color:#1e40af;">${PANEL_ICONS.userCircle}</span>
             <h3 style="margin: 0; color: #1e40af; font-size: 1rem;">Account Manager Dedicato</h3>
@@ -6051,7 +6094,10 @@ function renderGeneralDashboardTab() {
 
       <div class="card-saas" style="padding: 25px;">
         <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 1rem; color: #475569;">Trend Interazioni (Ultimi 7 giorni)</h3>
-        <div style="width: 100%; height: 250px;"><canvas id="generalStatsCanvas"></canvas></div>
+        <div style="width: 100%; height: 250px; position: relative;">
+          <canvas id="generalStatsCanvas"></canvas>
+          <div id="generalStatsEmpty" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; text-align:center; color:#94a3b8; font-size:0.85rem; padding:0 20px;">Non ci sono ancora dati sufficienti sulle interazioni giornaliere. Il grafico si popolerà man mano che le offerte ricevono visualizzazioni e click.</div>
+        </div>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 20px;">
@@ -6068,16 +6114,57 @@ function renderGeneralDashboardTab() {
     </div>
   `;
 
-  setTimeout(() => drawGeneralChart(totalClicks), 100);
+  setTimeout(() => loadGeneralChartData(), 100);
   return html;
 }
 
 /**
- * Disegna un grafico a barre base usando HTML5 Canvas
+ * Recupera da Supabase i dati REALI di interazione (views+opens) degli ultimi 7 giorni
+ * per lo store corrente. Se per un giorno non esistono eventi tracciati, quel giorno
+ * viene semplicemente omesso: nessun dato generato o casuale.
  */
-function drawGeneralChart(totalClicks) {
+async function loadGeneralChartData() {
   const canvas = document.getElementById('generalStatsCanvas');
+  if (!canvas) return; // l'utente potrebbe aver cambiato tab prima che la fetch finisca
+
+  try {
+    const { data, error } = await supabaseClient.rpc('get_offer_stat_trend', { p_days: 7 });
+    if (error) {
+      console.warn("Errore caricamento trend interazioni:", error);
+      drawGeneralChart([]);
+      return;
+    }
+    drawGeneralChart(data || []);
+  } catch (err) {
+    console.warn("Errore caricamento trend interazioni:", err);
+    drawGeneralChart([]);
+  }
+}
+
+/**
+ * Disegna un grafico a barre con i dati reali (views + opens per giorno) restituiti da Supabase.
+ * Riceve solo i giorni per cui esistono eventi tracciati: quelli mancanti non vengono disegnati.
+ */
+function drawGeneralChart(rows) {
+  const canvas = document.getElementById('generalStatsCanvas');
+  const emptyEl = document.getElementById('generalStatsEmpty');
   if (!canvas) return;
+
+  const dayLabels = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+  const points = (rows || [])
+    .map(r => ({
+      date: r.day,
+      value: (Number(r.views) || 0) + (Number(r.opens) || 0)
+    }))
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  if (points.length === 0) {
+    canvas.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'flex';
+    return;
+  }
+  canvas.style.display = 'block';
+  if (emptyEl) emptyEl.style.display = 'none';
 
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
@@ -6089,19 +6176,14 @@ function drawGeneralChart(totalClicks) {
   canvas.style.width = rect.width + 'px';
   canvas.style.height = '250px';
   ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, rect.width, 250);
 
-  const days = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
-  
-  // Genera dati mock basati sul totale reale per visualizzare il grafico
-  const avgPerDay = totalClicks / 7;
-  const data = days.map(() => Math.floor(avgPerDay * (0.6 + Math.random() * 0.8)));
-  const maxVal = Math.max(...data, 10);
-
+  const maxVal = Math.max(...points.map(p => p.value), 10);
   const padding = 40;
   const chartWidth = rect.width - padding * 2;
   const chartHeight = 250 - padding * 2;
-  const barSpacing = chartWidth / data.length;
-  const barWidth = barSpacing * 0.6;
+  const barSpacing = chartWidth / points.length;
+  const barWidth = Math.min(barSpacing * 0.6, 50);
 
   // 1. Disegno Linee di Griglia Orizzontali
   ctx.strokeStyle = '#e2e8f0';
@@ -6114,19 +6196,17 @@ function drawGeneralChart(totalClicks) {
   }
   ctx.stroke();
 
-  // 2. Disegno Barre
-  data.forEach((val, i) => {
+  // 2. Disegno Barre con dati reali
+  points.forEach((p, i) => {
     const x = padding + (i * barSpacing) + (barSpacing - barWidth) / 2;
-    const h = (val / maxVal) * chartHeight;
+    const h = (p.value / maxVal) * chartHeight;
     const y = 250 - padding - h;
 
-    // Gradiente moderno per la barra
     const grad = ctx.createLinearGradient(0, y, 0, 250 - padding);
     grad.addColorStop(0, '#3b82f6');
     grad.addColorStop(1, '#6366f1');
 
     ctx.fillStyle = grad;
-    // Disegna rettangolo con bordi superiori arrotondati
     if (ctx.roundRect) {
         ctx.beginPath();
         ctx.roundRect(x, y, barWidth, h, [6, 6, 0, 0]);
@@ -6135,15 +6215,16 @@ function drawGeneralChart(totalClicks) {
         ctx.fillRect(x, y, barWidth, h);
     }
 
-    // 3. Testo (Giorni e Valori)
+    // 3. Testo (Giorni e Valori) — etichetta calcolata dalla data reale
+    const label = dayLabels[new Date(p.date + 'T00:00:00').getDay()];
     ctx.fillStyle = '#64748b';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(days[i], x + barWidth / 2, 250 - 15);
-    
+    ctx.fillText(label, x + barWidth / 2, 250 - 15);
+
     ctx.fillStyle = '#1e293b';
     ctx.font = 'bold 11px sans-serif';
-    ctx.fillText(val, x + barWidth / 2, y - 8);
+    ctx.fillText(p.value, x + barWidth / 2, y - 8);
   });
 }
 
