@@ -2274,16 +2274,14 @@ async function geocodeStoreAddress(store) {
       }
     }
 
-        // Tentativo 3 (ultimo ripiego): solo la città.
-        coords = await tryGeocodeQuery(`${store.city}, Italia`);
-        if (coords) {
-          console.warn(`Indirizzo non trovato per "${store.name}", uso solo la città.`);
-          // Se vuoi un avviso a schermo senza bloccare il codice, usa .info:
-          if (typeof toast !== 'undefined' && toast.info) {
-            toast.info(`Nota: Per "${store.name}" è stata trovata solo la posizione della città.`);
-          }
-          return { ...coords, approximate: true, cityOnly: true };
-        }
+        
+    // Tentativo 3 (ultimo ripiego): solo la città. Segnato chiaramente come approssimativo.
+    coords = await tryGeocodeQuery(`${store.city}, Italia`);
+    if (coords) {
+      console.warn(`Indirizzo non trovato su OpenStreetMap per "${store.name}", uso solo la città.`);
+      return { ...coords, approximate: true, cityOnly: true };
+    }
+
     
   } catch (e) {
     console.warn("Geocoding fallito per negozio:", store.id, e);
@@ -5857,16 +5855,18 @@ window.saveLocationEdit = async (index) => {
     }
   }
 
-    // Aggiorna anche le coordinate nella memoria locale
-    partner.locations[index] = { 
-      ...loc, 
-      name: updatedLoc.name, 
-      address: updatedLoc.address, 
-      city: updatedLoc.city, 
-      cap: updatedLoc.cap,
-      latitude: updatedLoc.latitude, // Aggiunto
-      longitude: updatedLoc.longitude // Aggiunto
-    };
+    
+  // Aggiorna la memoria locale includendo anche le coordinate ritornate dal DB
+  partner.locations[index] = { 
+    ...loc, 
+    name: updatedLoc.name, 
+    address: updatedLoc.address, 
+    city: updatedLoc.city, 
+    cap: updatedLoc.cap,
+    latitude: updatedLoc.latitude || loc.latitude,
+    longitude: updatedLoc.longitude || loc.longitude
+  };
+
   
   const dataString = JSON.stringify(partner);
   sessionStorage.setItem(SESSION_PARTNER, dataString);
@@ -5918,14 +5918,20 @@ window.saveLocationCoordinates = async (index) => {
     return toast.error("Errore durante il salvataggio delle coordinate.");
   }
 
-  partner.locations[index] = { ...loc, latitude: latVal, longitude: lngVal };
+  // 1. Aggiorna l'oggetto locale
+  loc.latitude = latVal;
+  loc.longitude = lngVal;
+  partner.locations[index] = loc;
+
+  // 2. Salva la nuova sessione
   const dataString = JSON.stringify(partner);
   sessionStorage.setItem(SESSION_PARTNER, dataString);
   localStorage.setItem(PARTNER_AUTH_KEY, dataString);
   state.currentStore = partner;
 
+  // 3. Notifica e rinfresca la vista
   toast.success("Coordinate della sede aggiornate.");
-  renderStoreView();
+  setTimeout(() => { renderStoreView(); }, 100);
 };
 
 function renderImportTab() {
