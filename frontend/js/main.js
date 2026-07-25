@@ -2691,7 +2691,17 @@ window.searchSmartShoppingList = async () => {
     return;
   }
 
-  const itemCandidates = lines.map(line => ({ line, matches: fuzzyMatchOffers(line, allActiveOffers) }));
+  // Limita la ricerca alle sole sedi nel CAP impostato dall'utente (se presente),
+  // così la lista smart non propone mai negozi fuori dalla zona scelta.
+  const userCap = getCleanUserCap();
+  let offersInArea = allActiveOffers;
+  if (userCap) {
+    const distinctLocationIds = [...new Set(allActiveOffers.map(o => o.location_id).filter(Boolean))];
+    const locationsMap = await fetchPublicLocationsMap(distinctLocationIds);
+    offersInArea = allActiveOffers.filter(o => locationsMap[o.location_id]?.cap === userCap);
+  }
+
+  const itemCandidates = lines.map(line => ({ line, matches: fuzzyMatchOffers(line, offersInArea) }));
 
   let existingStoreIds = new Set();
   const userId = state.currentUser?.id;
@@ -5912,7 +5922,7 @@ window.saveLocationCoordinates = async (index) => {
     return toast.error("Coordinate non valide. Controlla gradi, primi e secondi inseriti.");
   }
 
-  const { error } = await supabaseClient.rpc('cache_location_coordinates', { p_location_id: loc.id, p_lat: latVal, p_lng: lngVal });
+  const { error } = await supabaseClient.rpc('set_location_coordinates', { p_location_id: loc.id, p_lat: latVal, p_lng: lngVal });
   if (error) {
     console.error("Errore salvataggio coordinate sede:", error);
     return toast.error("Errore durante il salvataggio delle coordinate.");
