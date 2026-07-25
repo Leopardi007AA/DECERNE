@@ -9,7 +9,17 @@ const SESSION_PARTNER = "decerne_partner_active"; // Sessione del supermercato l
 const SUPABASE_URL = "https://noqdpjlbmyjqzlmstfvx.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_ER6yqBMYCoQ561qXao-sBg_CrEv7BQ6";
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY); 
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Client Auth separato per il Negozio: chiave di storage diversa, così le due
+// sessioni (Utente e Negozio) non si sovrascrivono più a vicenda.
+const storeAuthClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    storageKey: 'sb-decerne-store-auth',
+    persistSession: true,
+    autoRefreshToken: true
+  }
+}); 
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -442,7 +452,7 @@ window.loginPartnerAction = async (email, pass) => {
     const cleanEmail = email.trim().toLowerCase();
 
     // 1. Verifica email+password vere tramite Supabase (un solo controllo, sicuro)
-    const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
+    const { data: authData, error: authError } = await storeAuthClient.auth.signInWithPassword({
       email: cleanEmail,
       password: pass
     });
@@ -451,19 +461,19 @@ window.loginPartnerAction = async (email, pass) => {
     }
 
     // 2. Recupera la riga del negozio collegata a questo utente
-    const { data: storeRow, error: storeError } = await supabaseClient
+    const { data: storeRow, error: storeError } = await storeAuthClient
       .from('stores')
       .select('*')
       .eq('auth_user_id', authData.user.id)
       .single();
     if (storeError || !storeRow) {
-      await supabaseClient.auth.signOut();
+      await storeAuthClient.auth.signOut();
       return { success: false, reason: 'no-store' };
     }
 
     // 3. Blocco se l'abbonamento è scaduto (stessa logica di prima)
     if (storeRow.subscription_status === 'expired') {
-      await supabaseClient.auth.signOut();
+      await storeAuthClient.auth.signOut();
       logAuditAction(storeRow.id, "LOGIN_BLOCKED", "Tentativo di accesso con account scaduto.");
       return { success: false, reason: 'expired' };
     }
@@ -603,14 +613,14 @@ window.saveStoreProfile = async (e) => {
 
 window.logoutPartner = () => {
   showConfirm("Vuoi uscire dall'area partner?", () => {
-    // PULIZIA TOTALE
+    storeAuthClient.auth.signOut();
     sessionStorage.removeItem(SESSION_PARTNER);
     localStorage.removeItem(PARTNER_AUTH_KEY); // FONDAMENTALE
-    
+
     state.currentStore = null;
     storeData.step = 'pricing';
     storeData.activeTab = 'home';
-    
+
     renderStoreView();
     updateDrawerUI();
     toast.info("Logout partner effettuato.");
@@ -3656,7 +3666,7 @@ setupEventListeners = function() {
 // invece di usare solo quello che era stato salvato al login (poteva diventare
 // vecchio: piano, abbonamento, indirizzo, ecc. cambiati altrove non si vedevano).
 async function refreshPartnerSession(storeId) {
-  const { data: storeRow, error } = await supabaseClient
+  const { data: storeRow, error } = await storeAuthClient
     .from('stores')
     .select('*')
     .eq('id', storeId)
@@ -3667,7 +3677,7 @@ async function refreshPartnerSession(storeId) {
     return null;
   }
 
-  const { data: locationsRows } = await supabaseClient
+  const { data: locationsRows } = await storeAuthClient
     .from('store_locations')
     .select('*')
     .eq('store_id', storeRow.id);
