@@ -2200,9 +2200,9 @@ async function renderCartContent() {
   const cart = (items || []).map(i => i.offers).filter(o => o && o.status === 'active' && o.end_date >= todayStr);
 
   const smartListHeader = `
-    <div style="display:flex; justify-content:flex-end; padding:10px 10px 4px;">
-      <button onclick="openSmartShoppingListModal()" style="background:linear-gradient(135deg,#2563eb,#1d4ed8); color:white; font-weight:600; border-radius:999px; padding:10px 18px; box-shadow:0 4px 14px rgba(37,99,235,0.35); display:inline-flex; align-items:center; gap:6px; border:none; font-size:0.85rem; cursor:pointer;">
-        📝 Lista della spesa
+    <div class="cart-toolbar">
+      <button class="btn cart-smart-btn" onclick="openSmartShoppingListModal()">
+        ${PANEL_ICONS.basket} Lista della spesa
       </button>
     </div>
   `;
@@ -2210,7 +2210,11 @@ async function renderCartContent() {
   if (cart.length === 0) {
     content.innerHTML = `
       ${smartListHeader}
-      <div style="padding:50px; color:#64748b;"><h3>La tua lista è vuota</h3><p>Aggiungi le offerte che ti interessano per trovarle facilmente in negozio.</p></div>
+      <div class="cart-empty-state">
+        <div class="round-ico">${PANEL_ICONS.basket}</div>
+        <h3>La tua lista è vuota</h3>
+        <p>Aggiungi le offerte che ti interessano per trovarle facilmente in negozio.</p>
+      </div>
     `;
     return;
   }
@@ -2219,21 +2223,21 @@ async function renderCartContent() {
 
   content.innerHTML = `
     ${smartListHeader}
-    <div class="offers-list-container">
+    <div class="cart-list">
     ${cart.map(o => `
-      <div class="offer-row" onclick="closeFullPageModal(); openProductDetail('${o.id}')" style="cursor:pointer;">
-        <img src="${getSafeImageUrl(o.img_url)}" style="width:60px; height:60px; object-fit:cover; margin:10px; border-radius:8px;">
-        <div class="product-info" style="padding:10px;">
-          <div class="product-details">
-            <div class="store-name">${locationsById[o.location_id]?.name || ""}</div>
-            <h3 style="font-size:0.95rem;">${o.product}</h3>
-            <div class="price-tag" style="font-size:1rem;">${formatPrice(o.price)}</div>
+      <div class="cart-row" onclick="closeFullPageModal(); openProductDetail('${o.id}')">
+        <div class="cart-row-img"><img src="${getSafeImageUrl(o.img_url)}" alt=""></div>
+        <div class="cart-row-body">
+          <div class="cart-row-info">
+            <div class="cart-row-store">${locationsById[o.location_id]?.name || ""}</div>
+            <div class="cart-row-product">${o.product}</div>
+            <div class="cart-row-price">${formatPrice(o.price)}</div>
           </div>
-          <button class="btn danger" onclick="event.stopPropagation(); removeFromCart('${o.id}')" style="padding:5px 10px; font-size:0.8rem;">Rimuovi</button>
+          <button class="btn danger cart-remove-btn" onclick="event.stopPropagation(); removeFromCart('${o.id}')">Rimuovi</button>
         </div>
       </div>
     `).join('')}
-      <button class="btn full-width" onclick="openCartMapView()" style="margin-top:20px; background:#2563eb; color:white; font-weight:600;">📍 Segui nella mappa fino ai negozi</button>
+      <button class="btn cart-map-btn" onclick="openCartMapView()">${PANEL_ICONS.pin} Segui nella mappa fino ai negozi</button>
     </div>
   `;
 }
@@ -2643,32 +2647,49 @@ window.openSmartShoppingListModal = () => {
     <div style="padding:14px;">
       <button class="btn outline" onclick="renderCartContent()" style="margin-bottom:14px;">← Torna al carrello</button>
 
-      <div style="background:#fffef7; background-image:repeating-linear-gradient(to bottom, transparent, transparent 27px, #e5e0cc 28px); border-radius:6px; box-shadow:0 10px 30px rgba(0,0,0,0.15); padding:24px 24px 24px 42px; position:relative; border:1px solid #e8e2c8;">
-        <div style="position:absolute; left:24px; top:0; bottom:0; width:1px; background:#e8a0a0;"></div>
+      <div class="smart-list-card">
+        <h3>${PANEL_ICONS.basket} La tua lista della spesa</h3>
+        <p class="smart-list-subtitle">Scrivi un prodotto per campo: cerchiamo tra tutte le offerte attive il negozio più conveniente per ognuno.</p>
 
-        <h3 style="margin:0 0 4px; font-size:1.1rem;">📝 La tua lista della spesa</h3>
-        <p style="font-size:0.8rem; color:#8a8570; margin-bottom:14px;">Scrivi un prodotto per riga: cerchiamo tra tutte le offerte attive il negozio più conveniente per ognuno.</p>
+        <label class="smart-list-label" for="smartListCostPerKm">Consumo carburante (€/km) — facoltativo</label>
+        <input type="number" id="smartListCostPerKm" class="smart-list-km-field" placeholder="Es: 0.15 (se vuoto, contiamo solo il prezzo più basso)" step="0.01" min="0">
 
-        <label style="font-size:0.78rem; color:#6b6650; display:block; margin-bottom:4px;">Consumo carburante (€/km) — facoltativo</label>
-        <input type="number" id="smartListCostPerKm" placeholder="Es: 0.15 (se vuoto, contiamo solo il prezzo più basso)" step="0.01" min="0" style="width:100%; padding:8px; border-radius:6px; border:1px solid #d8d2b8; background:white; margin-bottom:16px; box-sizing:border-box; font-size:0.85rem;">
-
-        <textarea id="smartListInput" rows="6" placeholder="latte&#10;pane&#10;detersivo piatti&#10;..." style="width:100%; background:transparent; border:none; outline:none; resize:vertical; font-family:inherit; font-size:0.95rem; line-height:28px; color:#2d2a1f;"></textarea>
+        <label class="smart-list-label">Prodotti da cercare</label>
+        <div id="smartListFieldsContainer" class="smart-list-fields">
+          <div class="smart-list-field-row"><input type="text" class="smart-list-item-input" placeholder="Prodotto 1 (es: latte)" oninput="handleSmartListFieldInput(this)"></div>
+        </div>
       </div>
 
-      <button class="btn full-width" onclick="searchSmartShoppingList()" style="margin-top:16px; background:#2563eb; color:white; font-weight:600; border-radius:12px; height:50px; font-size:1rem; border:none; cursor:pointer;">🔍 Trova Offerte</button>
+      <button class="btn full-width smart-list-find-btn" onclick="searchSmartShoppingList()">${PANEL_ICONS.search} Trova Offerte</button>
 
-      <div id="smartListResults" style="margin-top:16px;"></div>
+      <div id="smartListResults" class="smart-list-results"></div>
 
-      <button id="traceSmartListBtn" onclick="traceSmartListOnMap()" disabled style="margin-top:12px; width:100%; background:#cbd5e1; color:#94a3b8; font-weight:600; border-radius:12px; height:50px; font-size:1rem; cursor:not-allowed; transition:all 0.3s; border:none;">🗺️ Traccia la lista sulla mappa</button>
+      <button id="traceSmartListBtn" class="btn smart-list-trace-btn" onclick="traceSmartListOnMap()" disabled style="background:#cbd5e1; color:#94a3b8; cursor:not-allowed; box-shadow:none;">${PANEL_ICONS.route} Traccia la lista sulla mappa</button>
     </div>
   `;
+};
+
+// Aggiunge automaticamente un nuovo campo vuoto quando l'ultimo campo viene compilato
+window.handleSmartListFieldInput = (el) => {
+  const container = document.getElementById('smartListFieldsContainer');
+  if (!container) return;
+  const inputs = [...container.querySelectorAll('.smart-list-item-input')];
+  const isLast = inputs[inputs.length - 1] === el;
+  if (isLast && el.value.trim() !== '') {
+    const row = document.createElement('div');
+    row.className = 'smart-list-field-row';
+    row.innerHTML = `<input type="text" class="smart-list-item-input" placeholder="Prodotto ${inputs.length + 1} (es: pane)" oninput="handleSmartListFieldInput(this)">`;
+    container.appendChild(row);
+  }
 };
 
 window.searchSmartShoppingList = async () => {
   const resultsBox = document.getElementById('smartListResults');
   const traceBtn = document.getElementById('traceSmartListBtn');
-  const raw = document.getElementById('smartListInput')?.value || '';
-  const lines = [...new Set(raw.split('\n').map(l => l.trim()).filter(Boolean))];
+  const fieldValues = [...document.querySelectorAll('#smartListFieldsContainer .smart-list-item-input')]
+    .map(i => i.value.trim())
+    .filter(Boolean);
+  const lines = [...new Set(fieldValues)];
 
   traceBtn.disabled = true;
   traceBtn.style.background = '#cbd5e1';
@@ -2746,7 +2767,7 @@ window.searchSmartShoppingList = async () => {
         );
       });
     } catch (e) {
-      resultsBox.innerHTML = `<p style="color:#b45309; font-size:0.8rem; margin-bottom:8px;">⚠️ Non riesco a rilevare la tua posizione: confronto solo in base al prezzo più basso.</p>`;
+      resultsBox.innerHTML = `<p style="color:#b45309; font-size:0.8rem; margin-bottom:8px;">Non riesco a rilevare la tua posizione: confronto solo in base al prezzo più basso.</p>`;
     }
   }
 
@@ -2804,19 +2825,18 @@ window.searchSmartShoppingList = async () => {
     const match = assignment[idx];
     if (!match) {
       return `
-        <div style="padding:10px 14px; border-bottom:1px solid #f0f0f0;">
-          <strong>${ic.line}</strong><br>
-          <span style="font-size:0.85rem; color:#94a3b8;">Nessuna offerta disponibile al momento nelle vicinanze.</span>
+        <div class="smart-list-result-row">
+          <div class="item-name">${ic.line}</div>
+          <div class="item-empty">Nessuna offerta disponibile al momento nelle vicinanze.</div>
         </div>`;
     }
     const storeName = storesForDisplay[match.location_id]?.name || 'Negozio';
     const alreadyInRoute = existingStoreIds.has(match.location_id);
     matchedResults.push({ id: match.id, product: match.product, price: match.price, location_id: match.location_id });
     return `
-      <div style="padding:10px 14px; border-bottom:1px solid #f0f0f0;">
-        <strong>${ic.line}</strong><br>
-        <span style="font-size:0.9rem;">🏪 ${storeName} — ${formatPrice(match.price)}</span>
-        ${alreadyInRoute ? `<span style="font-size:0.75rem; color:#16a34a; margin-left:6px;">già nel carrello</span>` : ''}
+      <div class="smart-list-result-row">
+        <div class="item-name">${ic.line}</div>
+        <div class="item-match">${PANEL_ICONS.pin} ${storeName} — ${formatPrice(match.price)}${alreadyInRoute ? `<span class="already-badge">già nel carrello</span>` : ''}</div>
       </div>`;
   }).join('');
 
@@ -2824,10 +2844,10 @@ window.searchSmartShoppingList = async () => {
 
   if (matchedResults.length > 0) {
     traceBtn.disabled = false;
-    traceBtn.style.background = 'linear-gradient(135deg,#2563eb,#1d4ed8)';
+    traceBtn.style.background = 'linear-gradient(135deg, var(--primary), var(--primary-dark))';
     traceBtn.style.color = 'white';
     traceBtn.style.cursor = 'pointer';
-    traceBtn.style.boxShadow = '0 4px 14px rgba(37,99,235,0.45)';
+    traceBtn.style.boxShadow = '0 4px 14px rgba(15,98,254,0.35)';
   }
 };
 
@@ -4599,7 +4619,10 @@ const PANEL_ICONS = {
   lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>`,
   folder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>`,
   pencil: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`,
-  target: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`
+  target: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`,
+  basket: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 9h14l-1.5 10.5a2 2 0 0 1-2 1.5H8.5a2 2 0 0 1-2-1.5L5 9Z"/><path d="M9 9V7a3 3 0 0 1 6 0v2"/><path d="M9 13v4M15 13v4"/></svg>`,
+  search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`,
+  route: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="6" cy="6" r="2.3"/><circle cx="18" cy="18" r="2.3"/><path d="M8 6h7a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v0a3 3 0 0 0 3 3h7"/></svg>`,
 };
 
 // MODIFICA: renderDashboard più sicura
