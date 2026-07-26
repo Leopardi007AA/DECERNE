@@ -2423,19 +2423,20 @@ async function renderMultiStopMap(cart) {
     <div style="padding:10px;">
       <div style="display:flex; gap:8px; margin-bottom:10px;">
         <button class="btn outline" onclick="stopCartMapTracking()">← Torna alla lista</button>
-        <button class="btn outline" id="followMeBtn" onclick="toggleFollowMe()" style="margin-left:auto;">🎯 Seguimi</button>
+        <button class="btn outline" id="voiceGuideBtn" onclick="toggleCartVoice()">${PANEL_ICONS.headset} Voce</button>
+        <button class="btn outline" id="followMeBtn" onclick="toggleFollowMe()" style="margin-left:auto;">${PANEL_ICONS.target} Seguimi</button>
       </div>
       <p style="font-size:0.8rem; color:#94a3b8; margin-bottom:8px;">Tocca un negozio sulla mappa per tracciare subito il percorso.</p>
       ${unlocatableStores.length > 0 ? `
-        <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:0.8rem; color:#92400e;">
-          ⚠️ Non siamo riusciti a individuare l'indirizzo di: ${unlocatableStores.map(s => s.name).join(', ')}. Verifica che l'indirizzo del negozio sia corretto e completo.
+        <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:0.8rem; color:#92400e; display:flex; align-items:flex-start; gap:6px;">
+          ${PANEL_ICONS.alert}<span>Non siamo riusciti a individuare l'indirizzo di: ${unlocatableStores.map(s => s.name).join(', ')}. Verifica che l'indirizzo del negozio sia corretto e completo.</span>
         </div>
       ` : ''}
       <div id="cartMapContainer" style="width:100%; height:52vh; border-radius:12px; overflow:hidden;"></div>
       <div id="cartRouteInfoBar" style="display:none; margin-top:10px; padding:12px; background:#161616; color:white; border-radius:10px; text-align:center; font-size:0.95rem;"></div>
 
       <div style="margin-top:14px; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;">
-        <p style="font-size:0.85rem; color:#475569; margin-bottom:8px;">💡 Facoltativo: quanto ti costa il carburante per ogni chilometro? Ti diciamo se conviene un prezzo più alto ma più vicino.</p>
+        <p style="font-size:0.85rem; color:#475569; margin-bottom:8px; display:flex; align-items:center; gap:6px;">${PANEL_ICONS.bulb} Facoltativo: quanto ti costa il carburante per ogni chilometro? Ti diciamo se conviene un prezzo più alto ma più vicino.</p>
         <div style="display:flex; gap:8px;">
           <input type="number" id="costPerKmInput" placeholder="Es: 0.15" step="0.01" min="0" style="flex:1; padding:8px; border-radius:8px; border:1px solid #cbd5e1;">
           <button class="btn" onclick="evaluateSmartSavings()">Valuta risparmio</button>
@@ -2452,7 +2453,7 @@ async function renderMultiStopMap(cart) {
     }).addTo(cartMap);
 
     const carIcon = L.divIcon({
-      html: `<div id="carIconInner" style="font-size:26px; transform-origin:center; transition:transform 0.3s linear;">🚗</div>`,
+      html: `<div id="carIconInner" style="width:30px; height:30px; transform-origin:center; transition:transform 0.3s linear;"><svg viewBox="0 0 24 24" width="30" height="30"><circle cx="12" cy="12" r="10" fill="#2563eb" stroke="white" stroke-width="2.5"/><path d="M12 6.5 16 15 12 12.8 8 15Z" fill="white"/></svg></div>`,
       className: '', iconSize: [30, 30], iconAnchor: [15, 15]
     });
     cartUserMarker = L.marker([userPos.lat, userPos.lng], { icon: carIcon }).addTo(cartMap).bindPopup("<strong>La tua posizione</strong>");
@@ -2465,6 +2466,7 @@ async function renderMultiStopMap(cart) {
     (async () => {
       const visitOrder = computeVisitOrder(userPos.lat, userPos.lng, validStores);
       cartVisitOrder = visitOrder;
+      cartNextStopIndex = 0;
 
       const routePoints = [{ lat: userPos.lat, lng: userPos.lng }, ...visitOrder.map(s => ({ lat: s.latitude, lng: s.longitude }))];
       const multiRoute = await fetchMultiStopRoute(routePoints);
@@ -2482,15 +2484,21 @@ async function renderMultiStopMap(cart) {
 
         const legInfo = multiRoute?.legs?.[idx];
         const approxNote = store.approximateLocation
-          ? `<div style="margin-top:6px; font-size:0.75rem; color:#b45309;">⚠️ Posizione approssimativa: l'indirizzo esatto non è nel database delle mappe gratuite.</div>` : '';
+          ? `<div style="margin-top:6px; font-size:0.75rem; color:#b45309; display:flex; align-items:center; gap:4px;">${PANEL_ICONS.alert} Posizione approssimativa: l'indirizzo esatto non è nel database delle mappe gratuite.</div>` : '';
         marker.bindPopup(`
           <strong>Tappa ${idx + 1}: ${store.name}</strong><br>${productList}
-          ${legInfo ? `<div style="margin-top:8px; font-size:0.85rem; color:#475569;">📏 ${legInfo.distanceKm.toFixed(1)} km da qui &nbsp;·&nbsp; 🕒 ${formatDuration(legInfo.durationMin)}</div>` : ''}
+          ${legInfo ? `<div style="margin-top:8px; font-size:0.85rem; color:#475569; display:flex; align-items:center; gap:6px;">${PANEL_ICONS.road} ${legInfo.distanceKm.toFixed(1)} km da qui &nbsp;·&nbsp; ${PANEL_ICONS.clock} ${formatDuration(legInfo.durationMin)}</div>` : ''}
           ${approxNote}
         `);
       });
 
       updateTripInfoBar();
+      if (cartVoiceEnabled) {
+        const firstStopName = visitOrder[0]?.name || '';
+        speakVoiceMessage(visitOrder.length === 1
+          ? `Percorso pronto. Direzione ${firstStopName}.`
+          : `Percorso pronto con ${visitOrder.length} tappe. Prima tappa: ${firstStopName}.`);
+      }
       cartMap.fitBounds(bounds, { padding: [40, 40] });
       setTimeout(() => cartMap.invalidateSize(), 100);
     })();
@@ -2513,6 +2521,8 @@ let cartItemsByStoreGlobal = {};
 let cartUserPos = null;
 let cartVisitOrder = [];
 let cartMultiRoute = null;
+let cartNextStopIndex = 0;
+let cartVoiceEnabled = false;
 
 function computeVisitOrder(startLat, startLng, stores) {
   const remaining = [...stores];
@@ -2566,11 +2576,18 @@ function updateTripInfoBar() {
   if (!bar || !cartMultiRoute || !cartVisitOrder.length) return;
   bar.style.display = 'block';
   const stopsList = cartVisitOrder.map((s, i) => `${i + 1}. ${s.name}`).join(' → ');
+
+  // Tempo di arrivo riferito alla PRIMA tappa (non all'ultima). Se c'è una sola tappa, solo "Arrivo".
+  const firstLegMin = cartMultiRoute.legs?.[0]?.durationMin ?? cartMultiRoute.totalDurationMin;
+  const etaLabel = cartVisitOrder.length === 1
+    ? `Arrivo: ${formatEta(firstLegMin)}`
+    : `Arrivo alla prima tappa: ${formatEta(firstLegMin)}`;
+
   bar.innerHTML = `
     <div style="font-size:0.8rem; color:#cbd5e1; margin-bottom:4px;">${stopsList}</div>
-    <strong>Percorso completo</strong>: 📏 ${cartMultiRoute.totalDistanceKm.toFixed(1)} km &nbsp;·&nbsp;
-    🕒 ${formatDuration(cartMultiRoute.totalDurationMin)} &nbsp;·&nbsp;
-    Arrivo all'ultima tappa: ${formatEta(cartMultiRoute.totalDurationMin)}
+    <strong>Percorso completo</strong>: ${PANEL_ICONS.road} ${cartMultiRoute.totalDistanceKm.toFixed(1)} km &nbsp;·&nbsp;
+    ${PANEL_ICONS.clock} ${formatDuration(cartMultiRoute.totalDurationMin)} &nbsp;·&nbsp;
+    ${etaLabel}
   `;
 }
 
@@ -2966,7 +2983,7 @@ async function evaluateSmartSavings() {
   }
 
   if (results.length === 0) {
-    panel.innerHTML = `<p style="color:#16a34a; font-size:0.85rem;">✅ Stai già facendo le scelte migliori: nessun'altra combinazione conviene di più.</p>`;
+    panel.innerHTML = `<p style="color:#16a34a; font-size:0.85rem; font-weight:600;">Stai già facendo le scelte migliori: nessun'altra combinazione conviene di più.</p>`;
     return;
   }
 
@@ -2992,7 +3009,7 @@ async function evaluateSmartSavings() {
 
   panel.innerHTML = `
     ${cards}
-    ${totalSavings > 0 ? `<p style="font-weight:600; margin-top:8px;">💰 Risparmio totale possibile: ${formatPrice(totalSavings)}</p>` : ''}
+    ${totalSavings > 0 ? `<p style="font-weight:600; margin-top:8px; color:#16a34a;">Risparmio totale possibile: ${formatPrice(totalSavings)}</p>` : ''}
     <p style="font-size:0.75rem; color:#94a3b8; margin-top:6px;">Assumiamo che tu visiti comunque i negozi già presenti nel tuo percorso attuale.</p>
   `;
 }
@@ -3003,6 +3020,41 @@ function calculateBearing(lat1, lon1, lat2, lon2) {
   const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
             Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function speakVoiceMessage(text) {
+  if (!cartVoiceEnabled || !('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel(); // evita che due frasi si accavallino
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'it-IT';
+  utter.rate = 1;
+  window.speechSynthesis.speak(utter);
+}
+
+function toggleCartVoice() {
+  cartVoiceEnabled = !cartVoiceEnabled;
+  updateVoiceBtnLabel();
+  if (cartVoiceEnabled) {
+    speakVoiceMessage("Assistente vocale attivato. Ti avviserò quando arrivi a ogni tappa.");
+  } else if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+}
+
+function updateVoiceBtnLabel() {
+  const btn = document.getElementById('voiceGuideBtn');
+  if (btn) btn.innerHTML = cartVoiceEnabled
+    ? `${PANEL_ICONS.headset} Voce (attiva)`
+    : `${PANEL_ICONS.headset} Voce`;
 }
 
 function startLiveTracking() {
@@ -3032,6 +3084,20 @@ function startLiveTracking() {
         cartLastRouteRecalc = now;
         recalculateTrip(newLat, newLng);
       }
+
+      if (cartVoiceEnabled && cartVisitOrder.length && cartNextStopIndex < cartVisitOrder.length) {
+        const nextStop = cartVisitOrder[cartNextStopIndex];
+        const d = distanceMeters(newLat, newLng, nextStop.latitude, nextStop.longitude);
+        if (d < 60) {
+          const isLast = cartNextStopIndex === cartVisitOrder.length - 1;
+          speakVoiceMessage(`Sei arrivato a ${nextStop.name}.` + (isLast ? ' Hai completato il percorso.' : ''));
+          cartNextStopIndex++;
+          if (!isLast) {
+            const upcoming = cartVisitOrder[cartNextStopIndex];
+            setTimeout(() => speakVoiceMessage(`Prossima tappa: ${upcoming.name}.`), 3500);
+          }
+        }
+      }
     },
     (err) => console.warn("Errore tracciamento posizione:", err),
     { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
@@ -3046,7 +3112,9 @@ function toggleFollowMe() {
 
 function updateFollowBtnLabel() {
   const btn = document.getElementById('followMeBtn');
-  if (btn) btn.innerText = cartFollowMe ? "🎯 Seguimi (attivo)" : "🎯 Seguimi";
+  if (btn) btn.innerHTML = cartFollowMe
+    ? `${PANEL_ICONS.target} Seguimi (attivo)`
+    : `${PANEL_ICONS.target} Seguimi`;
 }
 
 function stopCartMapTracking() {
@@ -3063,6 +3131,8 @@ function stopCartMapTracking() {
   cartUserPos = null;
   cartVisitOrder = [];
   cartMultiRoute = null;
+  cartNextStopIndex = 0;
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   renderCartContent();
 }
 
@@ -4623,6 +4693,8 @@ const PANEL_ICONS = {
   basket: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 9h14l-1.5 10.5a2 2 0 0 1-2 1.5H8.5a2 2 0 0 1-2-1.5L5 9Z"/><path d="M9 9V7a3 3 0 0 1 6 0v2"/><path d="M9 13v4M15 13v4"/></svg>`,
   search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`,
   route: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="6" cy="6" r="2.3"/><circle cx="18" cy="18" r="2.3"/><path d="M8 6h7a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v0a3 3 0 0 0 3 3h7"/></svg>`,
+  clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>`,
+  road: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M8 3 5 21"/><path d="M16 3l3 18"/><path d="M12 6v2M12 11v2M12 16v2"/></svg>`,
 };
 
 // MODIFICA: renderDashboard più sicura
