@@ -3155,6 +3155,27 @@ window.removeFromCart = async (id) => {
   renderCartContent();
 };
 
+async function signInWithProvider(provider) {
+  try {
+    showLoading();
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: window.location.origin + window.location.pathname }
+    });
+    if (error) {
+      hideLoading();
+      toast.error("Impossibile accedere con " + provider + ". Riprova.");
+    }
+    // In caso di successo il browser viene reindirizzato al provider:
+    // al ritorno, restoreUserSession() (già chiamata in init()) rileva
+    // automaticamente la sessione e aggiorna l'interfaccia.
+  } catch (e) {
+    hideLoading();
+    console.error("Errore signInWithProvider:", e);
+    toast.error("Errore durante l'accesso.");
+  }
+}
+
 // ---------- Gestione Popup e Drawer ----------
 // --- FUNZIONI DI SUPPORTO MODAL (PORTATE ALL'ESTERNO) ---
 
@@ -3174,6 +3195,11 @@ function renderLoginForm() {
       <p style="text-align:center; margin-top:10px;">
         <a href="javascript:void(0)" onclick="renderForgotPasswordForm()" style="font-size:0.85rem; color:#64748b;">Password dimenticata?</a>
       </p>
+      <div class="social-divider"><span>oppure</span></div>
+      <button type="button" class="btn-social btn-google" onclick="signInWithProvider('google')">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><g fill-rule="evenodd"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z" fill="#EA4335"/></g></svg>
+        Continua con Google
+      </button>
       <p class="auth-switch">Non sei registrato? <a href="javascript:void(0)" onclick="showRegisterForm()">Registrati</a></p>
     </div>
   `;
@@ -3304,6 +3330,11 @@ function showRegisterForm() {
         </div>
         <button type="submit" class="btn">Registrati</button>
       </form>
+      <div class="social-divider"><span>oppure</span></div>
+      <button type="button" class="btn-social btn-google" onclick="signInWithProvider('google')">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><g fill-rule="evenodd"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z" fill="#EA4335"/></g></svg>
+        Continua con Google
+      </button>
       <p class="auth-switch">Hai già un account? <a href="javascript:void(0)" onclick="renderLoginForm()">Accedi</a></p>
     </div>
   `;
@@ -3444,6 +3475,7 @@ function openFullPageModal(type) {
   const modal = $("#fullPagePopup");
   if(!modal) return;
   
+  modal.classList.toggle("auth-modal", type === 'profile');
   modal.style.display = "flex";
   document.body.style.overflow = 'hidden';
 
@@ -3501,6 +3533,7 @@ async function validateRegistration() {
 function closeFullPageModal() {
   try {
     $("#fullPagePopup").style.display = "none";
+    $("#fullPagePopup").classList.remove("auth-modal");
     // RIPRISTINA SCORRIMENTO
     document.body.style.overflow = '';
   } catch (e) { console.error(e); }

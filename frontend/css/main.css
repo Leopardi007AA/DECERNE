@@ -1132,7 +1132,8 @@ body.drawer-open .navbar {
   padding: 80px 0 20px 0; /* Spazio per la navbar in alto */
   transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1500; /* Sopra #chisiamo-view (1400) così è visibile anche da quella pagina */
-  box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+  border-radius: 20px 0 0 20px;
+  box-shadow: -12px 0 40px rgba(15, 23, 42, 0.18);
 }
 
 /* SISTEMAZIONE MENU: Rimuove la traslazione a destra */
@@ -1144,20 +1145,32 @@ body.drawer-open .navbar {
 }
 
 .nav-menu li {
-  padding: 15px 25px; /* Padding interno equilibrato */
-  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 25px;
+  margin: 2px 10px 2px 0;
   cursor: pointer;
   font-weight: 500;
   color: var(--text);
   border-left: 4px solid transparent;
+  border-radius: 0 999px 999px 0;
   transition: 0.2s;
 }
 
-.nav-menu li:hover { background: #f0f4ff; color: var(--primary); }
-.nav-menu li.active { 
-  background: #f0f4ff; 
-  color: var(--primary); 
-  border-left-color: var(--primary); 
+.menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.nav-menu li:hover { background: linear-gradient(90deg, #eef2ff, transparent); color: var(--primary); }
+.nav-menu li.active {
+  background: linear-gradient(90deg, #e6edff, transparent);
+  color: var(--primary);
+  border-left-color: var(--primary);
 }
 
 #overlay {
@@ -1262,6 +1275,89 @@ hr {
   border-top: 1px solid #f0f0f0;
   margin: 10px 0;
 }
+
+/* ============================================================
+   POPUP CENTRATO (Login / Registrazione / Il Tuo Profilo)
+   Il contenuto resta invariato: cambia solo il contenitore,
+   che diventa una card centrata (invece che a tutto schermo)
+   con lo sfondo sottostante scurito.
+   ============================================================ */
+   .full-page-modal .modal-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+  }
+  
+  .full-page-modal.auth-modal {
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(10, 15, 30, 0.6);
+    backdrop-filter: blur(3px);
+  }
+  
+  .full-page-modal.auth-modal .modal-card {
+    width: min(440px, 100%);
+    height: auto;
+    max-height: 88vh;
+    background: var(--white);
+    border-radius: 20px;
+    box-shadow: 0 25px 60px rgba(10, 15, 30, 0.35);
+    overflow: hidden;
+    animation: authPopIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .full-page-modal.auth-modal .modal-content {
+    overflow-y: auto;
+  }
+  
+  @keyframes authPopIn {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  
+  /* Bottoni di accesso tramite provider esterni (Google, ecc.) */
+  .social-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 22px 0;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .social-divider::before,
+  .social-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #e5e9f0;
+  }
+  
+  .btn-social {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #dde2ea;
+    background: var(--white);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-social:hover {
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(15, 98, 254, 0.12);
+    transform: translateY(-1px);
+  }
 
 /* Badge di Stato Offerta */
 .status-pill {
