@@ -1148,13 +1148,12 @@ body.drawer-open .navbar {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 25px;
-  margin: 2px 10px 2px 0;
+  padding: 14px 22px;
+  margin: 2px 10px;
   cursor: pointer;
   font-weight: 500;
   color: var(--text);
-  border-left: 4px solid transparent;
-  border-radius: 0 999px 999px 0;
+  border-radius: 999px;
   transition: 0.2s;
 }
 
@@ -1168,10 +1167,11 @@ body.drawer-open .navbar {
 
 .nav-menu li:hover { background: linear-gradient(90deg, #eef2ff, transparent); color: var(--primary); }
 .nav-menu li.active {
-  background: linear-gradient(90deg, #e6edff, transparent);
-  color: var(--primary);
-  border-left-color: var(--primary);
+  background: linear-gradient(90deg, var(--primary) 0%, var(--primary-dark) 55%, transparent 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(15, 98, 254, 0.25);
 }
+.nav-menu li.active .menu-icon { opacity: 1; }
 
 #overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5);
@@ -1358,6 +1358,8 @@ hr {
     box-shadow: 0 4px 12px rgba(15, 98, 254, 0.12);
     transform: translateY(-1px);
   }
+  .btn-social.btn-facebook svg,
+  .btn-social.btn-apple svg { flex-shrink: 0; }
 
 /* Badge di Stato Offerta */
 .status-pill {

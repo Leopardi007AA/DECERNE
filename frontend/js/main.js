@@ -3200,6 +3200,14 @@ function renderLoginForm() {
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><g fill-rule="evenodd"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z" fill="#EA4335"/></g></svg>
         Continua con Google
       </button>
+      <button type="button" class="btn-social btn-facebook" onclick="signInWithProvider('facebook')">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        Continua con Facebook
+      </button>
+      <button type="button" class="btn-social btn-apple" onclick="signInWithProvider('apple')">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#000000" d="M16.365 1.43c0 1.14-.417 2.19-1.25 3.15-.977 1.14-2.164 1.8-3.454 1.69-.06-1.09.42-2.23 1.24-3.09.87-.92 2.35-1.62 3.464-1.75zm4.145 17.14c-.62 1.44-.92 2.08-1.72 3.35-1.11 1.77-2.68 3.97-4.62 3.99-1.72.02-2.16-1.12-4.49-1.11-2.33.01-2.82 1.13-4.54 1.11-1.94-.02-3.42-2.01-4.53-3.78-3.11-4.92-3.44-10.7-1.52-13.78 1.36-2.19 3.51-3.47 5.53-3.47 2.06 0 3.36 1.13 5.07 1.13 1.66 0 2.67-1.13 5.06-1.13 1.8 0 3.71.98 5.07 2.68-4.45 2.44-3.73 8.79.68 10.99z"/></svg>
+        Continua con Apple
+      </button>
       <p class="auth-switch">Non sei registrato? <a href="javascript:void(0)" onclick="showRegisterForm()">Registrati</a></p>
     </div>
   `;
@@ -3334,6 +3342,14 @@ function showRegisterForm() {
       <button type="button" class="btn-social btn-google" onclick="signInWithProvider('google')">
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><g fill-rule="evenodd"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z" fill="#EA4335"/></g></svg>
         Continua con Google
+      </button>
+      <button type="button" class="btn-social btn-facebook" onclick="signInWithProvider('facebook')">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        Continua con Facebook
+      </button>
+      <button type="button" class="btn-social btn-apple" onclick="signInWithProvider('apple')">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#000000" d="M16.365 1.43c0 1.14-.417 2.19-1.25 3.15-.977 1.14-2.164 1.8-3.454 1.69-.06-1.09.42-2.23 1.24-3.09.87-.92 2.35-1.62 3.464-1.75zm4.145 17.14c-.62 1.44-.92 2.08-1.72 3.35-1.11 1.77-2.68 3.97-4.62 3.99-1.72.02-2.16-1.12-4.49-1.11-2.33.01-2.82 1.13-4.54 1.11-1.94-.02-3.42-2.01-4.53-3.78-3.11-4.92-3.44-10.7-1.52-13.78 1.36-2.19 3.51-3.47 5.53-3.47 2.06 0 3.36 1.13 5.07 1.13 1.66 0 2.67-1.13 5.06-1.13 1.8 0 3.71.98 5.07 2.68-4.45 2.44-3.73 8.79.68 10.99z"/></svg>
+        Continua con Apple
       </button>
       <p class="auth-switch">Hai già un account? <a href="javascript:void(0)" onclick="renderLoginForm()">Accedi</a></p>
     </div>
@@ -3556,7 +3572,10 @@ function closeDrawer() {
     $("#overlay").style.display = "none";
     $("#menuBtn").classList.remove("open");
     document.body.style.overflow = '';
-    document.body.classList.remove('drawer-open');
+    // La navbar resta sopra al drawer per tutta la durata dell'animazione di uscita
+    // (0.3s, vedi transition di #drawer in CSS): solo dopo la classe viene rimossa,
+    // così il drawer non passa mai visivamente sopra alla navbar mentre scorre via.
+    setTimeout(() => document.body.classList.remove('drawer-open'), 300);
     notifyChiSiamoDrawerState(false);
   } catch (e) { console.error(e); }
 }
@@ -4102,60 +4121,6 @@ function renderStoreView() {
   }
 }
 
-function renderStoreLoginForm(container) {
-  container.innerHTML = `
-    <div class="pricing-wrapper" style="max-width: 420px; margin: 60px auto;">
-      <div class="onboarding-card">
-        <h3>Accesso Area Partner</h3>
-        <div id="storeLoginError" class="error-msg hidden"></div>
-        <form id="storeLoginForm" class="auth-form">
-          <input type="email" id="storeLoginEmail" placeholder="Email aziendale" required>
-          <input type="password" id="storeLoginPass" placeholder="Password" required>
-          <button type="submit" class="btn full-width">Accedi</button>
-        </form>
-        <p style="text-align:center; margin-top:10px;">
-          <a href="javascript:void(0)" onclick="renderStoreForgotPasswordForm()" style="font-size:0.85rem; color:#64748b;">Password dimenticata?</a>
-        </p>
-        <p class="auth-switch" style="text-align:center; margin-top:15px;">
-          <a href="javascript:void(0)" onclick="storeData.step='pricing'; renderStoreView();">Torna ai piani</a>
-        </p>
-      </div>
-    </div>
-  `;
-
-  $("#storeLoginForm").onsubmit = async (e) => {
-    e.preventDefault();
-    const btn = e.target.querySelector('button[type="submit"]');
-    btn.disabled = true;
-    btn.innerText = "Accesso in corso...";
-
-    const email = $("#storeLoginEmail").value;
-    const pass = $("#storeLoginPass").value;
-    const result = await window.loginPartnerAction(email, pass);
-
-    if (result.success) {
-      storeData.step = 'dashboard';
-      storeData.activeTab = 'home';
-      renderStoreView();
-      updateDrawerUI();
-      await refreshMyOffers();
-      toast.success("Bentornato!");
-    } else {
-      btn.disabled = false;
-      btn.innerText = "Accedi";
-      const err = $("#storeLoginError");
-      const messages = {
-        credentials: "Email o password errati.",
-        'no-store': "Nessun negozio associato a questo account.",
-        expired: "Il tuo abbonamento è scaduto. Contatta l'assistenza.",
-        technical: "Errore tecnico. Riprova tra poco."
-      };
-      err.innerText = messages[result.reason] || "Errore durante l'accesso.";
-      err.classList.remove("hidden");
-    }
-  };
-}
-
 function renderStoreForgotPasswordForm() {
   const container = $("#store-app-container");
   container.innerHTML = `
@@ -4478,8 +4443,8 @@ function renderOnboarding(container) {
 async function resendOnboardingOtp() {
   if (!storeData.tempReg?.email) return;
   const { error } = storeData.tempReg.existingAccount
-    ? await supabaseClient.auth.signInWithOtp({ email: storeData.tempReg.email, options: { shouldCreateUser: false } })
-    : await supabaseClient.auth.resend({ type: 'signup', email: storeData.tempReg.email });
+    ? await storeAuthClient.auth.signInWithOtp({ email: storeData.tempReg.email, options: { shouldCreateUser: false } })
+    : await storeAuthClient.auth.resend({ type: 'signup', email: storeData.tempReg.email });
   if (error) toast.error("Errore nell'invio. Riprova tra qualche minuto.");
   else toast.success("Codice reinviato!");
 }
@@ -4499,7 +4464,7 @@ async function handleOnboardingSubmit(step) {
 
       // Primo tentativo: c'è già un account (cliente o altro) con questa email?
       // shouldCreateUser:false NON crea nulla, fallisce se l'email non esiste ancora
-      const { error: otpCheckError } = await supabaseClient.auth.signInWithOtp({
+      const { error: otpCheckError } = await storeAuthClient.auth.signInWithOtp({
         email: emailClean,
         options: { shouldCreateUser: false }
       });
@@ -4540,7 +4505,7 @@ async function handleOnboardingSubmit(step) {
         existingAccount: false
       };
 
-      const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+      const { data: authData, error: authError } = await storeAuthClient.auth.signUp({
         email: emailClean,
         password: pass
       });
@@ -4560,7 +4525,7 @@ async function handleOnboardingSubmit(step) {
       // Email nuova -> tipo 'signup' (creata da signUp). Email già esistente -> tipo 'email' (da signInWithOtp)
       const otpType = storeData.tempReg.existingAccount ? 'email' : 'signup';
 
-      const { data, error } = await supabaseClient.auth.verifyOtp({
+      const { data, error } = await storeAuthClient.auth.verifyOtp({
         email: storeData.tempReg.email,
         token,
         type: otpType
@@ -4616,7 +4581,7 @@ async function handleOnboardingSubmit(step) {
       const planChoice = storeData.subscription?.plan || 'Starter';
 
       // La sessione è già attiva dallo step 3 (verifyOtp): possiamo scrivere direttamente su DB
-      const { data: storeRow, error: storeError } = await supabaseClient
+      const { data: storeRow, error: storeError } = await storeAuthClient
         .from('stores')
         .insert({
           auth_user_id: storeData.tempReg.authUserId,
@@ -4634,7 +4599,7 @@ async function handleOnboardingSubmit(step) {
         .single();
       if (storeError) throw new Error("Errore creazione negozio: " + storeError.message);
 
-      const { data: locationRow } = await supabaseClient
+      const { data: locationRow } = await storeAuthClient
         .from('store_locations')
         .insert({
           store_id: storeRow.id,
@@ -5088,6 +5053,9 @@ function renderStoreLoginForm(container) {
 
         <button type="submit" class="btn full-width">Accedi alla Dashboard</button>
       </form>
+      <p style="text-align:center; margin-top:10px;">
+        <a href="javascript:void(0)" onclick="renderStoreForgotPasswordForm()" style="font-size:0.85rem; color:#64748b;">Password dimenticata?</a>
+      </p>
       <p style="margin-top:20px; font-size:0.85rem; color:#64748b;">
         Non hai un account? <a href="javascript:void(0)" onclick="storeData.step='pricing'; renderStoreView();" style="color:var(--primary); font-weight:700;">Vedi i piani</a>
       </p>
