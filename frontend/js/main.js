@@ -447,7 +447,7 @@ function getCurrentPartner() {
 }
 
 // --- LOGIN PARTNER (ora collegato a Supabase Auth) ---
-window.loginPartnerAction = async (email, pass) => {
+window.loginPartnerAction = async (email, pass, remember = true) => {
   try {
     const cleanEmail = email.trim().toLowerCase();
 
@@ -512,8 +512,12 @@ window.loginPartnerAction = async (email, pass) => {
     };
 
     const sessionData = JSON.stringify(newStore);
-    localStorage.setItem(PARTNER_AUTH_KEY, sessionData);
-    sessionStorage.setItem(SESSION_PARTNER, sessionData);
+    sessionStorage.setItem(SESSION_PARTNER, sessionData); // sempre attiva per la sessione corrente del browser
+    if (remember) {
+      localStorage.setItem(PARTNER_AUTH_KEY, sessionData); // persiste 30 giorni solo se "Resta collegato" è spuntato
+    } else {
+      localStorage.removeItem(PARTNER_AUTH_KEY); // niente persistenza: pulisce anche un eventuale "ricordami" precedente
+    }
 
     state.currentStore = newStore;
     return { success: true, store: newStore };
@@ -1153,7 +1157,7 @@ function createOfferCardElement(o) {
   storeRow.style.marginBottom = "5px";
   storeRow.textContent = o.storeName || 'Supermercato';
   
-  if (isProfessional) {
+  if (isProfessional || isEnterprise) {
     const verBadge = document.createElement("span");
     verBadge.className = "store-verified-blue";
     verBadge.style.color = "#0f62fe";
@@ -3466,20 +3470,22 @@ function renderSearchModal() {
     if (filtered.length === 0) {
       resultsDiv.innerHTML = `<p style="text-align:center; padding:20px; color:#64748b;">Nessun risultato trovato per "${query}"${userCity ? ' nella tua zona' : ''}.</p>`;
     } else {
-      resultsDiv.innerHTML = filtered.map(o => `
-        <div class="offer-row modal-row" onclick="closeFullPageModal(); openProductDetail('${o.id}')">
-          <div class="product-image-container" style="width:70px; height:70px; min-width:70px;">
-            <img src="${getSafeImageUrl(o.img)}" class="product-img">
-          </div>
-          <div class="product-info">
-            <div class="product-details">
-              <div class="store-name">${o.storeName}</div>
-              <h3 style="font-size:1rem;">${o.product}</h3>
-              <div class="price-tag" style="font-size:1rem;">${formatPrice(o.price)}</div>
+      resultsDiv.innerHTML = `
+        <div class="cart-list">
+        ${filtered.map(o => `
+          <div class="cart-row" onclick="closeFullPageModal(); openProductDetail('${o.id}')">
+            <div class="cart-row-img"><img src="${getSafeImageUrl(o.img)}" alt=""></div>
+            <div class="cart-row-body">
+              <div class="cart-row-info">
+                <div class="cart-row-store">${o.storeName}</div>
+                <div class="cart-row-product">${o.product}</div>
+                <div class="cart-row-price">${formatPrice(o.price)}</div>
+              </div>
             </div>
           </div>
+        `).join('')}
         </div>
-      `).join('');
+      `;
     }
   }, 300);
 
@@ -5074,7 +5080,7 @@ function renderStoreLoginForm(container) {
     btn.innerText = "Verifica in corso...";
     errBox.classList.add("hidden");
 
-    const result = await loginPartnerAction(emailValue, passValue);
+    const result = await loginPartnerAction(emailValue, passValue, $("#stRemember").checked);
 
     if (result.success) {
       toast.success("Accesso effettuato! Benvenuto.");
@@ -5120,7 +5126,7 @@ function displayProductInModal(product) {
     : 0;
 
   // Logica Distintivo Blu per i Professional
-  const verifiedBadge = product.plan === 'Professional' 
+  const verifiedBadge = (product.plan === 'Professional' || product.plan === 'Enterprise')
     ? `<span class="store-verified-blue" style="font-size:0.85rem; margin-left:8px; vertical-align:middle; color:#0f62fe; font-weight:800;">✓ Negozio Verificato</span>` 
     : '';
 

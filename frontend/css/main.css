@@ -1351,6 +1351,11 @@ hr {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
+    margin-bottom: 10px;
+  }
+  
+  .btn-social:last-of-type {
+    margin-bottom: 0;
   }
   
   .btn-social:hover {
