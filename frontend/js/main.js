@@ -5625,7 +5625,7 @@ window.activatePlan = async function(planName) {
       renewal_date: renewalDate.toISOString().split('T')[0]
     };
 
-    if (planName === 'Professional' && !partner.apiKey) {
+    if ((planName === 'Professional' || planName === 'Enterprise') && !partner.apiKey) {
       updates.api_key = generateRandomApiKey();
     }
 
