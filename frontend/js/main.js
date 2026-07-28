@@ -926,6 +926,8 @@ function setMode(mode) {
 
     // Grafica del drawer: scura quando siamo su "Chi Siamo", normale altrove
     if($("#drawer")) $("#drawer").classList.toggle("drawer-dark", mode === "chisiamo");
+    // Su Chi Siamo la navbar standard deve restare nascosta sotto #chisiamo-view anche a drawer aperto
+    document.body.classList.toggle("mode-chisiamo", mode === "chisiamo");
 
     closeDrawer();
     window.scrollTo(0,0);
@@ -4703,6 +4705,10 @@ const PANEL_ICONS = {
   route: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="6" cy="6" r="2.3"/><circle cx="18" cy="18" r="2.3"/><path d="M8 6h7a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v0a3 3 0 0 0 3 3h7"/></svg>`,
   clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>`,
   road: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M8 3 5 21"/><path d="M16 3l3 18"/><path d="M12 6v2M12 11v2M12 16v2"/></svg>`,
+  store: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v10a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1V9"/><path d="M3 9h18"/></svg>`,
+  calendar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>`,
+  map: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M9 3 3 5v16l6-2 6 2 6-2V3l-6 2-6-2Z"/><path d="M9 3v16M15 5v16"/></svg>`,
+  phone: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.4 2.1L8.1 9.6a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.4c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.9 2Z"/></svg>`,
 };
 
 // MODIFICA: renderDashboard più sicura
@@ -5170,8 +5176,8 @@ function displayProductInModal(product) {
           <h1 style="margin: 15px 0 10px 0; color: #1e293b; font-size: 2.2rem; line-height: 1.2;">${product.product}</h1>
           
           <p style="color: #64748b; font-size: 1rem; margin-bottom: 25px; line-height: 1.5;">
-            🏪 Punto vendita: <strong class="store-name-link" style="color:#0f62fe; cursor:pointer; text-decoration:underline;" onclick="showStoreInfoPopup(window.__currentOfferStoreInfo)">${product.storeName}</strong>${verifiedBadge}<br>
-            📍 <span style="font-size: 0.9rem;">${product.storeAddress}</span>
+            <span style="display:inline-flex; vertical-align:middle;">${PANEL_ICONS.store}</span> Punto vendita: <strong class="store-name-link" style="color:#0f62fe; cursor:pointer; text-decoration:underline;" onclick="showStoreInfoPopup(window.__currentOfferStoreInfo)">${product.storeName}</strong>${verifiedBadge}<br>
+            <span style="display:inline-flex; vertical-align:middle;">${PANEL_ICONS.pin}</span> <span style="font-size: 0.9rem;">${product.storeAddress}</span>
           </p>
           
           <div style="background: #f0f6ff; padding: 25px; border-radius: 16px; margin-bottom: 25px; border: 1px solid #dbeafe;">
@@ -5180,7 +5186,7 @@ function displayProductInModal(product) {
               ${product.originalPrice > product.price ? `<span class="old-price-small" style="font-size: 1.4rem; text-decoration: line-through; color: #94a3b8;">${formatPrice(product.originalPrice)}</span>` : ''}
             </div>
             <div style="margin-top: 10px; display: flex; align-items: center; gap: 6px; color: #1e40af; font-weight: 600;">
-              <span>🗓️</span> <span>Scade il: ${product.endDate}</span>
+              <span style="display:inline-flex;">${PANEL_ICONS.calendar}</span> <span>Scade il: ${product.endDate}</span>
             </div>
           </div>
 
@@ -5189,12 +5195,12 @@ function displayProductInModal(product) {
             <p style="line-height: 1.6; color: #475569; font-size: 1.05rem;">${product.description || 'Nessuna descrizione aggiuntiva fornita dal punto vendita.'}</p>
           </div>
           
-          <button class="btn full-width detail-btn-cart" onclick="saveToShoppingList('${product.id}')" style="height: 60px; font-size: 1.2rem; border-radius: 14px; background: #0f62fe; box-shadow: 0 4px 14px rgba(15,98,254,0.3); transition: transform 0.2s;">
-            🛒 Aggiungi alla lista spesa
+          <button class="btn full-width detail-btn-cart" onclick="saveToShoppingList('${product.id}')" style="height: 60px; font-size: 1.2rem; border-radius: 14px; background: #0f62fe; box-shadow: 0 4px 14px rgba(15,98,254,0.3); transition: transform 0.2s; display:flex; align-items:center; justify-content:center; gap:10px;">
+            ${PANEL_ICONS.basket} Aggiungi alla lista spesa
           </button>
 
-          <button class="btn outline full-width" onclick="openStoreInGoogleMaps('${(product.storeAddress || product.storeName || '').replace(/'/g, "\\'")}')" style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px;">
-            🗺️ Vedi su Google Maps
+          <button class="btn outline full-width" onclick="openStoreInGoogleMaps('${(product.storeAddress || product.storeName || '').replace(/'/g, "\\'")}')" style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
+            ${PANEL_ICONS.map} Vedi su Google Maps
           </button>
         </div>
 
@@ -5226,9 +5232,9 @@ window.showStoreInfoPopup = (store) => {
     ${store.logo ? `<img src="${getSafeImageUrl(store.logo)}" class="store-info-logo" alt="${store.name}">` : ''}
     <div class="store-info-name">${store.name || 'Supermercato'}</div>
     ${isVerified ? `<span class="store-info-plan-badge"><span style="color:#0f62fe; font-weight:800; font-size:0.8rem;">✓ Negozio Verificato</span></span>` : ''}
-    ${row('📍', 'Indirizzo', addressLine)}
-    ${row('📞', 'Telefono', store.phone)}
-    ${row('🕒', 'Orari', store.hours)}
+    ${row(PANEL_ICONS.pin, 'Indirizzo', addressLine)}
+    ${row(PANEL_ICONS.phone, 'Telefono', store.phone)}
+    ${row(PANEL_ICONS.clock, 'Orari', store.hours)}
   `;
 
   overlay.classList.remove("hidden");

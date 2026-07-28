@@ -38,13 +38,17 @@ body {
 }
 
 .logo {
-  font-family: 'Montserrat', sans-serif; /* Nuovo font per il logo */
-  font-weight: 700;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
   font-size: 24px;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.06em;
   cursor: pointer;
+  background: linear-gradient(135deg, #ffffff 0%, #bfe0ff 55%, #7ec8ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 24px rgba(125, 200, 255, 0.35);
 }
-.logo-dot { color: #FFD700; } /* Colore più caldo per il punto */
 
 .nav-icons {
   display: flex;
@@ -67,6 +71,13 @@ body {
 
 .icon-btn:hover {
   background: rgba(255,255,255,0.15);
+}
+
+/* Su schermi piccoli la navbar mostra solo Menu e Carrello */
+@media (max-width: 768px) {
+  #searchBtn, #profileBtn {
+    display: none;
+  }
 }
 
 .icon-btn svg {
@@ -481,16 +492,28 @@ body {
   left: 50%;
   transform: translateX(-50%);
   background: white;
-  padding: 20px;
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  padding: 22px;
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
   z-index: 1250;
   width: 90%;
   max-width: 500px;
-  border: 1px solid #eee;
+  border: 1px solid #eef1f6;
 }
 
-.banner-content p { margin: 0 0 15px 0; font-size: 0.95rem; line-height: 1.4; }
+.banner-row { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
+.banner-ico {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #eef3ff;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.banner-row p { margin: 0; font-size: 0.95rem; line-height: 1.4; }
 .banner-btns { display: flex; gap: 10px; justify-content: flex-end; }
 .banner-btns .btn { padding: 8px 16px; font-size: 0.9rem; }
 
@@ -1107,8 +1130,8 @@ body {
   z-index: 1300; /* Normale: sotto #chisiamo-view (1400). Sale a 1550 quando il drawer è aperto, vedi regola .drawer-open .navbar */
 }
 
-body.drawer-open .navbar {
-  z-index: 1550; /* Sopra il drawer (1500) e sopra #chisiamo-view, solo mentre il drawer è aperto */
+body.drawer-open:not(.mode-chisiamo) .navbar {
+  z-index: 1550; /* Sopra il drawer (1500), solo mentre il drawer è aperto sulle pagine standard. Su Chi Siamo (.mode-chisiamo) resta sotto #chisiamo-view (1400) */
 }
 
 /* POPUP A TUTTO SCHERMO: Coprono anche la navbar */
