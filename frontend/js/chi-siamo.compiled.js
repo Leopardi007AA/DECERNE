@@ -807,8 +807,23 @@ const {
       key: i,
       className: i <= activeIndex ? "done" : ""
     }))))), /*#__PURE__*/React.createElement("footer", {
-      className: "dc-footer"
-    }, "Decerne © 2026 • Il risparmio a portata di clic"));
+      className: "dc-footer",
+      dangerouslySetInnerHTML: {
+        __html: "<div class=\"dc-footer-inner\">" +
+          "<div class=\"dc-footer-brand\">DECERNE</div>" +
+          "<p class=\"dc-footer-legal\">[RAGIONE SOCIALE] &middot; P.IVA [PARTITA IVA] &middot; Sede: [INDIRIZZO SEDE LEGALE]<br>" +
+          "PEC: <a href=\"mailto:[PEC]\">[PEC]</a> &middot; Assistenza: <a href=\"mailto:supporto@decerne.it\">supporto@decerne.it</a></p>" +
+          "<nav class=\"dc-footer-links\" aria-label=\"Link legali\">" +
+          "<a href=\"legale.html#termini\">Termini</a>" +
+          "<a href=\"legale.html#privacy\">Privacy</a>" +
+          "<a href=\"legale.html#cookie\">Cookie</a>" +
+          "<a href=\"legale.html#rimborsi\">Rimborsi</a>" +
+          "<a href=\"legale.html#recesso\">Recesso</a>" +
+          "</nav>" +
+          "<p class=\"dc-footer-copy\">&copy; 2026 DECERNE. Tutti i diritti riservati.</p>" +
+          "</div>"
+      }
+    }));
   }
   const root = ReactDOM.createRoot(document.getElementById('root'));
   root.render(/*#__PURE__*/React.createElement(App, null));

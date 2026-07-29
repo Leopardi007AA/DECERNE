@@ -309,10 +309,153 @@ body {
   z-index: 1450;
 }
 
+/* ============ FOOTER ISTITUZIONALE ============ */
 .site-footer {
-  text-align: center;
-  padding: 40px;
-  color: #888;
+  background: linear-gradient(180deg, #ffffff 0%, #eef2f9 100%);
+  border-top: 1px solid #e2e8f0;
+  color: #475569;
+  padding: 48px 24px 0;
+  font-size: 0.85rem;
+  margin-top: 40px;
+}
+
+.footer-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr;
+  gap: 32px 24px;
+  padding-bottom: 32px;
+}
+
+.footer-col h3 {
+  color: var(--text);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 14px;
+}
+
+.footer-col ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footer-col a {
+  color: #475569;
+  text-decoration: none;
+}
+
+.footer-col a:hover,
+.footer-col a:focus-visible {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+.footer-col a:focus-visible,
+.footer-bottom a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+.footer-brand .footer-logo {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 1.3rem;
+  letter-spacing: 0.06em;
+  color: var(--primary-dark);
+  margin-bottom: 8px;
+}
+
+.footer-tagline {
+  margin: 0 0 16px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.footer-legal-list {
+  list-style: none;
+  margin: 0;
+  padding: 14px 0 0;
+  border-top: 1px dashed #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.footer-legal-list a { color: inherit; }
+
+.footer-recesso-link {
+  font-weight: 700;
+  color: var(--primary-dark) !important;
+}
+
+.footer-secure-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.footer-secure-note svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+.footer-payment-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.footer-payment-badges span {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #64748b;
+  background: #fff;
+}
+
+/* La colonna "Per te" si vede solo su Home Utenti, "Per il tuo negozio" solo su Area Partner */
+body.mode-store .footer-col-user { display: none; }
+body.mode-user .footer-col-store { display: none; }
+
+/* Niente footer dentro popup, Chi Siamo (ha il suo) o Pannello Partner */
+body.dashboard-active .site-footer,
+body.mode-chisiamo .site-footer {
+  display: none;
+}
+
+.footer-bottom {
+  max-width: 1180px;
+  margin: 0 auto;
+  border-top: 1px solid #e2e8f0;
+  padding: 16px 0;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.footer-bottom a { color: inherit; }
+
+@media (max-width: 900px) {
+  .footer-inner { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 560px) {
+  .footer-inner { grid-template-columns: 1fr; }
+  .footer-bottom { flex-direction: column; text-align: center; }
 }
 
 /* --- NUOVO LAYOUT A RIGA --- */

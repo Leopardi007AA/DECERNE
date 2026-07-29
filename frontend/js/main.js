@@ -928,6 +928,9 @@ function setMode(mode) {
     if($("#drawer")) $("#drawer").classList.toggle("drawer-dark", mode === "chisiamo");
     // Su Chi Siamo la navbar standard deve restare nascosta sotto #chisiamo-view anche a drawer aperto
     document.body.classList.toggle("mode-chisiamo", mode === "chisiamo");
+    // Footer: colonna "Per te"/"Per il tuo negozio" cambia in base alla modalità
+    document.body.classList.toggle("mode-user", mode === "user");
+    document.body.classList.toggle("mode-store", mode === "store");
 
     closeDrawer();
     window.scrollTo(0,0);
@@ -4121,6 +4124,10 @@ function renderStoreView() {
 
   // RENDERING EFFETTIVO
   container.innerHTML = ""; // Pulisce il contenitore prima di disegnare
+
+  // Il footer non deve comparire dentro il Pannello Partner (dashboard),
+  // solo sulla pagina pubblica Area Partner (piani/onboarding/login)
+  document.body.classList.toggle("dashboard-active", storeData.step === "dashboard");
 
   if (storeData.step === 'pricing') {
     renderPricingTable(container);

@@ -14,6 +14,31 @@
   <title>Decerne — Trova le migliori offerte vicino a te</title>
   <meta name="referrer" content="no-referrer-when-downgrade">
   <link rel="stylesheet" href="css/main.css">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "@id": "https://www.decerne.it/#organization",
+      "name": "DECERNE",
+      "legalName": "[RAGIONE SOCIALE COMPLETA]",
+      "url": "https://www.decerne.it",
+      "vatID": "[PARTITA IVA]",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "[VIA E NUMERO CIVICO]",
+        "addressLocality": "[COMUNE]",
+        "addressRegion": "[PROVINCIA]",
+        "postalCode": "[CAP]",
+        "addressCountry": "IT"
+      },
+      "contactPoint": [{
+        "@type": "ContactPoint",
+        "email": "supporto@decerne.it",
+        "contactType": "customer service",
+        "availableLanguage": ["Italian"]
+      }]
+    }
+    </script>
 </head>
 <body>
 
@@ -229,8 +254,72 @@
 </section>
   </main>
 
-  <footer class="site-footer">
-    <small>Decerne &copy; 2026 • Il risparmio a portata di clic</small>
+  <footer class="site-footer" id="siteFooter">
+    <div class="footer-inner">
+
+      <div class="footer-col footer-brand">
+        <div class="footer-logo">DECERNE</div>
+        <p class="footer-tagline">Le offerte del tuo supermercato sotto casa, aggiornate ogni giorno.</p>
+        <ul class="footer-legal-list">
+          <li>[RAGIONE SOCIALE]</li>
+          <li>Sede legale: [INDIRIZZO SEDE LEGALE]</li>
+          <li>P.IVA / C.F. [PARTITA IVA]</li>
+          <li>REA [UFFICIO CCIAA] n. [NUMERO REA]</li>
+          <li>PEC: <a href="mailto:[PEC]">[PEC]</a></li>
+        </ul>
+      </div>
+
+      <nav class="footer-col" aria-label="Assistenza">
+        <h3>Assistenza</h3>
+        <ul>
+          <li><a href="legale.html#rimborsi">Rimborsi e cancellazioni</a></li>
+          <li><a href="mailto:supporto@decerne.it">Scrivi al supporto</a></li>
+          <li><a href="legale.html#recesso" class="footer-recesso-link">Recedi dal contratto qui</a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer-col" aria-label="Legale e privacy">
+        <h3>Legale &amp; Privacy</h3>
+        <ul>
+          <li><a href="legale.html#termini">Termini e condizioni</a></li>
+          <li><a href="legale.html#privacy">Privacy e geolocalizzazione</a></li>
+          <li><a href="legale.html#cookie">Cookie policy</a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer-col footer-col-user" aria-label="Per chi cerca offerte">
+        <h3>Per te</h3>
+        <ul>
+          <li><a href="javascript:void(0)" onclick="setMode('user')">Trova le offerte vicino a te</a></li>
+          <li><a href="javascript:void(0)" onclick="setMode('chisiamo')">Chi siamo</a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer-col footer-col-store" aria-label="Per i supermercati">
+        <h3>Per il tuo negozio</h3>
+        <ul>
+          <li><a href="javascript:void(0)" onclick="setMode('store')">Pubblica le tue offerte</a></li>
+          <li><a href="javascript:void(0)" onclick="setMode('chisiamo')">Come funziona</a></li>
+        </ul>
+      </nav>
+
+      <div class="footer-col footer-payments">
+        <h3>Pagamenti</h3>
+        <div class="footer-secure-note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Pagamenti gestiti in sicurezza da Stripe</span>
+        </div>
+        <div class="footer-payment-badges">
+          <span>VISA</span><span>Mastercard</span><span>Apple Pay</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="footer-bottom">
+      <span>&copy; 2026 DECERNE. Tutti i diritti riservati.</span>
+      <a href="legale.html#accessibilita">Dichiarazione di accessibilità</a>
+    </div>
   </footer>
 
   <!-- DRAWER LATERALE -->
