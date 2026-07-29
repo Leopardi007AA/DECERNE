@@ -267,6 +267,12 @@
           <li>REA [UFFICIO CCIAA] n. [NUMERO REA]</li>
           <li>PEC: <a href="mailto:[PEC]">[PEC]</a></li>
         </ul>
+        <div class="footer-social">
+          <a href="#" data-social="instagram" title="Instagram" aria-label="Instagram (link da collegare)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg></a>
+          <a href="#" data-social="facebook" title="Facebook" aria-label="Facebook (link da collegare)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 4h-2a4 4 0 0 0-4 4v3H7v4h2v7h4v-7h3l1-4h-4V8a1 1 0 0 1 1-1h3z"/></svg></a>
+          <a href="#" data-social="linkedin" title="LinkedIn" aria-label="LinkedIn (link da collegare)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/><path d="M10 9v12M10 13a4 4 0 0 1 8 0v8"/></svg></a>
+          <a href="#" data-social="tiktok" title="TikTok" aria-label="TikTok (link da collegare)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5c.2 0 .3 0 .5.02"/><path d="M14 3c0 2.5 2 4.5 4.5 4.5"/></svg></a>
+        </div>
       </div>
 
       <nav class="footer-col" aria-label="Assistenza">
@@ -309,18 +315,32 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           <span>Pagamenti gestiti in sicurezza da Stripe</span>
         </div>
-        <div class="footer-payment-badges">
-          <span>VISA</span><span>Mastercard</span><span>Apple Pay</span>
-        </div>
+        <div class="footer-payment-badges"><span>VISA</span><span>Mastercard</span><span>Apple Pay</span></div>
       </div>
 
     </div>
-
     <div class="footer-bottom">
       <span>&copy; 2026 DECERNE. Tutti i diritti riservati.</span>
       <a href="legale.html#accessibilita">Dichiarazione di accessibilità</a>
     </div>
   </footer>
+
+  <!-- BANNER COOKIE -->
+  <div id="cookieOverlay" class="cookie-overlay hidden"></div>
+  <div id="cookieBanner" class="cookie-banner hidden" role="dialog" aria-modal="true" aria-labelledby="cookieBannerTitle">
+    <button type="button" id="cookieBannerClose" class="cookie-banner-x" aria-label="Chiudi">&times;</button>
+    <h2 id="cookieBannerTitle">La tua privacy, prima di tutto</h2>
+    <div class="cookie-banner-scroll">
+      <p>DECERNE utilizza esclusivamente le tecnologie tecniche necessarie a far funzionare il sito: la sessione di accesso al tuo account (gestita da Supabase) e, se lo consenti, la posizione che ci indichi per mostrarti le offerte vicino a te. Non usiamo, ad oggi, cookie di profilazione o pubblicitari di terze parti.</p>
+      <p>Con "Accetta tutti" acconsenti anche a eventuali tecnologie non essenziali che potremo attivare in futuro (ad esempio statistiche di utilizzo aggregate), sempre nel rispetto di questa informativa. Con "Accetta essenziali" resta attivo solo ciò che serve a far funzionare il sito (login, sicurezza). Con "Rifiuta" neghi il consenso a tutto ciò che non è strettamente necessario.</p>
+      <p>La tua scelta viene registrata sui nostri sistemi con data, ora e indirizzo IP, per poter dimostrare — se richiesto dal Garante Privacy — di aver correttamente raccolto il consenso. Puoi leggere i dettagli nella <a href="legale.html#cookie" target="_blank" rel="noopener">Cookie Policy completa</a>.</p>
+    </div>
+    <div class="cookie-banner-actions">
+      <button type="button" class="btn outline" id="cookieRejectBtn">Rifiuta</button>
+      <button type="button" class="btn outline" id="cookieEssentialBtn">Accetta essenziali</button>
+      <button type="button" class="btn" id="cookieAcceptBtn">Accetta tutti</button>
+    </div>
+  </div>
 
   <!-- DRAWER LATERALE -->
   <div id="drawer">

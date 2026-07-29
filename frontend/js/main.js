@@ -7250,3 +7250,43 @@ window.hideLoading = () => {
     console.error("Errore durante hideLoading:", e);
   }
 };
+
+// ============ BANNER CONSENSO COOKIE ============
+// Si ripresenta ad ogni nuova visita (nuova sessione di navigazione), ma non
+// ad ogni refresh della pagina: usiamo sessionStorage, che sopravvive ai
+// reload ma si azzera quando chiudi la scheda/il browser.
+(function initCookieBanner() {
+  const STORAGE_KEY = "decerne_cookie_choice";
+  const LOG_ENDPOINT = "https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/log-cookie-consent";
+
+  function getStoredChoice() {
+    try { return sessionStorage.getItem(STORAGE_KEY); } catch (e) { return null; }
+  }
+  function storeChoice(choice) {
+    try { sessionStorage.setItem(STORAGE_KEY, choice); } catch (e) {}
+  }
+  function logChoice(choice) {
+    fetch(LOG_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ choice, page: location.pathname })
+    }).catch(() => {}); // non blocchiamo l'utente se il log fallisce
+  }
+  function closeBanner(choice) {
+    storeChoice(choice);
+    logChoice(choice);
+    $("#cookieBanner")?.classList.add("hidden");
+    $("#cookieOverlay")?.classList.add("hidden");
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    if (!getStoredChoice()) {
+      $("#cookieBanner")?.classList.remove("hidden");
+      $("#cookieOverlay")?.classList.remove("hidden");
+    }
+    $("#cookieAcceptBtn")?.addEventListener("click", () => closeBanner("accept_all"));
+    $("#cookieEssentialBtn")?.addEventListener("click", () => closeBanner("essential_only"));
+    $("#cookieRejectBtn")?.addEventListener("click", () => closeBanner("reject"));
+    $("#cookieBannerClose")?.addEventListener("click", () => closeBanner("dismissed"));
+  });
+})();
