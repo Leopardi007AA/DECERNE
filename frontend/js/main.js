@@ -315,7 +315,7 @@ async function logOfferChange(offerId, field, oldValue, newValue, modifiedBy) {
 
   const note = `${field}::${oldValue || "vuoto"}::${newValue || "vuoto"}::${modifiedBy}`;
 
-  const { error } = await supabaseClient
+  const { error } = await storeAuthClient
     .from('offer_history')
     .insert({ offer_id: offerId, change_note: note });
 
@@ -326,7 +326,7 @@ async function logOfferChange(offerId, field, oldValue, newValue, modifiedBy) {
  * Recupera lo storico di una specifica offerta
  */
 async function getOfferHistory(offerId) {
-  const { data, error } = await supabaseClient
+  const { data, error } = await storeAuthClient
     .from('offer_history')
     .select('change_note, changed_at')
     .eq('offer_id', offerId)
@@ -479,7 +479,7 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
     }
 
     // 4. Recupera le sedi collegate
-    const { data: locationsRows } = await supabaseClient
+    const { data: locationsRows } = await storeAuthClient
       .from('store_locations')
       .select('*')
       .eq('store_id', storeRow.id);
@@ -556,7 +556,7 @@ window.saveStoreProfile = async (e) => {
 
     const addressChanged = newFullAddress !== currentPartner.address;
 
-    const { data: storeRow, error } = await supabaseClient
+    const { data: storeRow, error } = await storeAuthClient
       .from('stores')
       .update({
         name: newName,
@@ -637,7 +637,7 @@ window.logoutPartner = () => {
  * finché il partner non rinnova l'abbonamento.
  */
 async function expireStoreOffers(storeId) {
-  const { error } = await supabaseClient
+  const { error } = await storeAuthClient
     .from('offers')
     .update({ status: 'paused', updated_at: new Date().toISOString() })
     .eq('store_id', storeId)
@@ -691,7 +691,7 @@ async function refreshMyOffers() {
     return;
   }
 
-  const { data: rows, error } = await supabaseClient
+  const { data: rows, error } = await storeAuthClient
     .from('offers')
     .select('*')
     .eq('store_id', partner.id)
@@ -734,7 +734,7 @@ async function refreshMyTrash() {
     return;
   }
 
-  const { data: rows, error } = await supabaseClient
+  const { data: rows, error } = await storeAuthClient
     .from('offers')
     .select('*')
     .eq('store_id', partner.id)
@@ -764,7 +764,7 @@ async function refreshMyTeam() {
     return;
   }
 
-  const { data: rows, error } = await supabaseClient
+  const { data: rows, error } = await storeAuthClient
     .from('team_members')
     .select('*')
     .eq('store_id', partner.id)
@@ -1688,7 +1688,7 @@ $("#offerForm").onsubmit = async (e) => {
 
     if (existingId) {
       // MODIFICA: aggiorna la riga esistente
-      ({ data: savedOffer, error: saveError } = await supabaseClient
+      ({ data: savedOffer, error: saveError } = await storeAuthClient
         .from('offers')
         .update(offerFields)
         .eq('id', existingId)
@@ -1697,7 +1697,7 @@ $("#offerForm").onsubmit = async (e) => {
     } else {
       // CREAZIONE: nuova riga, collegata al negozio loggato.
       // Il database stesso blocca chi supera il limite offerte del proprio piano (Starter = 10).
-      ({ data: savedOffer, error: saveError } = await supabaseClient
+      ({ data: savedOffer, error: saveError } = await storeAuthClient
         .from('offers')
         .insert({ ...offerFields, store_id: partner.id })
         .select()
@@ -1746,7 +1746,7 @@ window.editOffer = (id) => {
 
 window.deleteOffer = (id) => {
   showConfirm("Spostare questa offerta nel cestino?", async () => {
-    const { error } = await supabaseClient
+    const { error } = await storeAuthClient
       .from('offers')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
@@ -5280,7 +5280,7 @@ function updateDrawerUI() {
  * che nella sessione attiva (sessionStorage), garantendo la coerenza dei dati.
  */
 async function updatePartnerSubscription(partnerId, subscriptionObj) {
-  const { data: storeRow, error } = await supabaseClient
+  const { data: storeRow, error } = await storeAuthClient
     .from('stores')
     .update({
       plan: subscriptionObj.plan,
@@ -5376,7 +5376,7 @@ function showUndoBanner(message, offerId) {
 
 // Funzione universale di ripristino
 window.restoreOffer = async (id) => {
-  const { error } = await supabaseClient
+  const { error } = await storeAuthClient
     .from('offers')
     .update({ deleted_at: null })
     .eq('id', id);
@@ -5483,7 +5483,7 @@ async function checkSubscriptionsExpiry() {
     const daysLeft = Math.max(0, 30 - Math.floor(elapsedMs / MS_PER_DAY));
 
     if (elapsedMs >= TRIAL_DURATION_MS) {
-      await supabaseClient.from('stores').update({ subscription_status: 'expired' }).eq('id', partner.id);
+      await storeAuthClient.from('stores').update({ subscription_status: 'expired' }).eq('id', partner.id);
       sub.status = 'expired';
       sub.daysLeft = 0;
       await expireStoreOffers(partner.id);
@@ -5591,7 +5591,7 @@ window.promptUpgradeToStandard = function(partnerId) {
       if (!ok) return toast.error("Errore durante l'attivazione del piano.");
 
       // Riattiva tutte le offerte messe in pausa dalla scadenza del trial
-      await supabaseClient
+      await storeAuthClient
         .from('offers')
         .update({ status: 'active' })
         .eq('store_id', partnerId)
@@ -5629,7 +5629,7 @@ window.activatePlan = async function(planName) {
       updates.api_key = generateRandomApiKey();
     }
 
-    const { data: storeRow, error } = await supabaseClient
+    const { data: storeRow, error } = await storeAuthClient
       .from('stores')
       .update(updates)
       .eq('id', partner.id)
@@ -5842,7 +5842,7 @@ window.openAddLocationModal = async () => {
   const partner = getCurrentPartner();
   const fullAddress = `${addr.trim()}, ${cap.trim()} ${city.trim()}`.trim();
 
-  const { data: newLoc, error } = await supabaseClient
+  const { data: newLoc, error } = await storeAuthClient
     .from('store_locations')
     .insert({
       store_id: partner.id,
@@ -5886,7 +5886,7 @@ window.removeLocation = (index) => {
   }
 
   showConfirm("Eliminare questa sede? Le offerte collegate potrebbero non essere più accurate.", async () => {
-    const { error } = await supabaseClient
+    const { error } = await storeAuthClient
       .from('store_locations')
       .delete()
       .eq('id', loc.id);
@@ -5916,7 +5916,7 @@ window.setPrimaryLocation = (index) => {
   if (loc.isPrimary) return;
 
   showConfirm(`Impostare "${loc.name}" come sede principale?`, async () => {
-    const { error: clearError } = await supabaseClient
+    const { error: clearError } = await storeAuthClient
       .from('store_locations')
       .update({ is_primary: false })
       .eq('store_id', partner.id);
@@ -5926,7 +5926,7 @@ window.setPrimaryLocation = (index) => {
       return toast.error("Errore durante l'aggiornamento della sede principale.");
     }
 
-    const { error: setError } = await supabaseClient
+    const { error: setError } = await storeAuthClient
       .from('store_locations')
       .update({ is_primary: true })
       .eq('id', loc.id);
@@ -5967,7 +5967,7 @@ window.saveLocationEdit = async (index) => {
   const fullAddress = `${addr}, ${cap} ${city}`.trim();
   const addressChanged = fullAddress !== loc.address;
 
-  const { data: updatedLoc, error } = await supabaseClient
+  const { data: updatedLoc, error } = await storeAuthClient
     .from('store_locations')
     .update({ name, address: fullAddress, city, cap })
     .eq('id', loc.id)
@@ -6044,7 +6044,7 @@ window.saveLocationCoordinates = async (index) => {
     return toast.error("Coordinate non valide. Controlla gradi, primi e secondi inseriti.");
   }
 
-  const { error } = await supabaseClient.rpc('set_location_coordinates', { p_location_id: loc.id, p_lat: latVal, p_lng: lngVal });
+  const { error } = await storeAuthClient.rpc('set_location_coordinates', { p_location_id: loc.id, p_lat: latVal, p_lng: lngVal });
   if (error) {
     console.error("Errore salvataggio coordinate sede:", error);
     return toast.error("Errore durante il salvataggio delle coordinate.");
@@ -6136,7 +6136,7 @@ window.handleJSONImport = async () => {
       status: 'active'
     }));
 
-    const { data: inserted, error } = await supabaseClient
+    const { data: inserted, error } = await storeAuthClient
       .from('offers')
       .insert(rowsToInsert)
       .select();
@@ -6654,7 +6654,7 @@ window.addTeamMember = async (e) => {
     return toast.error(`L'utente ${email} fa già parte del tuo team.`);
   }
 
-  const { error } = await supabaseClient
+  const { error } = await storeAuthClient
     .from('team_members')
     .insert({ store_id: partner.id, email, role });
 
@@ -6673,7 +6673,7 @@ window.addTeamMember = async (e) => {
  */
 window.removeTeamMember = (id) => {
   showConfirm("Sei sicuro di voler rimuovere questo collaboratore? Perderà l'accesso immediato.", async () => {
-    const { error } = await supabaseClient
+    const { error } = await storeAuthClient
       .from('team_members')
       .delete()
       .eq('id', id);
@@ -6847,7 +6847,7 @@ window.regeneratePartnerApiKey = async () => {
 
   try {
     // 1. Aggiornamento atomico sul database Supabase (Corretto con const)
-    const { data: updatedStore, error } = await supabaseClient
+    const { data: updatedStore, error } = await storeAuthClient
       .from('stores')
       .update({ api_key: newKey })
       .eq('id', partner.id)
@@ -7119,7 +7119,7 @@ window.confirmCsvImport = async (storageKey) => {
     const defaultLocationId = locations.length === 1 ? locations[0].id : null;
 
     // Offerte già attive dello store, per il filtro/dedup (aggiorna invece di duplicare)
-    const { data: existingOffers } = await supabaseClient
+    const { data: existingOffers } = await storeAuthClient
       .from('offers')
       .select('id, product, location_id')
       .eq('store_id', partner.id)
@@ -7154,7 +7154,7 @@ window.confirmCsvImport = async (storageKey) => {
     }
 
     for (const item of toUpdate) {
-      const { error } = await supabaseClient
+      const { error } = await storeAuthClient
         .from('offers')
         .update({ ...item.row, updated_at: new Date().toISOString() })
         .eq('id', item.id);
