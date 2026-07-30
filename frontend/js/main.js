@@ -3900,15 +3900,8 @@ async function init() {
       if (sessionError) {
         toast.error("Il link di recupero non è valido o è scaduto. Richiedine uno nuovo.");
       } else {
-        if (urlParams.get('role') === 'store') {
-          setMode('store');
-          storeData.step = 'login';
-          renderStoreView();
-          renderResetPasswordForm();
-        } else {
-          openFullPageModal('profile');
-          renderResetPasswordForm();
-        }
+        openFullPageModal('profile');
+        renderResetPasswordForm();
       }
     } else {
       toast.error("Link di recupero non valido. Richiedine uno nuovo.");
@@ -4150,7 +4143,7 @@ function renderStoreForgotPasswordForm() {
         <div id="storeForgotError" class="error-msg hidden"></div>
         <form id="storeForgotForm" class="auth-form">
           <input type="email" id="storeForgotEmail" placeholder="Email aziendale" required>
-          <button type="submit" class="btn full-width">Invia link di recupero</button>
+          <button type="submit" class="btn full-width">Invia codice di recupero</button>
         </form>
         <p class="auth-switch" style="text-align:center; margin-top:15px;">
           <a href="javascript:void(0)" onclick="storeData.step='login'; renderStoreView();">Torna al login</a>
@@ -4162,8 +4155,9 @@ function renderStoreForgotPasswordForm() {
   $("#storeForgotForm").onsubmit = async (e) => {
     e.preventDefault();
     const email = $("#storeForgotEmail").value.trim().toLowerCase();
-    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}${window.location.pathname}?reset=1&role=store`
+    const { error } = await storeAuthClient.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false }
     });
     if (error) {
       const err = $("#storeForgotError");
@@ -4171,7 +4165,98 @@ function renderStoreForgotPasswordForm() {
       err.classList.remove("hidden");
       return;
     }
-    toast.success("Se l'email è registrata, riceverai un link per reimpostare la password.");
+    toast.success("Se l'email è registrata, riceverai un codice per reimpostare la password.");
+    renderStoreResetOtpForm(email);
+  };
+}
+
+function renderStoreResetOtpForm(email) {
+  const container = $("#store-app-container");
+  container.innerHTML = `
+    <div class="pricing-wrapper" style="max-width: 420px; margin: 60px auto;">
+      <div class="onboarding-card">
+        <h3>Inserisci il codice</h3>
+        <p style="color:#64748b; margin-bottom:15px; font-size:0.9rem;">Ti abbiamo inviato un codice a 6 cifre a ${email}.</p>
+        <div id="storeResetOtpError" class="error-msg hidden"></div>
+        <form id="storeResetOtpForm" class="auth-form">
+          <input type="text" id="storeResetOtpCode" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="Codice a 6 cifre" required>
+          <button type="submit" class="btn full-width">Verifica codice</button>
+        </form>
+        <p class="auth-switch" style="text-align:center; margin-top:15px;">
+          Non hai ricevuto il codice? <a href="javascript:void(0)" id="storeResendResetOtp">Invialo di nuovo</a>
+        </p>
+      </div>
+    </div>
+  `;
+
+  $("#storeResetOtpForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const token = $("#storeResetOtpCode").value.trim();
+    const err = $("#storeResetOtpError");
+    err.classList.add("hidden");
+    if (token.length !== 6) {
+      err.innerText = "Inserisci il codice a 6 cifre.";
+      err.classList.remove("hidden");
+      return;
+    }
+    const { data, error } = await storeAuthClient.auth.verifyOtp({ email, token, type: 'email' });
+    if (error || !data.user) {
+      err.innerText = "Codice non valido o scaduto. Riprova o richiedine uno nuovo.";
+      err.classList.remove("hidden");
+      return;
+    }
+    renderStoreResetNewPasswordForm();
+  };
+
+  $("#storeResendResetOtp").onclick = async () => {
+    const { error } = await storeAuthClient.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    if (error) toast.error("Errore nell'invio. Riprova tra qualche minuto.");
+    else toast.success("Codice reinviato!");
+  };
+}
+
+function renderStoreResetNewPasswordForm() {
+  const container = $("#store-app-container");
+  container.innerHTML = `
+    <div class="pricing-wrapper" style="max-width: 420px; margin: 60px auto;">
+      <div class="onboarding-card">
+        <h3>Imposta la nuova password</h3>
+        <div id="storeResetNewPassError" class="error-msg hidden"></div>
+        <form id="storeResetNewPassForm" class="auth-form">
+          <input type="password" id="storeResetNewPass" placeholder="Nuova password (min. 8)" required>
+          <input type="password" id="storeResetNewPassConfirm" placeholder="Conferma nuova password" required>
+          <button type="submit" class="btn full-width">Salva nuova password</button>
+        </form>
+      </div>
+    </div>
+  `;
+
+  $("#storeResetNewPassForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const pass = $("#storeResetNewPass").value;
+    const confirm = $("#storeResetNewPassConfirm").value;
+    const err = $("#storeResetNewPassError");
+    err.classList.add("hidden");
+    if (pass.length < 8) {
+      err.innerText = "La password deve essere di almeno 8 caratteri.";
+      err.classList.remove("hidden");
+      return;
+    }
+    if (pass !== confirm) {
+      err.innerText = "Le password non coincidono.";
+      err.classList.remove("hidden");
+      return;
+    }
+    const { error } = await storeAuthClient.auth.updateUser({ password: pass });
+    if (error) {
+      err.innerText = error.message?.toLowerCase().includes("different from the old password")
+        ? "La nuova password deve essere diversa da quella attuale. Scegline una diversa."
+        : "Errore durante il salvataggio. Riprova o richiedi un nuovo codice.";
+      err.classList.remove("hidden");
+      return;
+    }
+    toast.success("Password aggiornata! Effettua il login.");
+    await storeAuthClient.auth.signOut();
     storeData.step = 'login';
     renderStoreView();
   };
