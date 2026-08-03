@@ -418,7 +418,7 @@ async function checkRateLimit(partnerId) {
  * es. nel blocco LOGIN_BLOCKED)
  */
 async function logAuditAction(partnerId, type, details) {
-  const { error } = await supabaseClient.rpc('log_audit_action', {
+  const { error } = await storeAuthClient.rpc('log_audit_action', {
     p_actor: String(partnerId),
     p_action: type,
     p_target: details
@@ -473,8 +473,8 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
 
     // 3. Blocco se l'abbonamento è scaduto (stessa logica di prima)
     if (storeRow.subscription_status === 'expired') {
+      await logAuditAction(storeRow.id, "LOGIN_BLOCKED", "Tentativo di accesso con account scaduto.");
       await storeAuthClient.auth.signOut();
-      logAuditAction(storeRow.id, "LOGIN_BLOCKED", "Tentativo di accesso con account scaduto.");
       return { success: false, reason: 'expired' };
     }
 
@@ -7237,7 +7237,7 @@ window.confirmCsvImport = async (storageKey) => {
     });
 
     if (toInsert.length) {
-      const { error } = await supabaseClient.from('offers').insert(toInsert.map(i => i.row));
+      const { error } = await storeAuthClient.from('offers').insert(toInsert.map(i => i.row));
       if (error) {
         toInsert.forEach(i => results.errors.push({ index: null, product: i.row.product, reasons: [error.message] }));
       } else {

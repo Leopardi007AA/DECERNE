@@ -33,9 +33,10 @@ body {
    il footer resta sempre "ancorato" in fondo, senza saltare né lasciare
    una parte bianca sotto quando il contenuto è ancora corto (es. al refresh,
    prima che offerte/dashboard vengano caricate). */
-main.container {
-  flex: 1 0 auto;
-}
+   main.container {
+    flex: 1 0 auto;
+    width: 100%;
+  }
 
 .site-footer {
   flex-shrink: 0;
