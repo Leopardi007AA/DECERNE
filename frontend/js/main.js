@@ -724,6 +724,7 @@ async function refreshMyOffers() {
     opens: r.opens,
     unit: r.unit_of_measure,
     cardRequirement: r.card_requirement,
+    scheduledPublishAt: r.scheduled_publish_at,
     location_id: r.location_id  // FIX: serve per "Miglior sede" e per l'export CSV nella Dashboard Generale
   }));
 
@@ -1227,7 +1228,9 @@ function renderOffersTab() {
   const planName = partner?.plan || 'Starter';
   const limit = PLANS[planName].maxOffers;
   const current = storeData.offers.length;
-  
+  const canSchedule = planName !== 'Starter';
+  window.selectedOfferIds = new Set(); // reset selezione ad ogni apertura della tab
+
   // Logica per testo dinamico
   let limitInfo = "";
   if (planName === 'Standard' || planName === 'Professional') {
@@ -1247,12 +1250,33 @@ function renderOffersTab() {
             ${isLimitReached ? '<br><small style="color: #ef4444; font-weight: 700;">⚠️ Limite raggiunto!</small>' : ''}
         </div>
       </div>
-      <button class="btn ${isLimitReached ? 'disabled' : ''}" 
-              ${isLimitReached ? 'disabled' : ''} 
-              onclick="handleNewOfferClick()">
-        ${isLimitReached ? 'Limite raggiunto' : '+ Crea Nuova'}
-      </button>
+      <div style="display:flex; gap:10px;">
+        <button class="btn outline" onclick="toggleSelectAllOffers(document.getElementById('selectAllOffersCb').checked = !document.getElementById('selectAllOffersCb').checked)">
+          <input type="checkbox" id="selectAllOffersCb" style="pointer-events:none; margin-right:6px;"> Seleziona tutto
+        </button>
+        <button class="btn ${isLimitReached ? 'disabled' : ''}" 
+                ${isLimitReached ? 'disabled' : ''} 
+                onclick="handleNewOfferClick()">
+          ${isLimitReached ? 'Limite raggiunto' : '+ Crea Nuova'}
+        </button>
+      </div>
     </header>
+
+    <div id="bulkOffersToolbar" class="card-saas" style="display:none; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:15px; padding:12px 16px;">
+      <strong id="bulkOffersCount" style="color:#64748b; font-size:0.85rem;">0 selezionate</strong>
+      <button class="btn outline" style="padding:6px 12px;" onclick="bulkSetOfferStatus('active')">Attiva</button>
+      <button class="btn outline" style="padding:6px 12px;" onclick="bulkSetOfferStatus('draft')">Bozza</button>
+      <button class="btn outline" style="padding:6px 12px;" onclick="bulkSetOfferStatus('paused')">Pausa</button>
+      ${canSchedule ? `<button class="btn outline" style="padding:6px 12px;" onclick="toggleBulkScheduleFields()">${PANEL_ICONS.calendar} Programma</button>` : ''}
+      <button class="btn danger" style="padding:6px 12px;" onclick="bulkDeleteOffers()">${PANEL_ICONS.trash} Rimuovi</button>
+
+      ${canSchedule ? `
+      <div id="bulkScheduleFields" style="display:none; align-items:center; gap:8px;">
+        <input type="datetime-local" id="bulkScheduleDateTime" style="padding:6px 10px; border-radius:8px; border:1px solid #e2e8f0;">
+        <button class="btn" style="padding:6px 12px;" onclick="bulkSchedulePublish()">Conferma programmazione</button>
+      </div>` : ''}
+    </div>
+
     <div class="card">
       ${renderOffersTable()}
     </div>
@@ -1273,9 +1297,14 @@ function renderOffersTable(limit = 999) {
     const isExpired = o.endDate < todayStr; // scade solo il giorno DOPO la data impostata, non da mezzanotte UTC
     const statusClass = isExpired ? 'status-expired' : `status-${o.status}`;
     const statusLabel = isExpired ? 'SCADUTA' : o.status.toUpperCase();
+    const isSelected = window.selectedOfferIds && window.selectedOfferIds.has(o.id);
+    const scheduledBadge = o.scheduledPublishAt
+      ? `<div style="font-size:0.7rem; color:#b45309; margin-top:3px;">${PANEL_ICONS.calendar} Programmata: ${new Date(o.scheduledPublishAt).toLocaleString()}</div>`
+      : '';
 
     return `
       <tr>
+        <td><input type="checkbox" class="offer-select-checkbox" ${isSelected ? 'checked' : ''} onchange="toggleOfferSelection('${o.id}', this.checked)"></td>
         <td>
           <img src="${getSafeImageUrl(o.img)}" 
                style="width:40px; height:40px; border-radius:4px; object-fit:cover; border:1px solid #eee;">
@@ -1284,7 +1313,7 @@ function renderOffersTable(limit = 999) {
           <div style="font-weight:700;">${o.product}</div>
           <div style="font-size:0.75rem; color:#64748b;">${o.category}</div>
         </td>
-        <td><span class="status-pill ${statusClass}">${statusLabel}</span></td>
+        <td><span class="status-pill ${statusClass}">${statusLabel}</span>${scheduledBadge}</td>
         <td><strong style="color:var(--primary);">${formatPrice(o.price)}</strong></td>
         <td style="font-size:0.8rem;">${o.endDate}</td>
         <td>
@@ -1298,7 +1327,7 @@ function renderOffersTable(limit = 999) {
   return `
     <table class="offer-table">
       <thead>
-        <tr><th>Foto</th><th>Prodotto</th><th>Stato</th><th>Prezzo</th><th>Scadenza</th><th>Azioni</th></tr>
+        <tr><th></th><th>Foto</th><th>Prodotto</th><th>Stato</th><th>Prezzo</th><th>Scadenza</th><th>Azioni</th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
@@ -1799,6 +1828,106 @@ window.deleteOffer = (id) => {
   });
 };
 
+// ---------- Azioni massive sullo Stato Pubblicazione ----------
+window.selectedOfferIds = new Set();
+
+window.toggleOfferSelection = (id, checked) => {
+  if (checked) window.selectedOfferIds.add(id);
+  else window.selectedOfferIds.delete(id);
+  updateBulkOffersToolbar();
+};
+
+window.toggleSelectAllOffers = (checked) => {
+  const myOffers = getMyOffers();
+  window.selectedOfferIds = checked ? new Set(myOffers.map(o => o.id)) : new Set();
+  document.querySelectorAll('.offer-select-checkbox').forEach(cb => cb.checked = checked);
+  updateBulkOffersToolbar();
+};
+
+function updateBulkOffersToolbar() {
+  const toolbar = document.getElementById('bulkOffersToolbar');
+  const countEl = document.getElementById('bulkOffersCount');
+  if (!toolbar) return;
+  const n = window.selectedOfferIds.size;
+  toolbar.style.display = n > 0 ? 'flex' : 'none';
+  if (countEl) countEl.innerText = `${n} selezionat${n === 1 ? 'a' : 'e'}`;
+}
+
+// Un'azione immediata (attiva/bozza/pausa/rimuovi) annulla sempre un'eventuale
+// programmazione pendente sulle stesse offerte: l'azione immediata vince.
+window.bulkSetOfferStatus = async (status) => {
+  const ids = [...window.selectedOfferIds];
+  if (ids.length === 0) return;
+
+  const { error } = await storeAuthClient
+    .from('offers')
+    .update({ status, scheduled_publish_at: null, updated_at: new Date().toISOString() })
+    .in('id', ids);
+
+  if (error) {
+    console.error("Errore aggiornamento massivo stato:", error);
+    return toast.error("Errore durante l'aggiornamento massivo.");
+  }
+
+  toast.success(`${ids.length} offerte aggiornate.`);
+  window.selectedOfferIds = new Set();
+  await refreshMyOffers();
+  renderStoreView();
+};
+
+window.bulkDeleteOffers = () => {
+  const ids = [...window.selectedOfferIds];
+  if (ids.length === 0) return;
+
+  showConfirm(`Spostare ${ids.length} offerte selezionate nel cestino?`, async () => {
+    const { error } = await storeAuthClient
+      .from('offers')
+      .update({ deleted_at: new Date().toISOString(), scheduled_publish_at: null })
+      .in('id', ids);
+
+    if (error) {
+      console.error("Errore eliminazione massiva:", error);
+      return toast.error("Errore durante l'eliminazione massiva.");
+    }
+
+    toast.info(`${ids.length} offerte spostate nel cestino.`);
+    window.selectedOfferIds = new Set();
+    await refreshMyOffers();
+    renderStoreView();
+  });
+};
+
+window.toggleBulkScheduleFields = () => {
+  const el = document.getElementById('bulkScheduleFields');
+  if (el) el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+};
+
+window.bulkSchedulePublish = async () => {
+  const ids = [...window.selectedOfferIds];
+  const input = document.getElementById('bulkScheduleDateTime');
+  if (ids.length === 0) return;
+  if (!input || !input.value) return toast.error("Seleziona data e ora di pubblicazione.");
+
+  const when = new Date(input.value);
+  if (isNaN(when.getTime()) || when <= new Date()) return toast.error("Scegli una data e ora futura.");
+
+  const { error } = await storeAuthClient
+    .from('offers')
+    .update({ scheduled_publish_at: when.toISOString(), updated_at: new Date().toISOString() })
+    .in('id', ids);
+
+  if (error) {
+    console.error("Errore programmazione massiva:", error);
+    return toast.error(error.message?.includes('Starter')
+      ? "La programmazione non è disponibile con il piano Starter."
+      : "Errore durante la programmazione.");
+  }
+
+  toast.success(`Pubblicazione programmata per ${ids.length} offerte.`);
+  window.selectedOfferIds = new Set();
+  await refreshMyOffers();
+  renderStoreView();
+};
 
 // ---------- Gestione Utenti e Sessione ----------
 async function registerUser(userData) {
