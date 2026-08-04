@@ -716,6 +716,8 @@ async function refreshMyOffers() {
     status: r.status,
     views: r.views,
     opens: r.opens,
+    unit: r.unit_of_measure,
+    cardRequirement: r.card_requirement,
     location_id: r.location_id  // FIX: serve per "Miglior sede" e per l'export CSV nella Dashboard Generale
   }));
 
@@ -1586,11 +1588,15 @@ window.openOfferModal = (offer = null) => {
     $("#offImg").value = offer.img || ""; 
     $("#offDesc").value = offer.description || "";
     $("#offStatus").value = offer.status || "active";
+    $("#offUnit").value = offer.unit || "pezzo";
+    $("#offCardReq").value = offer.cardRequirement || "";
     renderOfferHistoryUI(offer.id);
   } else {
     $("#offerModalTitle").innerText = "Nuova Offerta";
     $("#offerForm").reset();
     $("#offerId").value = "";
+    $("#offUnit").value = "pezzo";
+    $("#offCardReq").value = "";
     $("#historySection").classList.add("hidden");
   }
 } catch (e) { console.error(e); }
@@ -1672,20 +1678,22 @@ $("#offerForm").onsubmit = async (e) => {
 
 
 
-    const offerFields = {
-      product: nome,
-      price: prezzoSconto,
-      original_price: prezzoOrig,
-      start_date: dataInizio,
-      end_date: dataFine,
-      category: $("#offCat").value,
-      description: $("#offDesc").value.trim(),
-      status: $("#offStatus").value || 'active',
-      img_url: imgUrl || PLACEHOLDER_IMG,
-      location_id: locationId,  // FIX: aggiunto campo location_id
-      limited_quantity: $("#offLimited") ? $("#offLimited").checked : false,
-      updated_at: new Date().toISOString()
-    };
+        const offerFields = {
+          product: nome,
+          price: prezzoSconto,
+          original_price: prezzoOrig,
+          start_date: dataInizio,
+          end_date: dataFine,
+          category: $("#offCat").value,
+          description: $("#offDesc").value.trim(),
+          status: $("#offStatus").value || 'active',
+          img_url: imgUrl || PLACEHOLDER_IMG,
+          location_id: locationId,  // FIX: aggiunto campo location_id
+          limited_quantity: $("#offLimited") ? $("#offLimited").checked : false,
+          unit_of_measure: $("#offUnit") ? $("#offUnit").value : 'pezzo',
+          card_requirement: $("#offCardReq") && $("#offCardReq").value ? $("#offCardReq").value : null,
+          updated_at: new Date().toISOString()
+        };
 
     let savedOffer, saveError;
 

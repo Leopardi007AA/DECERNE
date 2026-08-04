@@ -153,15 +153,36 @@
         <select id="offLocation" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;"></select>
         <small style="color: #64748b; font-size: 0.7rem;">Seleziona la sede specifica per questa offerta.</small>
       </div>
+      <div class="input-group">
+        <label>Categoria</label>
+        <select id="offCat">
+          <option value="Ortofrutta">Ortofrutta</option>
+          <option value="Macelleria">Macelleria</option>
+          <option value="Dispensa">Dispensa</option>
+          <option value="Surgelati">Surgelati</option>
+        </select>
+      </div>
+      <div class="form-row">
         <div class="input-group">
-          <label>Categoria</label>
-          <select id="offCat">
-            <option value="Ortofrutta">Ortofrutta</option>
-            <option value="Macelleria">Macelleria</option>
-            <option value="Dispensa">Dispensa</option>
-            <option value="Surgelati">Surgelati</option>
+          <label>Prezzo al</label>
+          <select id="offUnit">
+            <option value="pezzo">Pezzo</option>
+            <option value="kg">Kg</option>
+            <option value="hg">Hg (etto)</option>
+            <option value="g">Grammo</option>
+            <option value="litro">Litro</option>
+            <option value="confezione">Confezione</option>
           </select>
         </div>
+        <div class="input-group">
+          <label>Tessera negozio</label>
+          <select id="offCardReq">
+            <option value="">Non specificato</option>
+            <option value="required">Necessaria</option>
+            <option value="not_required">Non necessaria</option>
+          </select>
+        </div>
+      </div>
         <div class="form-row">
           <div class="input-group">
             <label>Data Inizio</label>
