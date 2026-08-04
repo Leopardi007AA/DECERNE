@@ -545,6 +545,8 @@ window.saveStoreProfile = async (e) => {
     const streetInput = document.getElementById("profStreet");
     const cityInput = document.getElementById("profCity");
     const capInput = document.getElementById("profCap");
+    const cardNameInput = document.getElementById("profCardName");
+    const cardImageInput = document.getElementById("profCardImage");
 
     const newName = clean(nameInput?.value || "");
     const newLogo = clean(logoInput?.value || "");
@@ -566,7 +568,9 @@ window.saveStoreProfile = async (e) => {
         internal_notes: clean(notesInput?.value || ""),
         address: newFullAddress,
         city: newCity || currentPartner.city,
-        cap: newCap || currentPartner.cap
+        cap: newCap || currentPartner.cap,
+        membership_card_name: clean(cardNameInput?.value || ""),
+        membership_card_image_url: clean(cardImageInput?.value || "")
       })
       .eq('id', currentPartner.id)
       .select()
@@ -590,7 +594,9 @@ window.saveStoreProfile = async (e) => {
       city: storeRow.city,
       cap: storeRow.cap,
       latitude: storeRow.latitude,
-      longitude: storeRow.longitude
+      longitude: storeRow.longitude,
+      membershipCardName: storeRow.membership_card_name || "",
+      membershipCardImage: storeRow.membership_card_image_url || ""
     };
 
     const dataString = JSON.stringify(updatedStore);
@@ -964,7 +970,7 @@ async function fetchPublicLocationsMap(locationIds) {
 
   const { data, error } = await supabaseClient
     .from('public_store_locations')
-    .select('location_id, store_id, location_name, store_name, address, city, cap, latitude, longitude, plan, is_primary, phone, hours, logo_url')
+    .select('location_id, store_id, location_name, store_name, address, city, cap, latitude, longitude, plan, is_primary, phone, hours, logo_url, membership_card_name, membership_card_image_url')
     .in('location_id', uniqueIds);
 
   if (error) console.error("Errore caricamento dati sedi negozio:", error);
@@ -984,7 +990,9 @@ async function fetchPublicLocationsMap(locationIds) {
     isPrimary: l.is_primary,
     phone: l.phone || "",
     hours: l.hours || "",
-    logo: l.logo_url || ""
+    logo: l.logo_url || "",
+    membershipCardName: l.membership_card_name || "",
+    membershipCardImage: l.membership_card_image_url || ""
   }]));
 }
 
@@ -1005,6 +1013,7 @@ async function renderOffers(page = state.currentPage, pageSize = state.pageSize)
     const sortMode = $("#categorySelect")?.value || "";
     const userCity = getCleanUserCity();
     const userCap = getCleanUserCap();
+    const noCardOnly = sortMode === "no-card";
 
     // Chiediamo a Supabase solo le offerte attive e non scadute, unite ai dati
     // del negozio collegato (nome, città, ecc. — non più duplicati nella riga offerta).
@@ -1043,7 +1052,8 @@ async function renderOffers(page = state.currentPage, pageSize = state.pageSize)
         storeCity: loc.city ? loc.city.toLowerCase() : "",
         storeCap: loc.cap || "",
         storeAddress: loc.address || "",
-        plan: loc.plan || "Starter"
+        plan: loc.plan || "Starter",
+        cardRequirement: r.card_requirement || null
       };
     });
 
@@ -1054,7 +1064,8 @@ async function renderOffers(page = state.currentPage, pageSize = state.pageSize)
                             o.storeName.toLowerCase().includes(query);
       const matchesCity = !userCity || (o.storeCity === userCity);
       const matchesCap = !userCap || (o.storeCap === userCap);
-      return matchesSearch && matchesCity && matchesCap;
+      const matchesNoCard = !noCardOnly || o.cardRequirement !== 'required';
+      return matchesSearch && matchesCity && matchesCap && matchesNoCard;
     });
 
     if (sortMode === "price-asc") {
@@ -1294,6 +1305,8 @@ function renderOffersTable(limit = 999) {
   `;
 }
 
+const UNIT_LABELS = { kg: 'kg', hg: 'hg', g: 'g', pezzo: 'pezzo', litro: 'litro', confezione: 'confezione' };
+
 // --- TAB: ABBONAMENTO ---
 function renderSubTab() {
   const partner = getCurrentPartner();
@@ -1463,6 +1476,19 @@ function renderProfileTab() {
           <label>Orari di Apertura Generali</label>
           <input type="text" id="profHours" value="${partner.hours || ''}" placeholder="Es: Lun-Sab 08:30-20:00">
         </div>
+
+        <h4 style="color: #64748b; font-size: 0.8rem; text-transform: uppercase; margin-top:20px;">Tessera Negozio</h4>
+        <div class="form-row">
+          <div class="input-group">
+            <label>Nome Tessera</label>
+            <input type="text" id="profCardName" value="${partner.membershipCardName || ''}" placeholder="Es: Carta Fedeltà Coop">
+          </div>
+          <div class="input-group">
+            <label>URL Immagine Tessera</label>
+            <input type="url" id="profCardImage" value="${partner.membershipCardImage || ''}" placeholder="https://link-immagine-tessera.png">
+          </div>
+        </div>
+        <small style="display:block; margin-top:-10px; margin-bottom:15px; color:#94a3b8;">Compila questi campi se i tuoi prodotti possono richiedere una tessera fedeltà: potrai poi indicarlo su ogni singola offerta.</small>
 
         <h4 style="color: #64748b; font-size: 0.8rem; text-transform: uppercase; margin-top:20px;">Indirizzo e Posizione</h4>
 
@@ -5283,11 +5309,21 @@ function displayProductInModal(product) {
           <div style="background: #f0f6ff; padding: 25px; border-radius: 16px; margin-bottom: 25px; border: 1px solid #dbeafe;">
             <div class="price-container" style="display:flex; align-items: baseline; gap: 12px;">
               <span class="price-tag" style="font-size: 3rem; color: #0f62fe; font-weight: 900;">${formatPrice(product.price)}</span>
+              <span style="font-size: 1rem; color: #64748b; font-weight: 600;">/ ${UNIT_LABELS[product.unit] || product.unit}</span>
               ${product.originalPrice > product.price ? `<span class="old-price-small" style="font-size: 1.4rem; text-decoration: line-through; color: #94a3b8;">${formatPrice(product.originalPrice)}</span>` : ''}
             </div>
             <div style="margin-top: 10px; display: flex; align-items: center; gap: 6px; color: #1e40af; font-weight: 600;">
               <span style="display:inline-flex;">${PANEL_ICONS.calendar}</span> <span>Scade il: ${product.endDate}</span>
             </div>
+            ${product.cardRequirement === 'required' ? `
+            <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; color: #b45309; font-weight: 600; background:#fffbeb; padding:8px 12px; border-radius:8px;">
+              ${product.storeCardImage ? `<img src="${getSafeImageUrl(product.storeCardImage)}" alt="Tessera" style="width:24px; height:24px; object-fit:contain; border-radius:4px;">` : ''}
+              <span>Richiede la tessera${product.storeCardName ? ` "${product.storeCardName}"` : ' del negozio'}</span>
+            </div>` : ''}
+            ${product.cardRequirement === 'not_required' ? `
+            <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; color: #15803d; font-weight: 600; background:#f0fdf4; padding:8px 12px; border-radius:8px;">
+              <span>Nessuna tessera necessaria</span>
+            </div>` : ''}
           </div>
 
           <div style="margin-bottom: 30px;">
@@ -5805,7 +5841,11 @@ window.openProductDetail = async (id) => {
     storeLogo: loc.logo || "",
     storePhone: loc.phone || "",
     storeHours: loc.hours || "",
-    plan: loc.plan || "Starter"
+    plan: loc.plan || "Starter",
+    unit: row.unit_of_measure || "pezzo",
+    cardRequirement: row.card_requirement || null,
+    storeCardName: loc.membershipCardName || "",
+    storeCardImage: loc.membershipCardImage || ""
   };
 
   displayProductInModal(product);
