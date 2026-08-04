@@ -2699,7 +2699,21 @@ function fuzzyMatchOffers(term, offers) {
   });
 }
 
+// Unità "a peso/volume": per queste il prezzo va confrontato normalizzato
+// (es. un negozio a €/hg e uno a €/kg non sono confrontabili a prezzo grezzo).
+const WEIGHT_UNITS_TO_KG = { kg: 1, hg: 0.1, g: 0.001 };
+function isWeightUnit(unit) {
+  return unit === 'kg' || unit === 'hg' || unit === 'g' || unit === 'litro';
+}
+// Riporta il prezzo a €/kg (o €/litro, che resta la sua unità base) per poter
+// confrontare equamente offerte con unità diverse.
+function comparableUnitPrice(price, unit) {
+  const factor = WEIGHT_UNITS_TO_KG[unit];
+  return factor ? price / factor : price; // kg/hg/g -> €/kg ; litro e pezzo restano invariati
+}
+
 window.smartListLastResults = [];
+window.smartListQuantities = {}; // quantità (kg o litri) specificate dall'utente per i prodotti a peso, chiave = testo prodotto normalizzato
 
 window.openSmartShoppingListModal = () => {
   const content = $("#modalContent");
@@ -2772,7 +2786,7 @@ window.searchSmartShoppingList = async () => {
   const today = new Date().toISOString().split('T')[0];
   const { data: allActiveOffers, error } = await supabaseClient
     .from('offers')
-    .select('id, product, price, location_id')
+    .select('id, product, price, location_id, unit_of_measure')
     .eq('status', 'active')
     .lte('start_date', today)
     .gte('end_date', today);
@@ -2843,17 +2857,30 @@ window.searchSmartShoppingList = async () => {
     }
   }
 
-  function costOf(match, selectedStores) {
-    if (!useDistance || !userPos) return match.price;
-    if (selectedStores.has(match.location_id)) return match.price;
+  // Prezzo "base" da usare per il confronto: se il prodotto è a peso/volume viene
+  // normalizzato (€/kg o €/litro); se l'utente ha indicato una quantità per quella
+  // riga, il prezzo normalizzato viene moltiplicato per la quantità richiesta,
+  // così il confronto (ed eventuale calcolo del carburante) è sul costo reale totale.
+  // Se la quantità non è specificata, si confronta semplicemente il prezzo unitario
+  // più conveniente, come richiesto.
+  function baseCostOf(match, quantity) {
+    const unitPrice = isWeightUnit(match.unit_of_measure) ? comparableUnitPrice(match.price, match.unit_of_measure) : match.price;
+    if (isWeightUnit(match.unit_of_measure) && quantity) return unitPrice * quantity;
+    return unitPrice;
+  }
+
+  function costOf(match, selectedStores, quantity) {
+    const base = baseCostOf(match, quantity);
+    if (!useDistance || !userPos) return base;
+    if (selectedStores.has(match.location_id)) return base;
     const store = storeCache[match.location_id];
     const d = store?.distanceFromUserKm;
     if (d == null) {
       // Distanza non calcolabile: NON deve mai vincere per costo "zero".
       // Penalità forte così l'opzione emerge solo se non esiste alternativa con distanza nota.
-      return match.price + 9999;
+      return base + 9999;
     }
-    return match.price + (d * 2 * costPerKm);
+    return base + (d * 2 * costPerKm);
   }
 
   let selectedStores = new Set(existingStoreIds);
@@ -2863,9 +2890,10 @@ window.searchSmartShoppingList = async () => {
     let changed = false;
     itemCandidates.forEach((ic, idx) => {
       if (ic.matches.length === 0) return;
+      const quantity = window.smartListQuantities[normalizeProductName(ic.line)];
       let best = null, bestCost = Infinity;
       ic.matches.forEach(m => {
-        const c = costOf(m, selectedStores);
+        const c = costOf(m, selectedStores, quantity);
         if (c < bestCost) { bestCost = c; best = m; }
       });
       if (!assignment[idx] || assignment[idx].location_id !== best.location_id) changed = true;
@@ -2893,10 +2921,23 @@ window.searchSmartShoppingList = async () => {
     const storeName = storesForDisplay[match.location_id]?.name || 'Negozio';
     const alreadyInRoute = existingStoreIds.has(match.location_id);
     matchedResults.push({ id: match.id, product: match.product, price: match.price, location_id: match.location_id });
+
+    const key = normalizeProductName(ic.line);
+    const unit = match.unit_of_measure;
+    const weightField = isWeightUnit(unit) ? `
+      <div class="smart-list-qty-row">
+        <label>Quantità desiderata (${unit === 'litro' ? 'litri' : 'kg'})</label>
+        <input type="number" class="smart-list-qty-input" min="0" step="0.1"
+               placeholder="Lascia vuoto per il prezzo più conveniente al ${unit}"
+               value="${window.smartListQuantities[key] || ''}"
+               onchange="updateSmartListQuantity('${key.replace(/'/g, "\\'")}', this.value)">
+      </div>` : '';
+
     return `
       <div class="smart-list-result-row">
         <div class="item-name">${ic.line}</div>
-        <div class="item-match">${PANEL_ICONS.pin} ${storeName} — ${formatPrice(match.price)}${alreadyInRoute ? `<span class="already-badge">già nel carrello</span>` : ''}</div>
+        <div class="item-match">${PANEL_ICONS.pin} ${storeName} — ${formatPrice(match.price)}/${unit}${alreadyInRoute ? `<span class="already-badge">già nel carrello</span>` : ''}</div>
+        ${weightField}
       </div>`;
   }).join('');
 
@@ -2909,6 +2950,18 @@ window.searchSmartShoppingList = async () => {
     traceBtn.style.cursor = 'pointer';
     traceBtn.style.boxShadow = '0 4px 14px rgba(15,98,254,0.35)';
   }
+};
+
+// Salva la quantità (kg/litri) indicata dall'utente per un prodotto a peso e
+// ricalcola subito la lista, così il confronto tra negozi tiene conto del costo reale totale.
+window.updateSmartListQuantity = (key, value) => {
+  const qty = parseFloat(value);
+  if (!isNaN(qty) && qty > 0) {
+    window.smartListQuantities[key] = qty;
+  } else {
+    delete window.smartListQuantities[key];
+  }
+  searchSmartShoppingList();
 };
 
 window.traceSmartListOnMap = async () => {
