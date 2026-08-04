@@ -1048,6 +1048,35 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
 .offer-table th { text-align: left; padding: 12px; border-bottom: 2px solid #eee; color: #64748b; font-size: 0.85rem; }
 .offer-table td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
 
+/* "Le tue Offerte": card leggermente più larga (bleed sul padding del container)
+   cosi' che Scadenza e i due tasti Azioni restino sempre sulla stessa riga */
+#myOffersCard {
+  margin-left: -16px;
+  margin-right: -16px;
+  width: calc(100% + 32px);
+}
+#myOffersCard .offer-table td:nth-child(6),
+#myOffersCard .offer-table td:nth-child(7) {
+  white-space: nowrap;
+}
+
+/* Dropdown "Stato Pubblicazione" nella toolbar di selezione multipla */
+.status-pub-dropdown { position: relative; display: inline-block; }
+#statoPubblicazioneMenu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  padding: 10px;
+  z-index: 60;
+  min-width: 230px;
+}
+#statoPubblicazioneMenu .btn { justify-content: flex-start; }
+
 .upgrade-banner { background: linear-gradient(90deg, #eff6ff, #dbeafe); padding: 15px; border-radius: 12px; border: 1px solid #bfdbfe; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; }
 
 /* ONBOARDING STEPS */

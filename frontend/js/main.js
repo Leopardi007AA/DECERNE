@@ -1267,17 +1267,21 @@ function renderOffersTab() {
       <button class="btn outline" style="padding:6px 12px;" onclick="bulkSetOfferStatus('active')">Attiva</button>
       <button class="btn outline" style="padding:6px 12px;" onclick="bulkSetOfferStatus('draft')">Bozza</button>
       <button class="btn outline" style="padding:6px 12px;" onclick="bulkSetOfferStatus('paused')">Pausa</button>
-      ${canSchedule ? `<button class="btn outline" style="padding:6px 12px;" onclick="toggleBulkScheduleFields()">${PANEL_ICONS.calendar} Programma</button>` : ''}
-      <button class="btn danger" style="padding:6px 12px;" onclick="bulkDeleteOffers()">${PANEL_ICONS.trash} Rimuovi</button>
-
       ${canSchedule ? `
-      <div id="bulkScheduleFields" style="display:none; align-items:center; gap:8px;">
-        <input type="datetime-local" id="bulkScheduleDateTime" style="padding:6px 10px; border-radius:8px; border:1px solid #e2e8f0;">
-        <button class="btn" style="padding:6px 12px;" onclick="bulkSchedulePublish()">Conferma programmazione</button>
+      <div class="status-pub-dropdown">
+        <button class="btn outline" style="padding:6px 12px;" onclick="toggleStatoPubblicazioneMenu()">${PANEL_ICONS.calendar} Stato Pubblicazione ▾</button>
+        <div id="statoPubblicazioneMenu">
+          <button class="btn outline" style="width:100%; padding:6px 12px;" onclick="toggleBulkScheduleFields()">${PANEL_ICONS.calendar} Programma</button>
+          <div id="bulkScheduleFields" style="display:none; flex-direction:column; gap:8px; margin-top:8px;">
+            <input type="datetime-local" id="bulkScheduleDateTime" step="300" style="padding:6px 10px; border-radius:8px; border:1px solid #e2e8f0; width:100%;">
+            <button class="btn" style="padding:6px 12px; width:100%;" onclick="bulkSchedulePublish()">Conferma programmazione</button>
+          </div>
+        </div>
       </div>` : ''}
+      <button class="btn danger" style="padding:6px 12px;" onclick="bulkDeleteOffers()">${PANEL_ICONS.trash} Rimuovi</button>
     </div>
 
-    <div class="card">
+    <div class="card" id="myOffersCard">
       ${renderOffersTable()}
     </div>
   `;
@@ -1733,12 +1737,15 @@ $("#offerForm").onsubmit = async (e) => {
 
 
 
+        const { start: finalStartDate, end: finalEndDate, reactivated } =
+          reactivateDatesIfNeeded(dataInizio, dataFine, $("#offStatus").value || 'active');
+
         const offerFields = {
           product: nome,
           price: prezzoSconto,
           original_price: prezzoOrig,
-          start_date: dataInizio,
-          end_date: dataFine,
+          start_date: finalStartDate,
+          end_date: finalEndDate,
           category: $("#offCat").value,
           description: $("#offDesc").value.trim(),
           status: $("#offStatus").value || 'active',
@@ -1789,7 +1796,9 @@ $("#offerForm").onsubmit = async (e) => {
       }
     }
 
-    toast.success(existingId ? "Offerta aggiornata!" : "Nuova offerta pubblicata!");
+    toast.success(reactivated
+      ? `Offerta riattivata: nuova scadenza ${finalEndDate}.`
+      : (existingId ? "Offerta aggiornata!" : "Nuova offerta pubblicata!"));
     
     // 4. Chiusura e Refresh UI
     closeOfferModal();
@@ -1828,6 +1837,28 @@ window.deleteOffer = (id) => {
   });
 };
 
+// Se un'offerta scaduta (data fine nel passato) viene rimessa "attiva",
+// non basta cambiare lo status: la tabella la mostrerebbe comunque come
+// SCADUTA finché end_date resta nel passato. Prolunghiamo il periodo
+// mantenendo la stessa durata originale, a partire da oggi.
+function reactivateDatesIfNeeded(startDateStr, endDateStr, status) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (status !== 'active' || !endDateStr || endDateStr >= todayStr) {
+    return { start: startDateStr, end: endDateStr, reactivated: false };
+  }
+  const oldStart = new Date(startDateStr || endDateStr);
+  const oldEnd = new Date(endDateStr);
+  const durationDays = Math.max(1, Math.round((oldEnd - oldStart) / 86400000));
+  const newStart = new Date();
+  const newEnd = new Date(newStart);
+  newEnd.setDate(newEnd.getDate() + durationDays);
+  return {
+    start: newStart.toISOString().split('T')[0],
+    end: newEnd.toISOString().split('T')[0],
+    reactivated: true
+  };
+}
+
 // ---------- Azioni massive sullo Stato Pubblicazione ----------
 window.selectedOfferIds = new Set();
 
@@ -1858,6 +1889,52 @@ function updateBulkOffersToolbar() {
 window.bulkSetOfferStatus = async (status) => {
   const ids = [...window.selectedOfferIds];
   if (ids.length === 0) return;
+
+  if (status === 'active') {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const myOffers = getMyOffers();
+    const expiredIds = ids.filter(id => {
+      const o = myOffers.find(off => off.id === id);
+      return o && o.endDate && o.endDate < todayStr;
+    });
+    const normalIds = ids.filter(id => !expiredIds.includes(id));
+
+    const updates = [];
+
+    if (normalIds.length > 0) {
+      updates.push(
+        storeAuthClient
+          .from('offers')
+          .update({ status, scheduled_publish_at: null, updated_at: new Date().toISOString() })
+          .in('id', normalIds)
+      );
+    }
+
+    for (const id of expiredIds) {
+      const o = myOffers.find(off => off.id === id);
+      const { start, end } = reactivateDatesIfNeeded(o.startDate, o.endDate, 'active');
+      updates.push(
+        storeAuthClient
+          .from('offers')
+          .update({ status, start_date: start, end_date: end, scheduled_publish_at: null, updated_at: new Date().toISOString() })
+          .eq('id', id)
+      );
+    }
+
+    const results = await Promise.all(updates);
+    const failed = results.find(r => r.error);
+
+    if (failed) {
+      console.error("Errore aggiornamento massivo stato:", failed.error);
+      return toast.error("Errore durante l'aggiornamento massivo.");
+    }
+
+    toast.success(`${ids.length} offerte aggiornate${expiredIds.length ? ` (${expiredIds.length} riattivate con nuova scadenza)` : ''}.`);
+    window.selectedOfferIds = new Set();
+    await refreshMyOffers();
+    renderStoreView();
+    return;
+  }
 
   const { error } = await storeAuthClient
     .from('offers')
@@ -1897,6 +1974,26 @@ window.bulkDeleteOffers = () => {
   });
 };
 
+window.toggleStatoPubblicazioneMenu = () => {
+  const menu = document.getElementById('statoPubblicazioneMenu');
+  if (!menu) return;
+  const opening = menu.style.display !== 'block';
+  menu.style.display = opening ? 'block' : 'none';
+  if (!opening) {
+    const fields = document.getElementById('bulkScheduleFields');
+    if (fields) fields.style.display = 'none';
+  }
+};
+
+// Chiude il menu "Stato Pubblicazione" se si clicca fuori
+document.addEventListener('click', (e) => {
+  const dropdown = document.querySelector('.status-pub-dropdown');
+  const menu = document.getElementById('statoPubblicazioneMenu');
+  if (dropdown && menu && menu.style.display === 'block' && !dropdown.contains(e.target)) {
+    menu.style.display = 'none';
+  }
+});
+
 window.toggleBulkScheduleFields = () => {
   const el = document.getElementById('bulkScheduleFields');
   if (el) el.style.display = el.style.display === 'none' ? 'flex' : 'none';
@@ -1910,6 +2007,7 @@ window.bulkSchedulePublish = async () => {
 
   const when = new Date(input.value);
   if (isNaN(when.getTime()) || when <= new Date()) return toast.error("Scegli una data e ora futura.");
+  if (when.getMinutes() % 5 !== 0) return toast.error("L'orario va impostato a intervalli di 5 minuti (00, 05, 10, 15...).");
 
   const { error } = await storeAuthClient
     .from('offers')
