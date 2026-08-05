@@ -1228,7 +1228,6 @@ function renderOffersTab() {
   const planName = partner?.plan || 'Starter';
   const limit = PLANS[planName].maxOffers;
   const current = storeData.offers.length;
-  const canSchedule = planName !== 'Starter';
   window.selectedOfferIds = new Set(); // reset selezione ad ogni apertura della tab
 
   // Logica per testo dinamico
@@ -1264,21 +1263,10 @@ function renderOffersTab() {
 
     <div id="bulkOffersToolbar" class="card-saas" style="display:none; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:15px; padding:12px 16px;">
       <strong id="bulkOffersCount" style="color:#64748b; font-size:0.85rem;">0 selezionate</strong>
-      <button class="btn outline" style="padding:6px 12px;" onclick="bulkSetOfferStatus('active')">Attiva</button>
-      <button class="btn outline" style="padding:6px 12px;" onclick="bulkSetOfferStatus('draft')">Bozza</button>
-      <button class="btn outline" style="padding:6px 12px;" onclick="bulkSetOfferStatus('paused')">Pausa</button>
-      ${canSchedule ? `
-      <div class="status-pub-dropdown">
-        <button class="btn outline" style="padding:6px 12px;" onclick="toggleStatoPubblicazioneMenu()">${PANEL_ICONS.calendar} Stato Pubblicazione ▾</button>
-        <div id="statoPubblicazioneMenu">
-          <button class="btn outline" style="width:100%; padding:6px 12px;" onclick="toggleBulkScheduleFields()">${PANEL_ICONS.calendar} Programma</button>
-          <div id="bulkScheduleFields" style="display:none; flex-direction:column; gap:8px; margin-top:8px;">
-            <input type="datetime-local" id="bulkScheduleDateTime" step="300" style="padding:6px 10px; border-radius:8px; border:1px solid #e2e8f0; width:100%;">
-            <button class="btn" style="padding:6px 12px; width:100%;" onclick="bulkSchedulePublish()">Conferma programmazione</button>
-          </div>
-        </div>
-      </div>` : ''}
-      <button class="btn danger" style="padding:6px 12px;" onclick="bulkDeleteOffers()">${PANEL_ICONS.trash} Rimuovi</button>
+      <button class="btn outline" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" onclick="bulkSetOfferStatus('active')">Attiva</button>
+      <button class="btn outline" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" onclick="bulkSetOfferStatus('draft')">Bozza</button>
+      <button class="btn outline" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" onclick="bulkSetOfferStatus('paused')">Pausa</button>
+      <button class="btn danger" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" onclick="bulkDeleteOffers()">${PANEL_ICONS.trash} Rimuovi</button>
     </div>
 
     <div class="card" id="myOffersCard">
@@ -1635,6 +1623,14 @@ window.openOfferModal = (offer = null) => {
     locSelect.innerHTML = `<option value="${defaultLoc.id}">${defaultLoc.name}</option>`;
   }
 
+  // Gestione pulsante "Programma": disponibile solo dal piano Standard in su
+  const canSchedule = (partner?.plan || 'Starter') !== 'Starter';
+  const scheduledBtn = $("#offStatusScheduledBtn");
+  if (scheduledBtn) {
+    scheduledBtn.disabled = !canSchedule;
+    scheduledBtn.title = canSchedule ? '' : 'Disponibile dal piano Standard in su';
+  }
+
   if (offer) {
     $("#offerModalTitle").innerText = "Modifica Offerta";
     $("#offerId").value = offer.id;
@@ -1646,9 +1642,11 @@ window.openOfferModal = (offer = null) => {
     $("#offEndDate").value = offer.endDate || "";
     $("#offImg").value = offer.img || ""; 
     $("#offDesc").value = offer.description || "";
-    $("#offStatus").value = offer.status || "active";
     $("#offUnit").value = offer.unit || "pezzo";
     $("#offCardReq").value = offer.cardRequirement || "";
+    if ($("#offLimited")) $("#offLimited").checked = !!offer.limitedQuantity;
+    if ($("#offScheduleDateTime")) $("#offScheduleDateTime").value = offer.scheduledPublishAt ? toLocalDateTimeInputValue(offer.scheduledPublishAt) : "";
+    setOfferStatusPill(offer.scheduledPublishAt ? 'scheduled' : (offer.status || 'active'));
     renderOfferHistoryUI(offer.id);
   } else {
     $("#offerModalTitle").innerText = "Nuova Offerta";
@@ -1656,9 +1654,50 @@ window.openOfferModal = (offer = null) => {
     $("#offerId").value = "";
     $("#offUnit").value = "pezzo";
     $("#offCardReq").value = "";
+    if ($("#offScheduleDateTime")) $("#offScheduleDateTime").value = "";
+    setOfferStatusPill('active');
     $("#historySection").classList.add("hidden");
   }
 } catch (e) { console.error(e); }
+};
+
+// Converte un timestamp ISO in un valore compatibile con <input type="datetime-local">
+// mantenendo l'orario locale (non UTC), coerentemente con quanto scelto dal partner.
+function toLocalDateTimeInputValue(isoString) {
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Gestisce la selezione dei pulsanti di Stato Pubblicazione (Attiva/Bozza/In Pausa/
+// Programma/Scaduta) all'interno del popup di creazione/modifica offerta.
+window.setOfferStatusPill = (status) => {
+  const group = $("#offStatusGroup");
+  if (!group) return;
+  group.querySelectorAll('.offer-status-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.status === status);
+  });
+  const hidden = $("#offStatus");
+  // Il campo nascosto #offStatus mantiene sempre lo stato "reale" da salvare
+  // (active/draft/paused); "scheduled" è solo uno stato di UI che attiva i
+  // campi data/ora e forza lo stato reale a "draft" finché la pubblicazione
+  // programmata non parte.
+  if (status === 'scheduled') {
+    hidden.value = 'draft';
+    hidden.dataset.scheduling = 'true';
+  } else {
+    hidden.value = status;
+    delete hidden.dataset.scheduling;
+  }
+  const fields = $("#offScheduleFields");
+  if (fields) fields.classList.toggle('hidden', status !== 'scheduled');
+};
+
+// "Scaduta" non è selezionabile manualmente: cliccandoci sopra spieghiamo perché,
+// senza cambiare lo stato attualmente selezionato.
+window.showExpiredStatusInfo = () => {
+  toast.info("Lo stato \"Scaduta\" viene impostato automaticamente dal sistema quando la data di fine offerta è superata: non è selezionabile manualmente.");
 };
 
 window.closeOfferModal = () => {
@@ -1727,6 +1766,28 @@ $("#offerForm").onsubmit = async (e) => {
       }
     }
 
+    // Validazione "Programma": richiesta data/ora futura, a intervalli di 5 minuti,
+    // e piano abilitato alla programmazione (non disponibile su Starter).
+    const isScheduling = $("#offStatus").dataset.scheduling === 'true';
+    let scheduledPublishAtISO = null;
+    if (isScheduling) {
+      if ((partner?.plan || 'Starter') === 'Starter') {
+        return toast.error("La programmazione non è disponibile con il piano Starter.");
+      }
+      const scheduleInput = $("#offScheduleDateTime");
+      if (!scheduleInput || !scheduleInput.value) {
+        return toast.error("Seleziona data e ora di pubblicazione.");
+      }
+      const when = new Date(scheduleInput.value);
+      if (isNaN(when.getTime()) || when <= new Date()) {
+        return toast.error("Scegli una data e ora futura per la programmazione.");
+      }
+      if (when.getMinutes() % 5 !== 0) {
+        return toast.error("L'orario va impostato a intervalli di 5 minuti (00, 05, 10, 15...).");
+      }
+      scheduledPublishAtISO = when.toISOString();
+    }
+
     submitBtn.disabled = true;
     submitBtn.innerText = "Salvataggio in corso...";
 
@@ -1754,6 +1815,7 @@ $("#offerForm").onsubmit = async (e) => {
           limited_quantity: $("#offLimited") ? $("#offLimited").checked : false,
           unit_of_measure: $("#offUnit") ? $("#offUnit").value : 'pezzo',
           card_requirement: $("#offCardReq") && $("#offCardReq").value ? $("#offCardReq").value : null,
+          scheduled_publish_at: scheduledPublishAtISO,
           updated_at: new Date().toISOString()
         };
 
@@ -1798,7 +1860,9 @@ $("#offerForm").onsubmit = async (e) => {
 
     toast.success(reactivated
       ? `Offerta riattivata: nuova scadenza ${finalEndDate}.`
-      : (existingId ? "Offerta aggiornata!" : "Nuova offerta pubblicata!"));
+      : (isScheduling
+          ? `Pubblicazione programmata per il ${new Date(scheduledPublishAtISO).toLocaleString()}.`
+          : (existingId ? "Offerta aggiornata!" : "Nuova offerta pubblicata!")));
     
     // 4. Chiusura e Refresh UI
     closeOfferModal();
@@ -5594,6 +5658,7 @@ function displayProductInModal(product) {
             </div>
             <div style="margin-top: 10px; display: flex; align-items: center; gap: 6px; color: #1e40af; font-weight: 600;">
               <span style="display:inline-flex;">${PANEL_ICONS.calendar}</span> <span>Scade il: ${product.endDate}</span>
+              ${product.limitedQuantity ? `<span style="margin-left:8px; background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; padding:2px 10px; border-radius:20px; font-size:0.75rem; font-weight:700;">Quantità Limitata</span>` : ''}
             </div>
             ${product.cardRequirement === 'required' ? `
             <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; color: #b45309; font-weight: 600; background:#fffbeb; padding:8px 12px; border-radius:8px;">
@@ -6124,6 +6189,7 @@ window.openProductDetail = async (id) => {
     plan: loc.plan || "Starter",
     unit: row.unit_of_measure || "pezzo",
     cardRequirement: row.card_requirement || null,
+    limitedQuantity: row.limited_quantity || false,
     storeCardName: loc.membershipCardName || "",
     storeCardImage: loc.membershipCardImage || ""
   };

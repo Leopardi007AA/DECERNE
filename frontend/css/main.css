@@ -1077,6 +1077,32 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
 }
 #statoPubblicazioneMenu .btn { justify-content: flex-start; }
 
+/* Gruppo pulsanti Stato Pubblicazione all'interno del popup Nuova/Modifica Offerta */
+.offer-status-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.offer-status-btn {
+  flex: 1 1 auto;
+  min-width: 90px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+.offer-status-btn:hover:not(:disabled) { border-color: #cbd5e1; background: #f1f5f9; }
+.offer-status-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.offer-status-btn.active { background: #16a34a; border-color: #16a34a; color: #fff; box-shadow: 0 2px 8px rgba(22,163,74,0.35); }
+.offer-status-btn.active[data-status="scheduled"] { background: #2563eb; border-color: #2563eb; box-shadow: 0 2px 8px rgba(37,99,235,0.35); }
+.offer-status-btn.active[data-status="expired"] { background: #dc2626; border-color: #dc2626; box-shadow: 0 2px 8px rgba(220,38,38,0.35); }
+.offer-status-btn[data-status="expired"] { border-style: dashed; }
+#offScheduleFields { display: flex; flex-direction: column; }
+#offScheduleFields.hidden { display: none; }
+#offScheduleFields #offScheduleDateTime { padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; margin-top: 4px; }
+
 .upgrade-banner { background: linear-gradient(90deg, #eff6ff, #dbeafe); padding: 15px; border-radius: 12px; border: 1px solid #bfdbfe; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; }
 
 /* ONBOARDING STEPS */
