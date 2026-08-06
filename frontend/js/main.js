@@ -1047,7 +1047,8 @@ async function fetchRecommendedOffers() {
       storeCap: r.store_cap || "",
       storeAddress: r.store_address || "",
       plan: r.plan || "Starter",
-      cardRequirement: r.card_requirement || null
+      cardRequirement: r.card_requirement || null,
+      limitedQuantity: r.limited_quantity || false
     }));
 
     renderRecommendedOffers(recommended);
@@ -1140,7 +1141,8 @@ async function renderOffers(page = state.currentPage, pageSize = state.pageSize)
         storeCap: loc.cap || "",
         storeAddress: loc.address || "",
         plan: loc.plan || "Starter",
-        cardRequirement: r.card_requirement || null
+        cardRequirement: r.card_requirement || null,
+        limitedQuantity: r.limited_quantity || false
       };
     });
 
@@ -1290,6 +1292,24 @@ function createOfferCardElement(o) {
   details.appendChild(storeRow);
   details.appendChild(title);
   details.appendChild(priceCont);
+
+  
+    if (o.limitedQuantity) {
+      const limBadge = document.createElement("span");
+      limBadge.style.cssText = "background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; padding:2px 10px; border-radius:20px; font-size:0.7rem; font-weight:700;";
+      limBadge.textContent = "Quantità Limitata";
+      badgesRow.appendChild(limBadge);
+    }
+
+    if (o.cardRequirement === 'required') {
+      const cardBadge = document.createElement("span");
+      cardBadge.style.cssText = "background:#fffbeb; color:#b45309; border:1px solid #fde68a; padding:2px 10px; border-radius:20px; font-size:0.7rem; font-weight:700;";
+      cardBadge.textContent = "Richiede tessera";
+      badgesRow.appendChild(cardBadge);
+    }
+
+    details.appendChild(badgesRow);
+  }
 
   // 3. TASTO AGGIUNGI
   const actions = document.createElement("div");
@@ -4418,6 +4438,16 @@ async function init() {
     }, 300);
   
     searchInput.oninput = () => {
+      // Nasconde/mostra "Offerte Consigliate" SUBITO (non debounced): appena si
+      // scrive la prima lettera deve sparire; appena si svuota il campo torna.
+      const hasQuery = searchInput.value.trim().length > 0;
+      if (hasQuery) {
+        const recommendedSection = $("#recommendedOffersSection");
+        if (recommendedSection) recommendedSection.classList.add("hidden");
+      } else {
+        fetchRecommendedOffers(); // Ripristina "Offerte Consigliate" se il campo torna vuoto
+      }
+
       debouncedRender();
       logSearchQuery(); // Traccia la ricerca per le Offerte Consigliate (solo utenti loggati)
     };
