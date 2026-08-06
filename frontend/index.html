@@ -121,14 +121,16 @@
            e lista della spesa dell'utente loggato. Stessa identica card di "Offerte Vicine"
            (createOfferCardElement) — cambia solo lo sfondo del pannello, per dare l'idea
            di uno strato sovrapposto alla schermata sottostante. -->
-      <section id="recommendedOffersSection" class="recommended-offers-panel hidden">
-        <div class="recommended-offers-header">
-          <span class="recommended-offers-badge">🏆 Per te</span>
-          <h2>Offerte Consigliate</h2>
-          <p>Selezionate in base alle tue ricerche, ai prodotti che guardi e alla tua lista della spesa</p>
-        </div>
-        <div id="recommendedOffersGrid" class="offers-list-container"></div>
-      </section>
+           <section id="recommendedOffersSection" class="recommended-offers-panel hidden">
+            <div class="recommended-offers-header">
+              <span class="recommended-offers-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M7 4h10v4a5 5 0 0 1-10 0Z"/><path d="M7 5H4a3 3 0 0 0 3 4"/><path d="M17 5h3a3 3 0 0 1-3 4"/><path d="M12 13v3"/><path d="M9 20h6"/><path d="M10 16.5h4v1.8a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1Z"/></svg>
+                Per te
+              </span>
+              <h2>Offerte Consigliate</h2>
+            </div>
+            <div id="recommendedOffersGrid" class="offers-list-container"></div>
+          </section>
     
       <h2 style="margin-bottom: 20px; color: var(--blue-900);">Offerte Vicine</h2>
       <div id="offersGrid" class="offers-list-container"></div>
@@ -173,8 +175,52 @@
         <select id="offCat">
           <option value="Ortofrutta">Ortofrutta</option>
           <option value="Macelleria">Macelleria</option>
+          <option value="Pescheria">Pescheria</option>
+          <option value="Salumeria">Salumeria</option>
+          <option value="Formaggi e Latticini">Formaggi e Latticini</option>
+          <option value="Uova">Uova</option>
+          <option value="Panetteria e Panificati">Panetteria e Panificati</option>
+          <option value="Pasticceria e Dolciumi">Pasticceria e Dolciumi</option>
+          <option value="Gastronomia e Piatti Pronti">Gastronomia e Piatti Pronti</option>
           <option value="Dispensa">Dispensa</option>
+          <option value="Pasta, Riso e Cereali">Pasta, Riso e Cereali</option>
+          <option value="Legumi e Scatolame">Legumi e Scatolame</option>
+          <option value="Sughi, Condimenti e Spezie">Sughi, Condimenti e Spezie</option>
+          <option value="Olio, Aceto e Sale">Olio, Aceto e Sale</option>
+          <option value="Colazione, Biscotti e Marmellate">Colazione, Biscotti e Marmellate</option>
+          <option value="Snack e Salatini">Snack e Salatini</option>
           <option value="Surgelati">Surgelati</option>
+          <option value="Gelati">Gelati</option>
+          <option value="Bevande Analcoliche">Bevande Analcoliche</option>
+          <option value="Acqua">Acqua</option>
+          <option value="Vino">Vino</option>
+          <option value="Birra e Alcolici">Birra e Alcolici</option>
+          <option value="Caffè, Tè e Infusi">Caffè, Tè e Infusi</option>
+          <option value="Prodotti Bio ed Ecologici">Prodotti Bio ed Ecologici</option>
+          <option value="Senza Glutine">Senza Glutine</option>
+          <option value="Prodotti Vegetariani e Vegani">Prodotti Vegetariani e Vegani</option>
+          <option value="Prima Infanzia">Prima Infanzia</option>
+          <option value="Prodotti Etnici e Internazionali">Prodotti Etnici e Internazionali</option>
+          <option value="Cura del Corpo e Bellezza">Cura del Corpo e Bellezza</option>
+          <option value="Igiene Orale">Igiene Orale</option>
+          <option value="Cura dei Capelli">Cura dei Capelli</option>
+          <option value="Profumeria">Profumeria</option>
+          <option value="Farmacia e Parafarmaco">Farmacia e Parafarmaco</option>
+          <option value="Pulizia Casa e Detersivi">Pulizia Casa e Detersivi</option>
+          <option value="Bucato e Stireria">Bucato e Stireria</option>
+          <option value="Carta e Monouso">Carta e Monouso</option>
+          <option value="Casalinghi e Cucina">Casalinghi e Cucina</option>
+          <option value="Elettrodomestici">Elettrodomestici</option>
+          <option value="Elettronica e Informatica">Elettronica e Informatica</option>
+          <option value="Cartoleria e Cancelleria">Cartoleria e Cancelleria</option>
+          <option value="Editoria, Libri e Riviste">Editoria, Libri e Riviste</option>
+          <option value="Giocattoli">Giocattoli</option>
+          <option value="Abbigliamento e Accessori">Abbigliamento e Accessori</option>
+          <option value="Fai da Te, Giardinaggio e Ferramenta">Fai da Te, Giardinaggio e Ferramenta</option>
+          <option value="Fiori e Piante">Fiori e Piante</option>
+          <option value="Animali Domestici">Animali Domestici</option>
+          <option value="Automobile e Accessori Auto">Automobile e Accessori Auto</option>
+          <option value="Altro">Altro</option>
         </select>
       </div>
       <div class="form-row">
