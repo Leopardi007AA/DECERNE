@@ -115,9 +115,23 @@
 
     <!-- VIEWS -->
     
-<section id="user-view" class="view">
-  <h2 style="margin-bottom: 20px; color: var(--blue-900);">Offerte Vicine</h2>
-  <div id="offersGrid" class="offers-list-container"></div>
+    <section id="user-view" class="view">
+
+      <!-- OFFERTE CONSIGLIATE: podio personalizzato in base a ricerche, prodotti aperti
+           e lista della spesa dell'utente loggato. Stessa identica card di "Offerte Vicine"
+           (createOfferCardElement) — cambia solo lo sfondo del pannello, per dare l'idea
+           di uno strato sovrapposto alla schermata sottostante. -->
+      <section id="recommendedOffersSection" class="recommended-offers-panel hidden">
+        <div class="recommended-offers-header">
+          <span class="recommended-offers-badge">🏆 Per te</span>
+          <h2>Offerte Consigliate</h2>
+          <p>Selezionate in base alle tue ricerche, ai prodotti che guardi e alla tua lista della spesa</p>
+        </div>
+        <div id="recommendedOffersGrid" class="offers-list-container"></div>
+      </section>
+    
+      <h2 style="margin-bottom: 20px; color: var(--blue-900);">Offerte Vicine</h2>
+      <div id="offersGrid" class="offers-list-container"></div>
 
   <div id="paginationContainer" style="margin-top: 30px; text-align: center; display: none;">
     <button id="loadMoreBtn" class="btn outline" style="padding: 12px 40px;">Carica altre offerte</button>

@@ -470,6 +470,31 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
   transform: translateY(-2px);
 }
 
+/* --- OFFERTE CONSIGLIATE: pannello "sovrapposto" sopra Offerte Vicine --- */
+.recommended-offers-panel {
+  position: relative;
+  background: linear-gradient(160deg, #eef4ff 0%, #f7faff 55%, #ffffff 100%);
+  border: 1px solid #dbe6fb;
+  border-radius: 24px;
+  padding: 24px 24px 20px;
+  margin-bottom: 32px;
+  box-shadow: 0 18px 40px -12px rgba(15, 98, 254, 0.22), 0 2px 8px rgba(15, 98, 254, 0.08);
+}
+.recommended-offers-header { margin-bottom: 16px; }
+.recommended-offers-badge {
+  display: inline-block;
+  font-size: 0.7rem; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;
+  color: #0f62fe; background: #e0ebff;
+  padding: 4px 12px; border-radius: 999px; margin-bottom: 8px;
+}
+.recommended-offers-header h2 { margin: 0 0 4px; color: var(--blue-900, #0a3d91); font-size: 1.3rem; }
+.recommended-offers-header p { margin: 0; font-size: 0.85rem; color: #64748b; }
+.recommended-offers-panel .offers-list-container { margin: 0; }
+
+@media (max-width: 600px) {
+  .recommended-offers-panel { padding: 18px 16px 16px; border-radius: 18px; }
+}
+
 /* --- CONTENITORE IMMAGINE (Risoluzione del problema bordi) --- */
 .product-image-container {
   position: relative;
@@ -534,51 +559,60 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
     padding: 14px;
   }
 
-  #offersGrid.offers-list-container {
+  #offersGrid.offers-list-container,
+  #recommendedOffersGrid.offers-list-container {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
   }
 
-  #offersGrid .offer-row {
+  #offersGrid .offer-row,
+  #recommendedOffersGrid .offer-row {
     flex-direction: column;
     align-items: stretch;
     margin-bottom: 0;
   }
 
-  #offersGrid .product-image-container {
+  #offersGrid .product-image-container,
+  #recommendedOffersGrid .product-image-container {
     width: 100%;
     height: 130px;
     min-width: 0;
     border-radius: 16px 16px 0 0;
   }
 
-  #offersGrid .product-info {
+  #offersGrid .product-info,
+  #recommendedOffersGrid .product-info {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
     padding: 12px;
   }
 
-  #offersGrid .store-name {
+  #offersGrid .store-name,
+  #recommendedOffersGrid .store-name {
     font-size: 0.7rem;
   }
 
-  #offersGrid .product-details h3 {
+  #offersGrid .product-details h3,
+  #recommendedOffersGrid .product-details h3 {
     font-size: 0.9rem;
     margin: 0 0 6px 0;
     line-height: 1.25;
   }
 
-  #offersGrid .price-tag {
+  #offersGrid .price-tag,
+  #recommendedOffersGrid .price-tag {
     font-size: 1.1rem;
   }
 
-  #offersGrid .product-actions {
+  #offersGrid .product-actions,
+  #recommendedOffersGrid .product-actions {
     width: 100%;
   }
 
-  #offersGrid .product-actions .btn {
+  #offersGrid .product-actions .btn,
+  #recommendedOffersGrid .product-actions .btn {
     width: 100%;
     padding: 10px;
     font-size: 0.85rem;

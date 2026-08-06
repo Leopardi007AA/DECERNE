@@ -1004,6 +1004,92 @@ function sortLocationsPrimaryFirst(locations) {
   return [...(locations || [])].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
 }
 
+// ============================================================
+// OFFERTE CONSIGLIATE — Podio di raccomandazione personalizzato
+// ============================================================
+// Il punteggio è calcolato lato Supabase (RPC get_recommended_offers): qui
+// arrivano già le 4 offerte pronte, disegnate con la stessa identica
+// createOfferCardElement() usata da "Offerte Vicine" — nessuna differenza
+// nella modalità di visualizzazione delle card.
+async function fetchRecommendedOffers() {
+  const section = $("#recommendedOffersSection");
+  const grid = $("#recommendedOffersGrid");
+  if (!section || !grid) return;
+
+  if (!state.currentUser) {
+    section.classList.add("hidden");
+    grid.innerHTML = "";
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient.rpc('get_recommended_offers', { p_limit: 4 });
+
+    if (error) {
+      console.warn("Errore caricamento offerte consigliate:", error);
+      section.classList.add("hidden");
+      return;
+    }
+
+    const recommended = (data || []).map(r => ({
+      id: r.id,
+      product: r.product,
+      price: r.price,
+      originalPrice: r.original_price,
+      category: r.category,
+      startDate: r.start_date,
+      endDate: r.end_date,
+      description: r.description,
+      img: r.img_url,
+      status: r.status,
+      storeName: r.store_name || "",
+      storeCity: r.store_city ? r.store_city.toLowerCase() : "",
+      storeCap: r.store_cap || "",
+      storeAddress: r.store_address || "",
+      plan: r.plan || "Starter",
+      cardRequirement: r.card_requirement || null
+    }));
+
+    renderRecommendedOffers(recommended);
+  } catch (e) {
+    console.warn("Errore imprevisto nelle offerte consigliate:", e);
+    section.classList.add("hidden");
+  }
+}
+
+function renderRecommendedOffers(offers) {
+  const section = $("#recommendedOffersSection");
+  const grid = $("#recommendedOffersGrid");
+  if (!section || !grid) return;
+
+  if (!offers || offers.length === 0) {
+    section.classList.add("hidden");
+    grid.innerHTML = "";
+    return;
+  }
+
+  grid.innerHTML = "";
+  offers.forEach(o => grid.appendChild(createOfferCardElement(o)));
+  section.classList.remove("hidden");
+}
+
+// Tracciamento ricerche testuali (debounced, per non scrivere ad ogni tasto premuto)
+let lastLoggedSearchQuery = "";
+const logSearchQuery = debounce(async () => {
+  const query = ($("#searchInput")?.value || "").trim();
+
+  if (!state.currentUser) return;
+  if (query.length < 2) return;
+  if (query.toLowerCase() === lastLoggedSearchQuery) return;
+  lastLoggedSearchQuery = query.toLowerCase();
+
+  const { error } = await supabaseClient
+    .from('user_search_events')
+    .insert({ user_id: state.currentUser.id, query });
+
+  if (error) console.warn("Errore salvataggio ricerca:", error);
+}, 700);
+
 async function renderOffers(page = state.currentPage, pageSize = state.pageSize) {
   try {
     const grid = $("#offersGrid");
@@ -2156,6 +2242,7 @@ async function loginUser(email, password) {
     updateLocationUI(`${state.currentUser.cap} ${state.currentUser.citta}`.trim());
     updateDrawerUI();
     renderOffers();
+    fetchRecommendedOffers();
 
     return { success: true };
   } catch (e) {
@@ -2177,6 +2264,7 @@ async function logoutUser() {
   updateDrawerUI();
   updateLocationUI("Posizione non impostata");
   renderOffers();
+  renderRecommendedOffers([]); // Nasconde "Offerte Consigliate" dopo il logout
   toast.info(TEXT.auth.logoutBtn);
 }
 
@@ -4287,6 +4375,7 @@ async function init() {
   }
 
   await restoreUserSession();
+  fetchRecommendedOffers(); // Non blocca l'avvio: si popola appena pronta
   const tempPartner = sessionStorage.getItem(SESSION_PARTNER);
   const permPartner = localStorage.getItem(PARTNER_AUTH_KEY);
   const cachedPartner = tempPartner || permPartner;
@@ -4328,7 +4417,10 @@ async function init() {
       renderOffers();
     }, 300);
   
-    searchInput.oninput = debouncedRender;
+    searchInput.oninput = () => {
+      debouncedRender();
+      logSearchQuery(); // Traccia la ricerca per le Offerte Consigliate (solo utenti loggati)
+    };
   }
   
   if (categorySelect) {
@@ -6150,6 +6242,13 @@ const originalOpenProductDetail = window.openProductDetail;
 window.openProductDetail = async (id) => {
   supabaseClient.rpc('increment_offer_stat', { p_offer_id: id, p_field: 'opens' })
     .then(({ error }) => { if (error) console.warn("Errore opens:", error); });
+
+  // Traccia l'apertura per l'utente loggato (usata dalle Offerte Consigliate)
+  if (state.currentUser) {
+    supabaseClient.from('user_offer_opens')
+      .insert({ user_id: state.currentUser.id, offer_id: id })
+      .then(({ error }) => { if (error) console.warn("Errore tracciamento apertura:", error); });
+  }
 
   const { data: row, error } = await supabaseClient
     .from('offers')
