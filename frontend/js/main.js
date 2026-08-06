@@ -725,6 +725,7 @@ async function refreshMyOffers() {
     unit: r.unit_of_measure,
     cardRequirement: r.card_requirement,
     scheduledPublishAt: r.scheduled_publish_at,
+    limitedQuantity: r.limited_quantity || false,  // FIX: mancava qui, per questo "Quantità Limitata" si deselezionava alla riapertura
     location_id: r.location_id  // FIX: serve per "Miglior sede" e per l'export CSV nella Dashboard Generale
   }));
 
@@ -6349,18 +6350,18 @@ function renderLocationsTab() {
               }
             </div>
 
-            <div class="form-row" style="gap: 10px;">
+            <div class="form-row" style="gap: 14px;">
               <div class="input-group" style="flex: 2;">
                 <label>Indirizzo</label>
-                <input type="text" id="locAddr_${index}" value="${extractStreetFromAddress(loc.address, loc.cap, loc.city) || ''}" placeholder="Via e numero civico">
+                <input type="text" id="locAddr_${index}" class="location-field-input" value="${extractStreetFromAddress(loc.address, loc.cap, loc.city) || ''}" placeholder="Via e numero civico">
               </div>
               <div class="input-group" style="flex: 1.2;">
                 <label>Città</label>
-                <input type="text" id="locCity_${index}" value="${loc.city || ''}" placeholder="Città">
+                <input type="text" id="locCity_${index}" class="location-field-input" value="${loc.city || ''}" placeholder="Città">
               </div>
               <div class="input-group" style="flex: 0 0 90px;">
                 <label>CAP</label>
-                <input type="text" id="locCap_${index}" value="${loc.cap || ''}" placeholder="00000">
+                <input type="text" id="locCap_${index}" class="location-field-input" value="${loc.cap || ''}" placeholder="00000">
               </div>
             </div>
 
@@ -6379,10 +6380,10 @@ function renderLocationsTab() {
                   <a href="javascript:void(0)" onclick="openLocationGoogleMapsHelper(${index})">Trova le coordinate →</a>
                 </p>
                 <label style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase;">Latitudine</label>
-                <div class="form-row" style="gap: 8px; margin: 4px 0 10px; align-items: flex-end;">
-                  <div class="input-group" style="flex: 1;"><input type="number" id="locLatDeg_${index}" min="0" max="90" placeholder="Gradi" value="${latDMS.deg}"></div>
-                  <div class="input-group" style="flex: 1;"><input type="number" id="locLatMin_${index}" min="0" max="59" placeholder="Primi" value="${latDMS.min}"></div>
-                  <div class="input-group" style="flex: 1;"><input type="number" id="locLatSec_${index}" min="0" max="59.99" step="0.1" placeholder="Secondi" value="${latDMS.sec}"></div>
+                <div class="form-row" style="gap: 12px; margin: 4px 0 10px; align-items: flex-end;">
+                  <div class="input-group" style="flex: 1;"><input type="number" id="locLatDeg_${index}" class="location-field-input" min="0" max="90" placeholder="Gradi" value="${latDMS.deg}"></div>
+                  <div class="input-group" style="flex: 1;"><input type="number" id="locLatMin_${index}" class="location-field-input" min="0" max="59" placeholder="Primi" value="${latDMS.min}"></div>
+                  <div class="input-group" style="flex: 1;"><input type="number" id="locLatSec_${index}" class="location-field-input" min="0" max="59.99" step="0.1" placeholder="Secondi" value="${latDMS.sec}"></div>
                   <div class="input-group" style="flex: 0.6;">
                     <select id="locLatDir_${index}">
                       <option value="N" ${latDMS.dir === 'N' ? 'selected' : ''}>N</option>
@@ -6391,10 +6392,10 @@ function renderLocationsTab() {
                   </div>
                 </div>
                 <label style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase;">Longitudine</label>
-                <div class="form-row" style="gap: 8px; margin: 4px 0 12px; align-items: flex-end;">
-                  <div class="input-group" style="flex: 1;"><input type="number" id="locLngDeg_${index}" min="0" max="180" placeholder="Gradi" value="${lngDMS.deg}"></div>
-                  <div class="input-group" style="flex: 1;"><input type="number" id="locLngMin_${index}" min="0" max="59" placeholder="Primi" value="${lngDMS.min}"></div>
-                  <div class="input-group" style="flex: 1;"><input type="number" id="locLngSec_${index}" min="0" max="59.99" step="0.1" placeholder="Secondi" value="${lngDMS.sec}"></div>
+                <div class="form-row" style="gap: 12px; margin: 4px 0 12px; align-items: flex-end;">
+                  <div class="input-group" style="flex: 1;"><input type="number" id="locLngDeg_${index}" class="location-field-input" min="0" max="180" placeholder="Gradi" value="${lngDMS.deg}"></div>
+                  <div class="input-group" style="flex: 1;"><input type="number" id="locLngMin_${index}" class="location-field-input" min="0" max="59" placeholder="Primi" value="${lngDMS.min}"></div>
+                  <div class="input-group" style="flex: 1;"><input type="number" id="locLngSec_${index}" class="location-field-input" min="0" max="59.99" step="0.1" placeholder="Secondi" value="${lngDMS.sec}"></div>
                   <div class="input-group" style="flex: 0.6;">
                     <select id="locLngDir_${index}">
                       <option value="E" ${lngDMS.dir === 'E' ? 'selected' : ''}>E</option>

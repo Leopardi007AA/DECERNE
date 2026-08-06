@@ -876,6 +876,29 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
   text-transform: uppercase;
 }
 
+/* --- Box sedi (Gestione Punti Vendita): indirizzo, città, CAP, coordinate --- */
+.location-field-input {
+  padding: 11px 14px;
+  border: 1px solid #dbe3ee;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--text);
+  background: #fff;
+  width: 100%;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.location-field-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(15, 98, 254, 0.12);
+}
+
+.location-field-input::placeholder {
+  color: #a0aec0;
+}
+
 .auth-form .form-row {
   display: flex;
   gap: 12px;
