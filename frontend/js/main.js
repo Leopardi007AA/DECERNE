@@ -499,6 +499,8 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
       hours: storeRow.hours || "",
       internalNotes: storeRow.internal_notes || "",
       apiKey: storeRow.api_key || "",
+      membershipCardName: storeRow.membership_card_name || "",  // FIX: mancava qui, per questo spariva al login
+      membershipCardImage: storeRow.membership_card_image_url || "",  // FIX: idem
       locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary, latitude: l.latitude, longitude: l.longitude }))),
       plan: storeRow.plan,
       subscription: {
@@ -4322,6 +4324,8 @@ async function refreshPartnerSession(storeId) {
       hours: storeRow.hours || "",
       internalNotes: storeRow.internal_notes || "",
       apiKey: storeRow.api_key || "",
+      membershipCardName: storeRow.membership_card_name || "",  // FIX: mancava anche qui
+      membershipCardImage: storeRow.membership_card_image_url || "",  // FIX: idem
       locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary, latitude: l.latitude != null ? parseFloat(l.latitude) : null, longitude: l.longitude != null ? parseFloat(l.longitude) : null }))),
       plan: storeRow.plan,
     subscription: {
