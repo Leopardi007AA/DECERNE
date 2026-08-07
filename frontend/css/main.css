@@ -1073,6 +1073,15 @@ select.location-field-input {
   margin-bottom: 15px;
 }
 
+/* Spazio riservato fisso per prezzo + eventuale riga "poi €.../mese", così le card
+   non cambiano altezza passando da Mensile ad Annuale (solo Starter in Mensile ha
+   la riga in più) */
+@media (min-width: 769px) {
+  .price-block {
+    min-height: 70px;
+  }
+}
+
 .plan-desc {
   font-size: 0.9rem;
   color: #475569;

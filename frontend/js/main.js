@@ -4764,27 +4764,33 @@ if (partner) {
     </div>`;
 }
 
-  // Helper per generare i pulsanti in modo dinamico
-  const getPlanButton = (planName, priceText) => {
-    // 1. Caso: Il partner è già su questo piano
-    if (currentPlan === planName) {
-      return `<button class="btn full-width disabled" disabled>Piano Attuale</button>`;
-    }
+const cycle = storeData.billingCycle || 'monthly'; // FIX: serve qui, prima ancora del template, per decidere il bottone di Starter
+const isAnnualView = cycle === 'annual';
 
-    // 2. Caso: Il partner è loggato e sta guardando un piano superiore al suo (upgrade diretto, no trial)
-    if (partner && PLAN_LEVELS[currentPlan] < PLAN_LEVELS[planName]) {
-      return `<button class="btn full-width" onclick="activatePlan('${planName}')">Attiva ${planName}</button>`;
-    }
+// Helper per generare i pulsanti in modo dinamico
+const getPlanButton = (planName, priceText) => {
+  // 1. Caso: Il partner è già su questo piano
+  if (currentPlan === planName) {
+    return `<button class="btn full-width disabled" disabled>Piano Attuale</button>`;
+  }
 
-    // 3. Caso default: Non loggato o altri stati (usa il trial)
-    return `<button class="btn ${planName === 'Standard' ? '' : 'outline'} full-width" onclick="startTrial('${planName}')">
-              ${planName === 'Starter' ? 'Prova gratuita' : 'Scegli ' + planName}
-            </button>`;
-  };
+  // 2. Caso: Il partner è loggato e sta guardando un piano superiore al suo (upgrade diretto, no trial)
+  if (partner && PLAN_LEVELS[currentPlan] < PLAN_LEVELS[planName]) {
+    return `<button class="btn full-width" onclick="activatePlan('${planName}')">Attiva ${planName}</button>`;
+  }
 
-  const cycle = storeData.billingCycle || 'monthly';
-  const isAnnual = cycle === 'annual';
+  // 2bis. Starter in modalità Annuale: niente prova gratuita, si registra subito con l'abbonamento annuale attivo
+  if (planName === 'Starter' && isAnnualView) {
+    return `<button class="btn outline full-width" onclick="startPlanDirect('Starter')">Scegli Starter</button>`;
+  }
 
+  // 3. Caso default: Non loggato o altri stati (usa il trial)
+  return `<button class="btn ${planName === 'Standard' ? '' : 'outline'} full-width" onclick="startTrial('${planName}')">
+            ${planName === 'Starter' ? 'Prova gratuita' : 'Scegli ' + planName}
+          </button>`;
+};
+
+const isAnnual = isAnnualView;
   container.innerHTML = `
     <div class="pricing-wrapper">
       <div class="pricing-header">
@@ -4802,12 +4808,14 @@ if (partner) {
         <!-- STARTER -->
         <div class="pricing-card">
           <div class="plan-type">🟦 STARTER</div>
-          ${isAnnual ? `
-          <div class="price">€199,99 <span>/ anno</span></div>
-          ` : `
-          <div class="price">€0 <span>/ 30gg prova</span></div>
-          <div class="price-sub">poi €19,99 / mese</div>
-          `}
+          <div class="price-block">
+            ${isAnnual ? `
+            <div class="price">€199,99 <span>/ anno</span></div>
+            ` : `
+            <div class="price">€0 <span>/ 30gg prova</span></div>
+            <div class="price-sub">poi €19,99 / mese</div>
+            `}
+          </div>
           <p class="plan-desc">Ideale per piccoli supermercati e negozi locali.</p>
           <ul class="features">
             <li>Fino a 10 offerte attive</li>
@@ -4822,7 +4830,9 @@ if (partner) {
         <div class="pricing-card popular">
           <div class="popular-badge">MIGLIOR VALORE</div>
           <div class="plan-type">🔵 STANDARD</div>
-          <div class="price">${isAnnual ? '€499,99 <span>/ anno</span>' : '€49,99 <span>/ mese</span>'}</div>
+          <div class="price-block">
+            <div class="price">${isAnnual ? '€499,99 <span>/ anno</span>' : '€49,99 <span>/ mese</span>'}</div>
+          </div>
           <p class="plan-desc">Per supermercati strutturati con più traffico.</p>
           <ul class="features">
             <li><strong>Offerte illimitate</strong></li>
@@ -4836,7 +4846,9 @@ if (partner) {
         <!-- PROFESSIONAL -->
         <div class="pricing-card">
           <div class="plan-type">🔷 PROFESSIONAL</div>
-          <div class="price">${isAnnual ? '€1.499,99 <span>/ anno</span>' : '€149,99 <span>/ mese</span>'}</div>
+          <div class="price-block">
+            <div class="price">${isAnnual ? '€1.499,99 <span>/ anno</span>' : '€149,99 <span>/ mese</span>'}</div>
+          </div>
           <p class="plan-desc">Per catene e supermercati ad alto volume.</p>
           <ul class="features">
             <li>Offerte in posizione "Featured"</li>
@@ -4850,7 +4862,9 @@ if (partner) {
         <!-- ENTERPRISE -->
         <div class="pricing-card">
           <div class="plan-type">🔶 ENTERPRISE</div>
-          <div class="price">Custom</div>
+          <div class="price-block">
+            <div class="price">Custom</div>
+          </div>
           <p class="plan-desc">Per grandi catene o accordi su larga scala.</p>
           <ul class="features">
             <li>Integrazione sistemi interni</li>
@@ -4915,7 +4929,26 @@ window.startTrial = async function(planName) {
   }
 };
 
-// Esempio ipotetico di funzione per forzare la scadenza (da usare per test o cron)
+/**
+ * Come startTrial, ma per scelte che NON devono passare dal periodo di prova
+ * (oggi: solo Starter Annuale). Porta comunque alla stessa identica schermata
+ * di registrazione — cambia solo cosa viene scritto su Supabase alla fine.
+ */
+window.startPlanDirect = function(planName) {
+  const partner = getCurrentPartner();
+  if (partner) {
+    // Un partner già loggato non dovrebbe arrivare qui (vede "Piano Attuale" o "Attiva"),
+    // ma per sicurezza lo mandiamo comunque sull'attivazione diretta corretta.
+    return window.activatePlan(planName);
+  }
+
+  storeData.subscription.plan = planName;
+  storeData.billingCycleAtSignup = 'annual'; // letto in handleOnboardingSubmit (step 4)
+  storeData.step = 'onboarding';
+  renderStoreView();
+};
+
+// Esempio ipotetico di funzione per forzare la scadenza (da usare per test or cron)
 function simulateTrialExpiry(partnerId) {
   const expiredSub = {
       plan: 'Starter',
@@ -5188,6 +5221,17 @@ async function handleOnboardingSubmit(step) {
       const emailClean = storeData.tempReg.email;
       const planChoice = storeData.subscription?.plan || 'Starter';
 
+      // FIX: se si arriva qui da "Scegli Starter" in modalità Annuale (startPlanDirect),
+      // niente prova gratuita: il negozio nasce già attivo con rinnovo a 1 anno.
+      const isDirectAnnual = storeData.billingCycleAtSignup === 'annual';
+      const todayISO = new Date().toISOString().split("T")[0];
+      let annualRenewalISO = null;
+      if (isDirectAnnual) {
+        const renewalDate = new Date();
+        renewalDate.setFullYear(renewalDate.getFullYear() + 1);
+        annualRenewalISO = renewalDate.toISOString().split("T")[0];
+      }
+
       // La sessione è già attiva dallo step 3 (verifyOtp): possiamo scrivere direttamente su DB
       const { data: storeRow, error: storeError } = await storeAuthClient
         .from('stores')
@@ -5201,7 +5245,10 @@ async function handleOnboardingSubmit(step) {
           logo_url: logoUrl,
           phone: phone,
           plan: planChoice,
-          internal_notes: referralNotes
+          internal_notes: referralNotes,
+          billing_cycle: isDirectAnnual ? 'annual' : 'monthly',
+          subscription_status: isDirectAnnual ? 'active' : 'trial',
+          renewal_date: annualRenewalISO
         })
         .select()
         .single();
@@ -5237,13 +5284,20 @@ async function handleOnboardingSubmit(step) {
         internalNotes: storeRow.internal_notes || "",
         locations: [{ id: locationRow.id, name: "Sede Principale", address: fullAddress, city: storeData.tempReg.city, cap: storeData.tempReg.cap, isPrimary: true, latitude: initialCoords?.lat ?? null, longitude: initialCoords?.lng ?? null }],
         plan: storeRow.plan,
-        subscription: {
+        subscription: isDirectAnnual ? {
+          plan: storeRow.plan,
+          status: 'active',
+          renewalDate: annualRenewalISO,
+          daysLeft: 9999
+        } : {
           plan: storeRow.plan,
           status: 'trial',
-          startedAt: new Date().toISOString().split("T")[0],
+          startedAt: todayISO,
           daysLeft: 30
         }
       };
+
+      storeData.billingCycleAtSignup = null; // reset, non deve influenzare registrazioni successive
 
       const sessionData = JSON.stringify(newStore);
       localStorage.setItem(PARTNER_AUTH_KEY, sessionData);
@@ -5893,7 +5947,8 @@ async function updatePartnerSubscription(partnerId, subscriptionObj) {
       plan: subscriptionObj.plan,
       subscription_status: subscriptionObj.status,
       trial_started_at: subscriptionObj.startedAt || null,
-      renewal_date: subscriptionObj.renewalDate || null
+      renewal_date: subscriptionObj.renewalDate || null,
+      billing_cycle: subscriptionObj.billingCycle || 'monthly'
     })
     .eq('id', partnerId)
     .select()
@@ -6198,7 +6253,8 @@ window.promptUpgradeToStandard = function(partnerId) {
         status: 'active',
         startedAt: new Date().toISOString().split("T")[0],
         renewalDate: renewalDate.toISOString().split("T")[0],
-        daysLeft: 9999
+        daysLeft: 9999,
+        billingCycle: cycle
       };
 
       const ok = await updatePartnerSubscription(partnerId, activeSub);
@@ -6243,7 +6299,8 @@ window.activatePlan = async function(planName) {
     const updates = {
       plan: planName,
       subscription_status: 'active',
-      renewal_date: renewalDate.toISOString().split('T')[0]
+      renewal_date: renewalDate.toISOString().split('T')[0],
+      billing_cycle: cycle
     };
 
     if ((planName === 'Professional' || planName === 'Enterprise') && !partner.apiKey) {
