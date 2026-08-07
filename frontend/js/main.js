@@ -4782,20 +4782,32 @@ if (partner) {
             </button>`;
   };
 
+  const cycle = storeData.billingCycle || 'monthly';
+  const isAnnual = cycle === 'annual';
+
   container.innerHTML = `
     <div class="pricing-wrapper">
       <div class="pricing-header">
         <span class="badge-partner">AREA PARTNER</span>
         <h2>Scegli il piano perfetto per il tuo business</h2>
         <p>Hai già un account? <button class="btn" style="padding: 5px 15px; font-size: 0.8rem; margin-left: 10px;" onclick="showStoreLogin()">Accedi qui</button></p>
+
+        <div class="billing-cycle-switch">
+          <button type="button" class="cycle-btn ${!isAnnual ? 'active' : ''}" onclick="setBillingCycle('monthly')">Mensile</button>
+          <button type="button" class="cycle-btn ${isAnnual ? 'active' : ''}" onclick="setBillingCycle('annual')">Annuale</button>
+        </div>
       </div>
       
       <div class="pricing-grid">
         <!-- STARTER -->
         <div class="pricing-card">
           <div class="plan-type">🟦 STARTER</div>
+          ${isAnnual ? `
+          <div class="price">€199,99 <span>/ anno</span></div>
+          ` : `
           <div class="price">€0 <span>/ 30gg prova</span></div>
           <div class="price-sub">poi €19,99 / mese</div>
+          `}
           <p class="plan-desc">Ideale per piccoli supermercati e negozi locali.</p>
           <ul class="features">
             <li>Fino a 10 offerte attive</li>
@@ -4810,7 +4822,7 @@ if (partner) {
         <div class="pricing-card popular">
           <div class="popular-badge">MIGLIOR VALORE</div>
           <div class="plan-type">🔵 STANDARD</div>
-          <div class="price">€49,99 <span>/ mese</span></div>
+          <div class="price">${isAnnual ? '€499,99 <span>/ anno</span>' : '€49,99 <span>/ mese</span>'}</div>
           <p class="plan-desc">Per supermercati strutturati con più traffico.</p>
           <ul class="features">
             <li><strong>Offerte illimitate</strong></li>
@@ -4824,7 +4836,7 @@ if (partner) {
         <!-- PROFESSIONAL -->
         <div class="pricing-card">
           <div class="plan-type">🔷 PROFESSIONAL</div>
-          <div class="price">€149,99 <span>/ mese</span></div>
+          <div class="price">${isAnnual ? '€1.499,99 <span>/ anno</span>' : '€149,99 <span>/ mese</span>'}</div>
           <p class="plan-desc">Per catene e supermercati ad alto volume.</p>
           <ul class="features">
             <li>Offerte in posizione "Featured"</li>
@@ -4859,6 +4871,15 @@ if (partner) {
     </div>
   `;
 }
+
+/**
+ * Cambia il ciclo di fatturazione mostrato in pagina piani (mensile/annuale)
+ * e ridisegna la tabella prezzi mantenendo lo step corrente.
+ */
+window.setBillingCycle = function(cycle) {
+  storeData.billingCycle = cycle;
+  renderStoreView();
+};
 
 /**
  * Attiva un periodo di prova (Trial) per un determinato piano.
@@ -6157,13 +6178,20 @@ function getSubscriptionBanner() {
  * Simula un modal di pagamento e attiva l'abbonamento Standard.
  */
 window.promptUpgradeToStandard = function(partnerId) {
+  const cycle = storeData.billingCycle || 'monthly'; // FIX: stessa logica di activatePlan
+  const priceLabel = cycle === 'annual' ? '€499,99/anno' : '€49,99/mese';
+
   showConfirm(
     `<h3>Attivazione Piano Standard</h3>
-     <p>Stai per attivare il piano Standard a <strong>€49,99/mese</strong>.<br>Il pagamento verrà effettuato con il metodo salvato.</p>
+     <p>Stai per attivare il piano Standard a <strong>${priceLabel}</strong>.<br>Il pagamento verrà effettuato con il metodo salvato.</p>
      <small style="color:#64748b">Tutte le tue offerte 'paused' verranno riattivate automaticamente.</small>`, 
     async () => {
       const renewalDate = new Date();
-      renewalDate.setMonth(renewalDate.getMonth() + 1);
+      if (cycle === 'annual') {
+        renewalDate.setFullYear(renewalDate.getFullYear() + 1);
+      } else {
+        renewalDate.setMonth(renewalDate.getMonth() + 1);
+      }
 
       const activeSub = {
         plan: 'Standard',
@@ -6201,9 +6229,16 @@ window.activatePlan = async function(planName) {
   const partner = getCurrentPartner();
   if (!partner) return toast.error("Esegui il login come partner per attivare un piano.");
 
-  showConfirm(`Confermi l'attivazione del piano ${planName}?`, async () => {
+  const cycle = storeData.billingCycle || 'monthly'; // FIX: da qui deriva il conteggio giorni (mensile = +1 mese, annuale = +1 anno)
+  const cycleLabel = cycle === 'annual' ? '1 anno' : '1 mese';
+
+  showConfirm(`Confermi l'attivazione del piano ${planName} (durata ${cycleLabel})?`, async () => {
     const renewalDate = new Date();
-    renewalDate.setMonth(renewalDate.getMonth() + 1);
+    if (cycle === 'annual') {
+      renewalDate.setFullYear(renewalDate.getFullYear() + 1);
+    } else {
+      renewalDate.setMonth(renewalDate.getMonth() + 1);
+    }
 
     const updates = {
       plan: planName,
@@ -6385,7 +6420,7 @@ function renderLocationsTab() {
                   <div class="input-group" style="flex: 1;"><input type="number" id="locLatMin_${index}" class="location-field-input" min="0" max="59" placeholder="Primi" value="${latDMS.min}"></div>
                   <div class="input-group" style="flex: 1;"><input type="number" id="locLatSec_${index}" class="location-field-input" min="0" max="59.99" step="0.1" placeholder="Secondi" value="${latDMS.sec}"></div>
                   <div class="input-group" style="flex: 0.6;">
-                    <select id="locLatDir_${index}">
+                    <select id="locLatDir_${index}" class="location-field-input">
                       <option value="N" ${latDMS.dir === 'N' ? 'selected' : ''}>N</option>
                       <option value="S" ${latDMS.dir === 'S' ? 'selected' : ''}>S</option>
                     </select>
@@ -6397,7 +6432,7 @@ function renderLocationsTab() {
                   <div class="input-group" style="flex: 1;"><input type="number" id="locLngMin_${index}" class="location-field-input" min="0" max="59" placeholder="Primi" value="${lngDMS.min}"></div>
                   <div class="input-group" style="flex: 1;"><input type="number" id="locLngSec_${index}" class="location-field-input" min="0" max="59.99" step="0.1" placeholder="Secondi" value="${lngDMS.sec}"></div>
                   <div class="input-group" style="flex: 0.6;">
-                    <select id="locLngDir_${index}">
+                    <select id="locLngDir_${index}" class="location-field-input">
                       <option value="E" ${lngDMS.dir === 'E' ? 'selected' : ''}>E</option>
                       <option value="W" ${lngDMS.dir === 'W' ? 'selected' : ''}>O</option>
                     </select>

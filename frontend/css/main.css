@@ -899,6 +899,45 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
   color: #a0aec0;
 }
 
+select.location-field-input {
+  padding-right: 30px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+}
+
+/* --- Switch Mensile/Annuale (pagina piani Area Partner) --- */
+.billing-cycle-switch {
+  display: inline-flex;
+  margin-top: 16px;
+  padding: 4px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+}
+
+.billing-cycle-switch .cycle-btn {
+  border: none;
+  background: transparent;
+  padding: 8px 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #64748b;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.billing-cycle-switch .cycle-btn.active {
+  background: #fff;
+  color: var(--primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
 .auth-form .form-row {
   display: flex;
   gap: 12px;
