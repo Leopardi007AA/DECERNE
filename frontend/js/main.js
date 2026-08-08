@@ -4787,12 +4787,14 @@ const getPlanButton = (planName, priceText) => {
     return `<button class="btn full-width" onclick="activatePlan('${planName}')">Attiva ${planName}</button>`;
   }
 
-  // 2bis. Starter in modalità Annuale: niente prova gratuita, si registra subito con l'abbonamento annuale attivo
-  if (planName === 'Starter' && isAnnualView) {
-    return `<button class="btn outline full-width" onclick="startPlanDirect('Starter')">Scegli Starter</button>`;
+  // 2bis. Modalità Annuale (non loggato): niente prova gratuita per nessun piano, si registra
+  // subito con l'abbonamento annuale attivo (prima valeva solo per Starter, per questo Standard
+  // e Professional finivano comunque nel trial mensile)
+  if (isAnnualView) {
+    return `<button class="btn ${planName === 'Standard' ? '' : 'outline'} full-width" onclick="startPlanDirect('${planName}')">Scegli ${planName}</button>`;
   }
 
-  // 3. Caso default: Non loggato o altri stati (usa il trial)
+  // 3. Caso default: Non loggato, modalità Mensile (usa il trial)
   return `<button class="btn ${planName === 'Standard' ? '' : 'outline'} full-width" onclick="startTrial('${planName}')">
             ${planName === 'Starter' ? 'Prova gratuita' : 'Scegli ' + planName}
           </button>`;
