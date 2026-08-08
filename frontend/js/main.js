@@ -507,7 +507,9 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
         plan: storeRow.plan,
         status: storeRow.subscription_status,
         startedAt: storeRow.trial_started_at,
-        daysLeft: storeRow.trial_started_at 
+        renewalDate: storeRow.renewal_date,  // FIX: mancava, per questo il rinnovo annuale spariva al login
+        billingCycle: storeRow.billing_cycle || 'monthly',
+        daysLeft: storeRow.subscription_status === 'trial' && storeRow.trial_started_at
           ? Math.max(0, 30 - Math.floor((Date.now() - Date.parse(storeRow.trial_started_at)) / (24*60*60*1000)))
           : 30
       }
@@ -4328,14 +4330,16 @@ async function refreshPartnerSession(storeId) {
       membershipCardImage: storeRow.membership_card_image_url || "",  // FIX: idem
       locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary, latitude: l.latitude != null ? parseFloat(l.latitude) : null, longitude: l.longitude != null ? parseFloat(l.longitude) : null }))),
       plan: storeRow.plan,
-    subscription: {
-      plan: storeRow.plan,
-      status: storeRow.subscription_status,
-      startedAt: storeRow.trial_started_at,
-      daysLeft: storeRow.trial_started_at
-        ? Math.max(0, 30 - Math.floor((Date.now() - Date.parse(storeRow.trial_started_at)) / (24*60*60*1000)))
-        : 30
-    }
+      subscription: {
+        plan: storeRow.plan,
+        status: storeRow.subscription_status,
+        startedAt: storeRow.trial_started_at,
+        renewalDate: storeRow.renewal_date,  // FIX: idem, spariva ad ogni refresh
+        billingCycle: storeRow.billing_cycle || 'monthly',
+        daysLeft: storeRow.subscription_status === 'trial' && storeRow.trial_started_at
+          ? Math.max(0, 30 - Math.floor((Date.now() - Date.parse(storeRow.trial_started_at)) / (24*60*60*1000)))
+          : 30
+      }
   };
 
   const sessionData = JSON.stringify(freshStore);
