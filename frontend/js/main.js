@@ -451,7 +451,6 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
   try {
     const cleanEmail = email.trim().toLowerCase();
 
-    // 1. Verifica email+password vere tramite Supabase (un solo controllo, sicuro)
     const { data: authData, error: authError } = await storeAuthClient.auth.signInWithPassword({
       email: cleanEmail,
       password: pass
@@ -460,67 +459,86 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
       return { success: false, reason: 'credentials' };
     }
 
-    // 2. Recupera la riga del negozio collegata a questo utente
     const { data: storeRow, error: storeError } = await storeAuthClient
       .from('stores')
       .select('*')
       .eq('auth_user_id', authData.user.id)
       .single();
+
+    let teamRow = null;
+    let ownerStoreRow = storeRow;
+
     if (storeError || !storeRow) {
-      await storeAuthClient.auth.signOut();
-      return { success: false, reason: 'no-store' };
+      // Non è proprietario di nessun negozio: potrebbe essere un Collaboratore
+      const { data: tRow } = await storeAuthClient
+        .from('team_members')
+        .select('*, stores(*)')
+        .eq('auth_user_id', authData.user.id)
+        .maybeSingle();
+
+      if (!tRow || !tRow.stores) {
+        await storeAuthClient.auth.signOut();
+        return { success: false, reason: 'no-store' };
+      }
+      teamRow = tRow;
+      ownerStoreRow = tRow.stores;
     }
 
-    // 3. Blocco se l'abbonamento è scaduto (stessa logica di prima)
-    if (storeRow.subscription_status === 'expired') {
-      await logAuditAction(storeRow.id, "LOGIN_BLOCKED", "Tentativo di accesso con account scaduto.");
+    if (ownerStoreRow.subscription_status === 'expired') {
+      await logAuditAction(ownerStoreRow.id, "LOGIN_BLOCKED", "Tentativo di accesso con account scaduto.");
       await storeAuthClient.auth.signOut();
       return { success: false, reason: 'expired' };
     }
 
-    // 4. Recupera le sedi collegate
+    // Collaboratore al primo accesso: deve verificare l'email col codice a 6 cifre
+    // e scegliere una password personale prima di entrare nel pannello.
+    if (teamRow && teamRow.must_reset_password) {
+      return { success: false, reason: 'team-first-login', email: cleanEmail };
+    }
+
     const { data: locationsRows } = await storeAuthClient
       .from('store_locations')
       .select('*')
-      .eq('store_id', storeRow.id);
+      .eq('store_id', ownerStoreRow.id);
 
-    // Stesso formato di sempre, per compatibilità col resto della dashboard
     const newStore = {
-      id: storeRow.id,
-      email: storeRow.email,
-      name: storeRow.name,
-      address: storeRow.address,
-      city: storeRow.city,
-      cap: storeRow.cap,
-      latitude: storeRow.latitude,
-      longitude: storeRow.longitude,
-      logo: storeRow.logo_url || "",
-      phone: storeRow.phone || "",
-      hours: storeRow.hours || "",
-      internalNotes: storeRow.internal_notes || "",
-      apiKey: storeRow.api_key || "",
-      membershipCardName: storeRow.membership_card_name || "",  // FIX: mancava qui, per questo spariva al login
-      membershipCardImage: storeRow.membership_card_image_url || "",  // FIX: idem
+      id: ownerStoreRow.id,
+      email: ownerStoreRow.email,
+      name: ownerStoreRow.name,
+      address: ownerStoreRow.address,
+      city: ownerStoreRow.city,
+      cap: ownerStoreRow.cap,
+      latitude: ownerStoreRow.latitude,
+      longitude: ownerStoreRow.longitude,
+      logo: ownerStoreRow.logo_url || "",
+      phone: ownerStoreRow.phone || "",
+      hours: ownerStoreRow.hours || "",
+      internalNotes: ownerStoreRow.internal_notes || "",
+      apiKey: ownerStoreRow.api_key || "",
+      membershipCardName: ownerStoreRow.membership_card_name || "",
+      membershipCardImage: ownerStoreRow.membership_card_image_url || "",
       locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary, latitude: l.latitude, longitude: l.longitude }))),
-      plan: storeRow.plan,
+      plan: ownerStoreRow.plan,
       subscription: {
-        plan: storeRow.plan,
-        status: storeRow.subscription_status,
-        startedAt: storeRow.trial_started_at,
-        renewalDate: storeRow.renewal_date,  // FIX: mancava, per questo il rinnovo annuale spariva al login
-        billingCycle: storeRow.billing_cycle || 'monthly',
-        daysLeft: storeRow.subscription_status === 'trial' && storeRow.trial_started_at
-          ? Math.max(0, 30 - Math.floor((Date.now() - Date.parse(storeRow.trial_started_at)) / (24*60*60*1000)))
+        plan: ownerStoreRow.plan,
+        status: ownerStoreRow.subscription_status,
+        startedAt: ownerStoreRow.trial_started_at,
+        renewalDate: ownerStoreRow.renewal_date,
+        billingCycle: ownerStoreRow.billing_cycle || 'monthly',
+        daysLeft: ownerStoreRow.subscription_status === 'trial' && ownerStoreRow.trial_started_at
+          ? Math.max(0, 30 - Math.floor((Date.now() - Date.parse(ownerStoreRow.trial_started_at)) / (24*60*60*1000)))
           : 30
-      }
+      },
+      isCollaborator: !!teamRow,
+      collaboratorRole: teamRow ? teamRow.role : null
     };
 
     const sessionData = JSON.stringify(newStore);
-    sessionStorage.setItem(SESSION_PARTNER, sessionData); // sempre attiva per la sessione corrente del browser
+    sessionStorage.setItem(SESSION_PARTNER, sessionData);
     if (remember) {
-      localStorage.setItem(PARTNER_AUTH_KEY, sessionData); // persiste 30 giorni solo se "Resta collegato" è spuntato
+      localStorage.setItem(PARTNER_AUTH_KEY, sessionData);
     } else {
-      localStorage.removeItem(PARTNER_AUTH_KEY); // niente persistenza: pulisce anche un eventuale "ricordami" precedente
+      localStorage.removeItem(PARTNER_AUTH_KEY);
     }
 
     state.currentStore = newStore;
@@ -793,7 +811,8 @@ async function refreshMyTeam() {
     id: r.id,
     email: r.email,
     role: r.role,
-    addedAt: r.added_at
+    addedAt: r.added_at,
+    status: r.status || 'invited'
   }));
 
   if (state.mode === 'store') renderStoreView();
@@ -4753,6 +4772,110 @@ function renderStoreResetNewPasswordForm() {
   };
 }
 
+// ============ PRIMO ACCESSO COLLABORATORE (Team) ============
+function renderTeamFirstLoginOtpForm(email) {
+  const container = $("#store-app-container");
+  storeAuthClient.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+
+  container.innerHTML = `
+    <div class="pricing-wrapper" style="max-width: 420px; margin: 60px auto;">
+      <div class="onboarding-card">
+        <h3>Verifica il tuo accesso</h3>
+        <p style="color:#64748b; margin-bottom:15px; font-size:0.9rem;">Primo accesso come Collaboratore: ti abbiamo inviato un codice a 6 cifre a<br><strong>${email}</strong></p>
+        <div id="teamOtpError" class="error-msg hidden"></div>
+        <form id="teamOtpForm" class="auth-form">
+          <input type="text" id="teamOtpCode" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="Codice a 6 cifre" required>
+          <button type="submit" class="btn full-width">Verifica codice</button>
+        </form>
+        <p class="auth-switch" style="text-align:center; margin-top:15px;">
+          Non hai ricevuto il codice? <a href="javascript:void(0)" id="teamResendOtp">Invialo di nuovo</a>
+        </p>
+      </div>
+    </div>
+  `;
+
+  $("#teamOtpForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const token = $("#teamOtpCode").value.trim();
+    const err = $("#teamOtpError");
+    err.classList.add("hidden");
+    if (token.length !== 6) {
+      err.innerText = "Inserisci il codice a 6 cifre.";
+      err.classList.remove("hidden");
+      return;
+    }
+    const { data, error } = await storeAuthClient.auth.verifyOtp({ email, token, type: 'email' });
+    if (error || !data.user) {
+      err.innerText = "Codice non valido o scaduto. Riprova o richiedine uno nuovo.";
+      err.classList.remove("hidden");
+      return;
+    }
+    renderTeamSetPasswordForm(email);
+  };
+
+  $("#teamResendOtp").onclick = async () => {
+    const { error } = await storeAuthClient.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    if (error) toast.error("Errore nell'invio. Riprova tra qualche minuto.");
+    else toast.success("Codice reinviato!");
+  };
+}
+
+function renderTeamSetPasswordForm(email) {
+  const container = $("#store-app-container");
+  container.innerHTML = `
+    <div class="pricing-wrapper" style="max-width: 420px; margin: 60px auto;">
+      <div class="onboarding-card">
+        <h3>Scegli la tua password</h3>
+        <p style="color:#64748b; margin-bottom:15px; font-size:0.9rem;">Email verificata. Imposta una password personale per accedere al Pannello Partner (nessuna email di conferma).</p>
+        <div id="teamNewPassError" class="error-msg hidden"></div>
+        <form id="teamNewPassForm" class="auth-form">
+          <input type="password" id="teamNewPass" placeholder="Nuova password (min. 8)" required>
+          <input type="password" id="teamNewPassConfirm" placeholder="Conferma password" required>
+          <button type="submit" class="btn full-width">Salva e accedi</button>
+        </form>
+      </div>
+    </div>
+  `;
+
+  $("#teamNewPassForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const pass = $("#teamNewPass").value;
+    const confirm = $("#teamNewPassConfirm").value;
+    const err = $("#teamNewPassError");
+    err.classList.add("hidden");
+    if (pass.length < 8) {
+      err.innerText = "La password deve essere di almeno 8 caratteri.";
+      err.classList.remove("hidden");
+      return;
+    }
+    if (pass !== confirm) {
+      err.innerText = "Le password non coincidono.";
+      err.classList.remove("hidden");
+      return;
+    }
+
+    const { error: updateError } = await storeAuthClient.auth.updateUser({ password: pass });
+    if (updateError) {
+      err.innerText = "Errore durante il salvataggio. Riprova o richiedi un nuovo codice.";
+      err.classList.remove("hidden");
+      return;
+    }
+
+    const { error: rpcError } = await storeAuthClient.rpc('complete_team_member_first_login', {});
+    if (rpcError) {
+      console.error("Errore attivazione collaboratore:", rpcError);
+      err.innerText = "Password salvata ma si è verificato un errore. Riprova ad accedere.";
+      err.classList.remove("hidden");
+      return;
+    }
+
+    toast.success("Tutto pronto! Accedi con la nuova password.");
+    await storeAuthClient.auth.signOut();
+    storeData.step = 'login';
+    renderStoreView();
+  };
+}
+
 function renderPricingTable(container) {
   const partner = getCurrentPartner();
   const currentPlan = partner?.plan || ''; // Recupera il piano attuale (se loggato)
@@ -5376,13 +5499,19 @@ function renderDashboard(container) {
   const partner = getCurrentPartner();
   if (!partner) return;
 
+  const isManager = partner.isCollaborator && partner.collaboratorRole === 'Manager';
+  const collaboratorBadgeHTML = partner.isCollaborator
+    ? `<div style="margin-top:6px;"><span class="badge-plan plan-standard" title="Stai operando come collaboratore di ${partner.name}">${PANEL_ICONS.users} Collaboratore · ${partner.collaboratorRole}</span></div>`
+    : '';
+
   container.innerHTML = `
     <div class="store-dashboard">
       <aside class="store-sidebar">
         <div class="sidebar-title">PANNELLO PARTNER</div>
+        ${collaboratorBadgeHTML}
         <button class="store-nav-btn ${storeData.activeTab === 'home' ? 'active' : ''}" onclick="switchStoreTab('home')">${PANEL_ICONS.home} Panoramica</button>
         <button class="store-nav-btn ${storeData.activeTab === 'offers' ? 'active' : ''}" onclick="switchStoreTab('offers')">${PANEL_ICONS.tag} Le mie Offerte</button>
-        <button class="store-nav-btn ${storeData.activeTab === 'locations' ? 'active' : ''}" onclick="switchStoreTab('locations')">${PANEL_ICONS.pin} Gestione Sedi</button>
+        ${!isManager ? `<button class="store-nav-btn ${storeData.activeTab === 'locations' ? 'active' : ''}" onclick="switchStoreTab('locations')">${PANEL_ICONS.pin} Gestione Sedi</button>` : ''}
         <button class="store-nav-btn ${storeData.activeTab === 'trash' ? 'active' : ''}" onclick="switchStoreTab('trash')">${PANEL_ICONS.trash} Cestino</button>
         ${(() => {
           const p = getCurrentPartner();
@@ -5390,13 +5519,13 @@ function renderDashboard(container) {
           const isPro = plan === 'Professional' || plan === 'Enterprise';
           const isEnt = plan === 'Enterprise';
           return `
-            ${isEnt ? `<button class="store-nav-btn ${storeData.activeTab === 'general' ? 'active' : ''}" onclick="switchStoreTab('general')">${PANEL_ICONS.chart} Dashboard Generale</button>` : ''}
+            ${isEnt && !isManager ? `<button class="store-nav-btn ${storeData.activeTab === 'general' ? 'active' : ''}" onclick="switchStoreTab('general')">${PANEL_ICONS.chart} Dashboard Generale</button>` : ''}
             ${isPro ? `<button class="store-nav-btn ${storeData.activeTab === 'api' ? 'active' : ''}" onclick="switchStoreTab('api')">${PANEL_ICONS.plug} Integrazione API</button>` : ''}
-            ${isEnt ? `<button class="store-nav-btn ${storeData.activeTab === 'team' ? 'active' : ''}" onclick="switchStoreTab('team')">${PANEL_ICONS.users} Team</button>` : ''}
+            ${isEnt && !isManager ? `<button class="store-nav-btn ${storeData.activeTab === 'team' ? 'active' : ''}" onclick="switchStoreTab('team')">${PANEL_ICONS.users} Team</button>` : ''}
           `;
         })()}
-        <button class="store-nav-btn ${storeData.activeTab === 'sub' ? 'active' : ''}" onclick="switchStoreTab('sub')">${PANEL_ICONS.card} Abbonamento</button>
-        <button class="store-nav-btn ${storeData.activeTab === 'profile' ? 'active' : ''}" onclick="switchStoreTab('profile')">${PANEL_ICONS.settings} Impostazioni</button>
+        ${!isManager ? `<button class="store-nav-btn ${storeData.activeTab === 'sub' ? 'active' : ''}" onclick="switchStoreTab('sub')">${PANEL_ICONS.card} Abbonamento</button>` : ''}
+        ${!isManager ? `<button class="store-nav-btn ${storeData.activeTab === 'profile' ? 'active' : ''}" onclick="switchStoreTab('profile')">${PANEL_ICONS.settings} Impostazioni</button>` : ''}
         <div class="sidebar-footer">
           <button class="store-nav-btn" onclick="logoutPartner()" style="color: #ef4444; width: 100%; text-align: left;">${PANEL_ICONS.logout} Esci</button>
         </div>
@@ -5544,6 +5673,13 @@ window.switchStoreTab = (tab) => {
 function renderCurrentTab() {
   const partner = getCurrentPartner();
   if (!partner) return '';
+
+  const isManagerCollaborator = partner.isCollaborator && partner.collaboratorRole === 'Manager';
+  const managerAllowedTabs = ['home', 'offers', 'trash', 'api'];
+  if (isManagerCollaborator && !managerAllowedTabs.includes(storeData.activeTab)) {
+    storeData.activeTab = 'home';
+    return renderHomeTab();
+  }
 
   const plan = partner.plan || 'Starter';
   const isEnterprise = plan === 'Enterprise';
@@ -5758,6 +5894,12 @@ function renderStoreLoginForm(container) {
       storeData.activeTab = 'home';
       renderStoreView();
       updateDrawerUI();
+      return;
+    }
+
+    if (result.reason === 'team-first-login') {
+      toast.info("Verifica la tua email per completare il primo accesso.");
+      renderTeamFirstLoginOtpForm(result.email);
       return;
     }
 
@@ -7180,15 +7322,21 @@ function renderTeamTab() {
   header.append(titleGroup, badge);
 
   // --- LAYOUT GRID ---
+  // FIX: "1fr 350px" fisso faceva uscire il form di destra dal riquadro quando
+  // la tabella a sinistra si allargava (es. email lunghe). minmax(0, 1fr) impedisce
+  // alla colonna sinistra di spingere fuori la destra, che ora può allargarsi
+  // tra 340 e 420px restando comunque dentro il contenitore.
   const grid = document.createElement("div");
   grid.style.display = "grid";
-  grid.style.gridTemplateColumns = "1fr 350px";
+  grid.style.gridTemplateColumns = "minmax(0, 1fr) minmax(340px, 420px)";
   grid.style.gap = "30px";
   grid.style.alignItems = "start";
+  grid.style.width = "100%";
 
-  // --- COLONNA SINISTRA: TABELLA ---
   const listCard = document.createElement("div");
   listCard.className = "card-saas";
+  listCard.style.minWidth = "0";
+  listCard.style.overflowX = "auto";
   const h3List = document.createElement("h3");
   h3List.style.marginTop = "0";
   h3List.style.fontSize = "1rem";
@@ -7196,6 +7344,7 @@ function renderTeamTab() {
 
   const table = document.createElement("table");
   table.className = "offer-table";
+  table.style.minWidth = "420px";
   
   // Header Tabella
   const thead = document.createElement("thead");
@@ -7225,6 +7374,7 @@ function renderTeamTab() {
       const tdEmail = document.createElement("td");
       const strong = document.createElement("strong");
       strong.textContent = u.email;
+      strong.style.wordBreak = "break-all";
       tdEmail.appendChild(strong);
 
       const tdRole = document.createElement("td");
@@ -7235,8 +7385,9 @@ function renderTeamTab() {
 
       const tdStatus = document.createElement("td");
       const statusSpan = document.createElement("span");
-      statusSpan.style.color = "#10b981";
-      statusSpan.textContent = "● Attivo";
+      const isActive = u.status === 'active';
+      statusSpan.style.color = isActive ? "#10b981" : "#f59e0b";
+      statusSpan.textContent = isActive ? "● Attivo" : "● In attesa di primo accesso";
       tdStatus.appendChild(statusSpan);
 
       const tdActions = document.createElement("td");
@@ -7314,7 +7465,7 @@ function renderTeamTab() {
   note.style.color = "#64748b";
   note.style.marginTop = "15px";
   note.style.lineHeight = "1.4";
-  note.textContent = "Nota: Gli utenti aggiunti riceveranno un'email per configurare la propria password d'accesso.";
+  note.textContent = "Nota: il collaboratore riceverà via email le credenziali di primo accesso, generate automaticamente. Al primo accesso dovrà verificare l'email e scegliere una password personale.";
 
   formCard.append(h3Form, form, note);
 
@@ -7349,23 +7500,35 @@ window.addTeamMember = async (e) => {
   if (!emailRegex.test(email)) {
     return toast.error("Inserisci un indirizzo email nel formato corretto (es: nome@azienda.it).");
   }
-
   if (myTeamCache.some(u => u.email === email)) {
     return toast.error(`L'utente ${email} fa già parte del tuo team.`);
   }
 
-  const { error } = await storeAuthClient
-    .from('team_members')
-    .insert({ store_id: partner.id, email, role });
+  const submitBtn = document.querySelector("#addTeamForm button[type='submit']");
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Invio in corso..."; }
 
-  if (error) {
-    console.error("Errore aggiunta membro team:", error);
-    return toast.error("Si è verificato un errore durante il salvataggio.");
+  try {
+    const { data: sessionData } = await storeAuthClient.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) throw new Error("Sessione non valida.");
+
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-team-member`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify({ store_id: partner.id, email, role })
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || "Errore durante l'invito.");
+
+    toast.success(`Collaboratore invitato: ${email} (${role}). Riceverà le credenziali via email.`);
+    emailInput.value = "";
+    await refreshMyTeam();
+  } catch (err) {
+    console.error("Errore aggiunta membro team:", err);
+    toast.error(err.message || "Si è verificato un errore durante l'invito.");
+  } finally {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Invia Invito / Aggiungi"; }
   }
-
-  toast.success(`Collaboratore aggiunto: ${email} (${role})`);
-  emailInput.value = "";
-  await refreshMyTeam();
 };
 
 /**
