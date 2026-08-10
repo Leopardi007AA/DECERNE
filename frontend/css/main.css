@@ -2377,6 +2377,17 @@ hr {
     border-left: 1px solid rgba(34, 211, 238, 0.15);
   }
   
+  @media (max-width: 768px) {
+    body.mode-chisiamo #drawer {
+      top: 64px;
+      height: calc(100% - 64px);
+    }
+  
+    body.mode-chisiamo #overlay {
+      top: 64px;
+    }
+  }
+
   #drawer.drawer-dark .drawer-header h3 {
     color: #fff;
   }
