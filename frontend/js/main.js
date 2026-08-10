@@ -6598,6 +6598,14 @@ function renderLocationsTab() {
               }
             </div>
 
+${plan === 'Enterprise' ? `
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:6px 10px;">
+                <span style="font-size:0.7rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.4px;">ID Sede (per API)</span>
+                <code style="flex:1; font-size:0.75rem; color:#334155; word-break:break-all;">${loc.id}</code>
+                <button class="btn outline" style="padding:3px 10px; font-size:0.7rem;" onclick="navigator.clipboard.writeText('${loc.id}'); toast.success('ID sede copiato!')">Copia</button>
+              </div>
+            ` : ''}
+
             <div class="form-row" style="gap: 14px;">
               <div class="input-group" style="flex: 2;">
                 <label>Indirizzo</label>
@@ -7630,10 +7638,15 @@ function renderApiTab() {
     "price": 0.99,
     "original_price": 1.49,
     "location_id": "uuid-della-tua-sede",
-    "category": "Dispensa"
+    "category": "Dispensa",
+    "unit_of_measure": "pezzo",
+    "card_requirement": "not_required",
+    "limited_quantity": false
   }'</pre>
             <div style="color: #64748b; margin: 6px 0 0 55px; font-size: 0.72rem;">
-              Campi obbligatori: "product", "price". "location_id" può essere omesso solo se hai una sola sede registrata. Se ometti le date, l'annuncio parte oggi e scade dopo 30 giorni.
+              Campi obbligatori: "product", "price". "location_id" lo trovi nella tab Sedi (tasto "Copia" accanto a ogni punto vendita) e può essere omesso solo se hai una sola sede registrata.
+              "unit_of_measure" ammette: pezzo, kg, hg, g, litro, confezione (default: pezzo). "card_requirement" ammette: required, not_required (default: non specificato).
+              Se ometti le date, l'annuncio parte oggi e scade dopo 30 giorni. La pubblicazione programmata non è al momento disponibile via API: le offerte create da qui vanno subito attive.
             </div>
           </div>
 
