@@ -5119,9 +5119,38 @@ function renderOnboarding(container) {
           <input type="text" id="obName" placeholder="Nome Supermercato (es: Conad City)" required value="${storeData.tempReg?.name || ''}">
           <select id="obType" required>
             <option value="">Tipologia Attività</option>
-            <option value="supermarket">Supermercato</option>
-            <option value="discount">Discount</option>
-            <option value="local">Negozio Alimentare</option>
+            <option value="Supermercato">Supermercato</option>
+            <option value="Ipermercato">Ipermercato</option>
+            <option value="Discount">Discount</option>
+            <option value="Minimarket / Negozio di Vicinato">Minimarket / Negozio di Vicinato</option>
+            <option value="Negozio Alimentare">Negozio Alimentare</option>
+            <option value="Drogheria">Drogheria</option>
+            <option value="Macelleria">Macelleria</option>
+            <option value="Pescheria">Pescheria</option>
+            <option value="Salumeria">Salumeria</option>
+            <option value="Gastronomia e Rosticceria">Gastronomia e Rosticceria</option>
+            <option value="Panetteria e Panificio">Panetteria e Panificio</option>
+            <option value="Pasticceria">Pasticceria</option>
+            <option value="Gelateria">Gelateria</option>
+            <option value="Fruttivendolo">Fruttivendolo</option>
+            <option value="Enoteca">Enoteca</option>
+            <option value="Negozio Bio ed Ecologico">Negozio Bio ed Ecologico</option>
+            <option value="Negozio Prodotti Etnici">Negozio Prodotti Etnici</option>
+            <option value="Cash & Carry / Grossista">Cash & Carry / Grossista</option>
+            <option value="Mercato Rionale / Banco Mercato">Mercato Rionale / Banco Mercato</option>
+            <option value="Farmacia">Farmacia</option>
+            <option value="Parafarmacia">Parafarmacia</option>
+            <option value="Erboristeria">Erboristeria</option>
+            <option value="Profumeria">Profumeria</option>
+            <option value="Ferramenta">Ferramenta</option>
+            <option value="Cartoleria">Cartoleria</option>
+            <option value="Edicola">Edicola</option>
+            <option value="Tabaccheria">Tabaccheria</option>
+            <option value="Fioraio">Fioraio</option>
+            <option value="Negozio per Animali">Negozio per Animali</option>
+            <option value="Casalinghi ed Elettrodomestici">Casalinghi ed Elettrodomestici</option>
+            <option value="Abbigliamento e Accessori">Abbigliamento e Accessori</option>
+            <option value="Altro">Altro</option>
           </select>
           <input type="email" id="obEmail" placeholder="Email Aziendale" required value="${storeData.tempReg?.email || ''}">
           ${storeData.tempReg?.existingAccount ? `
@@ -5382,6 +5411,7 @@ async function handleOnboardingSubmit(step) {
           billing_cycle: isDirectAnnual ? 'annual' : 'monthly',
           subscription_status: isDirectAnnual ? 'active' : 'trial',
           renewal_date: annualRenewalISO,
+          business_type: typeVal,
           // FIX: prima chi si registrava direttamente su Professional/Enterprise
           // restava senza api_key finché non cliccava "Rigenera" a mano.
           api_key: (planChoice === 'Professional' || planChoice === 'Enterprise') ? generateRandomApiKey() : null
