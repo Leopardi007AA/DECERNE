@@ -5381,7 +5381,10 @@ async function handleOnboardingSubmit(step) {
           internal_notes: referralNotes,
           billing_cycle: isDirectAnnual ? 'annual' : 'monthly',
           subscription_status: isDirectAnnual ? 'active' : 'trial',
-          renewal_date: annualRenewalISO
+          renewal_date: annualRenewalISO,
+          // FIX: prima chi si registrava direttamente su Professional/Enterprise
+          // restava senza api_key finché non cliccava "Rigenera" a mano.
+          api_key: (planChoice === 'Professional' || planChoice === 'Enterprise') ? generateRandomApiKey() : null
         })
         .select()
         .single();
@@ -5415,6 +5418,7 @@ async function handleOnboardingSubmit(step) {
         phone: storeRow.phone || "",
         hours: "",
         internalNotes: storeRow.internal_notes || "",
+        apiKey: storeRow.api_key || "",
         locations: [{ id: locationRow.id, name: "Sede Principale", address: fullAddress, city: storeData.tempReg.city, cap: storeData.tempReg.cap, isPrimary: true, latitude: initialCoords?.lat ?? null, longitude: initialCoords?.lng ?? null }],
         plan: storeRow.plan,
         subscription: isDirectAnnual ? {
@@ -7327,10 +7331,9 @@ function renderTeamTab() {
   // alla colonna sinistra di spingere fuori la destra, che ora può allargarsi
   // tra 340 e 420px restando comunque dentro il contenitore.
   const grid = document.createElement("div");
-  grid.style.display = "grid";
-  grid.style.gridTemplateColumns = "minmax(0, 1fr) minmax(340px, 420px)";
+  grid.style.display = "flex";
+  grid.style.flexDirection = "column";
   grid.style.gap = "30px";
-  grid.style.alignItems = "start";
   grid.style.width = "100%";
 
   const listCard = document.createElement("div");
@@ -7469,7 +7472,7 @@ function renderTeamTab() {
 
   formCard.append(h3Form, form, note);
 
-  grid.append(listCard, formCard);
+  grid.append(formCard, listCard);
   wrapper.append(header, grid);
 
   return wrapper; // Restituisce un elemento DOM invece di una stringa
