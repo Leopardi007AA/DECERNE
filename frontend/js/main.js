@@ -1133,6 +1133,7 @@ async function renderOffers(page = state.currentPage, pageSize = state.pageSize)
       .from('offers')
       .select('*')
       .eq('status', 'active')
+      .is('deleted_at', null)
       .lte('start_date', today)
       .gte('end_date', today);
 
@@ -3193,6 +3194,7 @@ window.searchSmartShoppingList = async () => {
     .from('offers')
     .select('id, product, price, location_id, unit_of_measure')
     .eq('status', 'active')
+    .is('deleted_at', null)
     .lte('start_date', today)
     .gte('end_date', today);
 
@@ -3416,7 +3418,8 @@ async function evaluateSmartSavings() {
   const { data: allActiveOffers, error } = await supabaseClient
     .from('offers')
     .select('id, product, price, location_id')
-    .eq('status', 'active');
+    .eq('status', 'active')
+    .is('deleted_at', null);
 
   if (error || !allActiveOffers) {
     panel.innerHTML = `<p style="color:#dc2626; font-size:0.85rem;">Errore nel confronto. Riprova.</p>`;
@@ -3940,6 +3943,7 @@ function renderSearchModal() {
       .from('offers')
       .select('*')
       .eq('status', 'active')
+      .is('deleted_at', null)
       .lte('start_date', today)
       .gte('end_date', today);
 
@@ -6545,6 +6549,7 @@ window.openProductDetail = async (id) => {
     .from('offers')
     .select('*')
     .eq('id', id)
+    .is('deleted_at', null)
     .single();
 
   if (error || !row) {
