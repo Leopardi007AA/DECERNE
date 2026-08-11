@@ -87,10 +87,8 @@
     
     .dc-hamburger {
       display: flex;
-      flex-direction: column;
-      justify-content: center;
       align-items: center;
-      gap: 5px;
+      justify-content: center;
       width: 40px;
       height: 40px;
       background: rgba(34, 211, 238, 0.08);
@@ -99,25 +97,37 @@
       cursor: pointer;
       padding: 0;
     }
-    
-    .dc-hamburger span {
-      display: block;
-      width: 18px;
-      height: 2px;
-      background: var(--cyan);
-      border-radius: 2px;
-      transition: transform 0.3s, opacity 0.3s;
+
+    /* Stessa identica icona/animazione della navbar di Home Utenti
+       (.hamburger-icon), solo racchiusa nel bottone bordato di Chi Siamo */
+    .dc-hamburger .hamburger-icon {
+      width: 22px;
+      height: 14px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
-    
-    .dc-hamburger.open span:nth-child(1) {
+
+    .dc-hamburger .hamburger-icon span {
+      display: block;
+      height: 2px;
+      width: 100%;
+      background-color: var(--cyan);
+      border-radius: 2px;
+      transition: all 0.3s ease;
+    }
+
+    .dc-hamburger.open .hamburger-icon span:nth-child(1) {
       transform: translateY(6px) rotate(45deg);
     }
-    
-    .dc-hamburger.open span:nth-child(2) {
+
+    .dc-hamburger.open .hamburger-icon span:nth-child(2) {
       opacity: 0;
+      transform: translateX(10px);
     }
-    
-    .dc-hamburger.open span:nth-child(3) {
+
+    .dc-hamburger.open .hamburger-icon span:nth-child(3) {
       transform: translateY(-6px) rotate(-45deg);
     }
     

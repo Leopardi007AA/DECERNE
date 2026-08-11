@@ -712,7 +712,7 @@ const {
       className: `dc-hamburger${isDrawerOpen ? ' open' : ''}`,
       onClick: handleHamburgerClick,
       "aria-label": "Apri menu"
-    }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", null)))), /*#__PURE__*/React.createElement("section", {
+    }, /*#__PURE__*/React.createElement("div", { className: "hamburger-icon" }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", null))))), /*#__PURE__*/React.createElement("section", {
       className: "dc-hero"
     }, /*#__PURE__*/React.createElement("div", {
       className: "dc-hero-badge"
