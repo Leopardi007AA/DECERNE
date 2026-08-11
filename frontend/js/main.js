@@ -564,21 +564,11 @@ window.saveStoreProfile = async (e) => {
     const logoInput = document.getElementById("profLogo");
     const hoursInput = document.getElementById("profHours");
     const notesInput = document.getElementById("profNotes");
-    const streetInput = document.getElementById("profStreet");
-    const cityInput = document.getElementById("profCity");
-    const capInput = document.getElementById("profCap");
     const cardNameInput = document.getElementById("profCardName");
     const cardImageInput = document.getElementById("profCardImage");
 
     const newName = clean(nameInput?.value || "");
     const newLogo = clean(logoInput?.value || "");
-
-    const newStreet = clean(streetInput?.value || "");
-    const newCity = clean(cityInput?.value || "").trim().toLowerCase();
-    const newCap = clean(capInput?.value || "").trim();
-    const newFullAddress = newStreet && newCap && newCity ? `${newStreet}, ${newCap} ${newCity}` : currentPartner.address;
-
-    const addressChanged = newFullAddress !== currentPartner.address;
 
     const { data: storeRow, error } = await storeAuthClient
       .from('stores')
@@ -588,9 +578,6 @@ window.saveStoreProfile = async (e) => {
         hours: clean(hoursInput?.value || ""),
         logo_url: newLogo,
         internal_notes: clean(notesInput?.value || ""),
-        address: newFullAddress,
-        city: newCity || currentPartner.city,
-        cap: newCap || currentPartner.cap,
         membership_card_name: clean(cardNameInput?.value || ""),
         membership_card_image_url: clean(cardImageInput?.value || "")
       })
@@ -615,8 +602,6 @@ window.saveStoreProfile = async (e) => {
       address: storeRow.address,
       city: storeRow.city,
       cap: storeRow.cap,
-      latitude: storeRow.latitude,
-      longitude: storeRow.longitude,
       membershipCardName: storeRow.membership_card_name || "",
       membershipCardImage: storeRow.membership_card_image_url || ""
     };
@@ -626,11 +611,7 @@ window.saveStoreProfile = async (e) => {
     localStorage.setItem(PARTNER_AUTH_KEY, dataString);
     state.currentStore = updatedStore;
 
-    if (addressChanged) {
-      toast.success("Profilo salvato! Hai cambiato l'indirizzo: ricordati di controllare le coordinate della sede in \"Gestione Sedi\".");
-    } else {
-      toast.success("Profilo salvato!");
-    }
+    toast.success("Profilo salvato!");
     
     updateDrawerUI();      // Cambia il nome nel menu
     await refreshMyOffers(); // Rinfresca la dashboard del negozio
@@ -964,6 +945,9 @@ function setMode(mode) {
     // Footer: colonna "Per te"/"Per il tuo negozio" cambia in base alla modalità
     document.body.classList.toggle("mode-user", mode === "user");
     document.body.classList.toggle("mode-store", mode === "store");
+    // Il footer va nascosto solo dentro al Pannello Partner vero e proprio: se stai
+    // uscendo dalla modalità store, questa classe non deve restare attiva
+    if (mode !== "store") document.body.classList.remove("dashboard-active");
 
     closeDrawer();
     window.scrollTo(0,0);
@@ -1571,6 +1555,12 @@ function renderProfileTab() {
   const partner = getCurrentPartner();
   if (!partner) return '';
 
+  // Sede principale: quella segnata come tale in "Gestione Sedi" (che all'inizio
+  // coincide con l'indirizzo di registrazione). Mai una sede a caso.
+  const primaryLocation = (partner.locations && partner.locations.length > 0)
+    ? (partner.locations.find(l => l.isPrimary) || partner.locations[0])
+    : { address: partner.address, city: partner.city, cap: partner.cap };
+
   return `
     <header class="tab-header">
       <h2>${PANEL_ICONS.settings} Impostazioni Account</h2>
@@ -1625,19 +1615,20 @@ function renderProfileTab() {
         <small style="display:block; margin-top:-10px; margin-bottom:15px; color:#94a3b8;">Compila questi campi se i tuoi prodotti possono richiedere una tessera fedeltà: potrai poi indicarlo su ogni singola offerta.</small>
 
         <h4 style="color: #64748b; font-size: 0.8rem; text-transform: uppercase; margin-top:20px;">Indirizzo e Posizione</h4>
+        <small style="display:block; margin-bottom:10px; color:#94a3b8;">Dati della sede principale, impostata in "Gestione Sedi". Per cambiarli vai in quella scheda.</small>
 
         <div class="input-group">
           <label>Indirizzo e Numero Civico</label>
-          <input type="text" id="profStreet" value="${extractStreetFromAddress(partner.address, partner.cap, partner.city)}" placeholder="Es: Via Roma, 15">
+          <input type="text" value="${extractStreetFromAddress(primaryLocation.address, primaryLocation.cap, primaryLocation.city)}" disabled style="background:#f8fafc; cursor:not-allowed; color:#94a3b8;">
         </div>
         <div class="form-row">
           <div class="input-group" style="flex: 2;">
             <label>Città</label>
-            <input type="text" id="profCity" value="${partner.city || ''}" placeholder="Es: Milano">
+            <input type="text" value="${primaryLocation.city || ''}" disabled style="background:#f8fafc; cursor:not-allowed; color:#94a3b8;">
           </div>
           <div class="input-group" style="flex: 1;">
             <label>CAP</label>
-            <input type="text" id="profCap" value="${partner.cap || ''}" maxlength="5" placeholder="12345">
+            <input type="text" value="${primaryLocation.cap || ''}" disabled style="background:#f8fafc; cursor:not-allowed; color:#94a3b8;">
           </div>
         </div>
 
@@ -5930,6 +5921,7 @@ function renderStoreLoginForm(container) {
       toast.success("Accesso effettuato! Benvenuto.");
       storeData.step = 'dashboard';
       storeData.activeTab = 'home';
+      await refreshMyOffers(); // scarica i dati veri PRIMA di mostrare la Panoramica
       renderStoreView();
       updateDrawerUI();
       return;
@@ -6230,7 +6222,7 @@ function showUndoBanner(message, offerId) {
 window.restoreOffer = async (id) => {
   const { error } = await storeAuthClient
     .from('offers')
-    .update({ deleted_at: null })
+    .update({ deleted_at: null, status: 'paused' })
     .eq('id', id);
 
   if (error) {
