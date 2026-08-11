@@ -4602,6 +4602,8 @@ function setupManualLocationInput() {
 function renderStoreView() {
   const container = $("#store-app-container");
   if (!container) return;
+
+  closeStatInfo(); // niente popup informativi orfani cambiando tab/vista
   
   const partner = getCurrentPartner();
   
@@ -5521,7 +5523,77 @@ const PANEL_ICONS = {
   calendar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>`,
   map: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M9 3 3 5v16l6-2 6 2 6-2V3l-6 2-6-2Z"/><path d="M9 3v16M15 5v16"/></svg>`,
   phone: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.4 2.1L8.1 9.6a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.4c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.9 2Z"/></svg>`,
+  info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r="0.6" fill="currentColor" stroke="none"/></svg>`,
+ };
+
+// ============================================================
+// POPUP INFORMATIVI SULLE STATISTICHE — Pannello Partner
+// ============================================================
+// Testi mostrati quando si clicca su un'etichetta di una statistica
+// (Panoramica e Dashboard Generale). Stesso identico meccanismo per
+// tutti i piani di abbonamento.
+const PANEL_STAT_INFO = {
+  totalViews: "Quante volte una tua offerta è comparsa nella home degli utenti o nei risultati di ricerca. Ogni comparsa in griglia conta come una visualizzazione, anche se l'utente non ci clicca sopra.",
+  detailOpens: "Quante volte gli utenti hanno aperto il dettaglio di una tua offerta cliccandoci sopra, per vedere prezzo, descrizione e sede.",
+  avgCtr: "Il Click-Through Rate: la percentuale di visualizzazioni che si trasformano in un'apertura del dettaglio. Si calcola come Aperture Dettaglio diviso Visualizzazioni Totali. Più è alto, più le tue offerte attirano attenzione.",
+  bestOffer: "L'offerta con lo sconto percentuale più alto tra quelle attualmente pubblicate, calcolato confrontando il prezzo originale con quello scontato.",
+  mostClicked: "L'offerta su cui gli utenti hanno cliccato più spesso per aprirne il dettaglio e saperne di più.",
+  trend7d: "L'andamento giornaliero di visualizzazioni e aperture di dettaglio delle tue offerte negli ultimi 7 giorni, per capire se l'interesse sta crescendo o calando.",
+  bestLocation: "La sede che, tra tutte le tue sedi, ha ricevuto più visualizzazioni sulle sue offerte: è quella su cui i clienti mostrano più interesse."
 };
+
+window.showStatInfo = (event, key) => {
+  event.stopPropagation();
+  closeStatInfo();
+
+  const text = PANEL_STAT_INFO[key];
+  if (!text) return;
+
+  const anchor = event.currentTarget;
+  const rect = anchor.getBoundingClientRect();
+
+  const popover = document.createElement('div');
+  popover.className = 'info-popover';
+  popover.id = 'activeStatInfoPopover';
+  popover.innerHTML = `<p>${text}</p>`;
+  document.body.appendChild(popover);
+
+  // Leggermente più largo del label che l'ha aperto, entro un minimo/massimo leggibile
+  const popWidth = Math.min(Math.max(rect.width + 60, 220), 300);
+  popover.style.width = popWidth + 'px';
+
+  let top = rect.bottom + window.scrollY + 8;
+  let left = rect.left + window.scrollX - 10;
+
+  const maxLeft = window.scrollX + document.documentElement.clientWidth - popWidth - 12;
+  if (left > maxLeft) left = Math.max(maxLeft, window.scrollX + 12);
+
+  popover.style.top = top + 'px';
+  popover.style.left = left + 'px';
+
+  requestAnimationFrame(() => popover.classList.add('visible'));
+
+  setTimeout(() => {
+    document.addEventListener('click', closeStatInfoOnOutsideClick);
+    document.addEventListener('keydown', closeStatInfoOnEscape);
+  }, 0);
+};
+
+function closeStatInfo() {
+  const existing = document.getElementById('activeStatInfoPopover');
+  if (existing) existing.remove();
+  document.removeEventListener('click', closeStatInfoOnOutsideClick);
+  document.removeEventListener('keydown', closeStatInfoOnEscape);
+}
+
+function closeStatInfoOnOutsideClick(e) {
+  const popover = document.getElementById('activeStatInfoPopover');
+  if (popover && !popover.contains(e.target)) closeStatInfo();
+}
+
+function closeStatInfoOnEscape(e) {
+  if (e.key === 'Escape') closeStatInfo();
+}
 
 // MODIFICA: renderDashboard più sicura
 function renderDashboard(container) {
@@ -5613,13 +5685,14 @@ function renderHomeTab() {
   const heroStatHTML = `
     <div class="stats-grid-saas">
       <div class="stat-card-saas primary">
-        <div class="label">Visualizzazioni Totali</div>
+        <div class="label stat-label-info" onclick="showStatInfo(event, 'totalViews')">Visualizzazioni Totali ${PANEL_ICONS.info}</div>
         <div class="value" style="color: var(--primary);">${totalViews}</div>
         <small style="color:#64748b;">Quante volte è comparsa una tua offerta</small>
       </div>
       <div class="stat-card-saas">
-        <div class="label">Aperture Dettaglio</div>
-        <div class="value" style="color: #10b981;">${totalOpens}</div>
+        <div class="label stat-label-info" onclick="showStatInfo(event, 'detailOpens')">Aperture Dettaglio ${PANEL_ICONS.info}</div>
+        <div class="value" style="color: #10b981; font-size: 2.6rem;">${totalOpens}</div>
+        <small style="color:#64748b;">Quante volte è stato aperto il dettaglio di una tua offerta</small>
       </div>
     </div>
   `;
@@ -5627,16 +5700,16 @@ function renderHomeTab() {
   const advancedStatsHTML = isStandardOrHigher ? `
     <div class="stats-grid-saas" style="margin-top: 16px;">
       <div class="stat-card-saas accent-indigo">
-        <div class="label">CTR Medio</div>
+        <div class="label stat-label-info" onclick="showStatInfo(event, 'avgCtr')">CTR Medio ${PANEL_ICONS.info}</div>
         <div class="value" style="color: #6366f1;">${avgCtr}%</div>
       </div>
       <div class="stat-card-saas accent-amber">
-        <div class="label">${PANEL_ICONS.flame} Migliore Offerta</div>
+        <div class="label stat-label-info" onclick="showStatInfo(event, 'bestOffer')">${PANEL_ICONS.flame} Migliore Offerta ${PANEL_ICONS.info}</div>
         <div class="value" style="font-size: 1.2rem;">${bestOffer.product}</div>
         <small style="color: #f59e0b; font-weight: 700;">Sconto: ${bestOffer.val}</small>
       </div>
       <div class="stat-card-saas accent-emerald">
-        <div class="label">${PANEL_ICONS.cursor} Più cliccata</div>
+        <div class="label stat-label-info" onclick="showStatInfo(event, 'mostClicked')">${PANEL_ICONS.cursor} Più cliccata ${PANEL_ICONS.info}</div>
         <div class="value" style="font-size: 1.2rem;">${mostClicked.product}</div>
         <small style="color: #10b981; font-weight: 700;">${mostClicked.val} click</small>
       </div>
@@ -7109,7 +7182,7 @@ function renderGeneralDashboardTab() {
         <small>Interazioni dirette</small>
       </div>
       <div class="stat-card-saas accent-indigo">
-        <div class="label">CTR Medio</div>
+        <div class="label stat-label-info" onclick="showStatInfo(event, 'avgCtr')">CTR Medio ${PANEL_ICONS.info}</div>
         <div class="value">${avgCtr}%</div>
         <small>Efficacia offerte</small>
       </div>
@@ -7128,7 +7201,7 @@ function renderGeneralDashboardTab() {
       ` : ''}
 
       <div class="card-saas" style="padding: 25px;">
-        <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 1rem; color: #475569;">Trend Interazioni (Ultimi 7 giorni)</h3>
+        <h3 class="stat-label-info" style="margin-top: 0; margin-bottom: 20px; font-size: 1rem; color: #475569; display:flex; align-items:center; gap:6px;" onclick="showStatInfo(event, 'trend7d')">Trend Interazioni (Ultimi 7 giorni) ${PANEL_ICONS.info}</h3>
         <div style="width: 100%; height: 250px; position: relative;">
           <canvas id="generalStatsCanvas"></canvas>
           <div id="generalStatsEmpty" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; text-align:center; color:#94a3b8; font-size:0.85rem; padding:0 20px;">Non ci sono ancora dati sufficienti sulle interazioni giornaliere. Il grafico si popolerà man mano che le offerte ricevono visualizzazioni e click.</div>
@@ -7137,7 +7210,7 @@ function renderGeneralDashboardTab() {
 
       <div style="display: flex; flex-direction: column; gap: 20px;">
         <div class="card-saas accent-purple" style="background: #fdfaff; flex: 1; display: flex; flex-direction: column; justify-content: center;">
-          <div class="label" style="color: #6929c4; font-weight: 700; margin-bottom: 10px; display:flex; align-items:center; gap:6px;">${PANEL_ICONS.trophy} MIGLIOR SEDE</div>
+          <div class="label stat-label-info" style="color: #6929c4; font-weight: 700; margin-bottom: 10px; display:flex; align-items:center; gap:6px;" onclick="showStatInfo(event, 'bestLocation')">${PANEL_ICONS.trophy} MIGLIOR SEDE ${PANEL_ICONS.info}</div>
           <div style="font-size: 1.2rem; font-weight: 800; color: #1e293b;">${bestLocName}</div>
           <small style="color: #64748b; margin-top: 5px;">Sedi totali: ${activeLocCount}</small>
         </div>

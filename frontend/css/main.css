@@ -2894,3 +2894,34 @@ hr {
   font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 8px;
   transition: all 0.3s;
 }
+
+/* Popup informativi sulle etichette delle statistiche (Pannello Partner) */
+.stat-label-info {
+  cursor: pointer;
+  user-select: none;
+}
+.stat-label-info:hover { color: var(--primary); }
+.stat-label-info svg { opacity: 0.55; flex-shrink: 0; }
+.stat-label-info:hover svg { opacity: 1; }
+
+.info-popover {
+  position: absolute;
+  z-index: 2000;
+  background: #1e293b;
+  color: #f1f5f9;
+  padding: 14px 16px;
+  border-radius: var(--panel-radius-b, 16px 30px 14px 26px);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.28);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  pointer-events: none;
+}
+.info-popover.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.info-popover p { margin: 0; }
