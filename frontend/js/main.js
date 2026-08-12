@@ -799,6 +799,59 @@ async function refreshMyTeam() {
   if (state.mode === 'store') renderStoreView();
 }
 
+let myIntegrationCache = null;
+
+// Config dell'integrazione col gestionale (tabella "store_integrations"). Può non esistere
+// ancora: la riga nasce alla prima sincronizzazione riuscita da /inventory-sync.
+async function refreshMyIntegration() {
+  const partner = getCurrentPartner();
+  if (!partner) {
+    myIntegrationCache = null;
+    return;
+  }
+
+  const { data: row, error } = await storeAuthClient
+    .from('store_integrations')
+    .select('*')
+    .eq('store_id', partner.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Errore caricamento stato integrazione:", error);
+    return;
+  }
+
+  myIntegrationCache = row ? {
+    provider: row.provider,
+    status: row.status,
+    lastSyncAt: row.last_sync_at
+  } : null;
+
+  if (state.mode === 'store') renderStoreView();
+}
+
+window.saveIntegrationProvider = async () => {
+  const partner = getCurrentPartner();
+  if (!partner) return toast.error("Sessione non valida.");
+
+  const input = document.getElementById('integrationProviderInput');
+  const value = (input?.value || '').trim();
+  if (!value) return toast.error("Inserisci il nome del gestionale.");
+
+  const { error } = await storeAuthClient
+    .from('store_integrations')
+    .update({ provider: value, updated_at: new Date().toISOString() })
+    .eq('store_id', partner.id);
+
+  if (error) {
+    console.error("Errore salvataggio gestionale:", error);
+    return toast.error("Errore durante il salvataggio.");
+  }
+
+  toast.success("Gestionale aggiornato.");
+  refreshMyIntegration();
+};
+
 let myProductsCache = [];
 
 // Prodotti sincronizzati dal gestionale del negozio (tabella "products", sola lettura lato partner:
@@ -5800,7 +5853,7 @@ window.switchStoreTab = (tab) => {
   if (tab === 'offers' || tab === 'home') refreshMyOffers();
   if (tab === 'trash') refreshMyTrash();
   if (tab === 'team') refreshMyTeam();
-  if (tab === 'api') refreshMyProducts();
+  if (tab === 'api') { refreshMyProducts(); refreshMyIntegration(); }
 
   if (state.mode === 'store') {
     renderStoreView();
@@ -7881,9 +7934,40 @@ function renderApiTab() {
         <p style="color: #64748b; font-size: 0.85rem;">
           Prodotti ricevuti dal tuo gestionale via /inventory-sync. Sola lettura: le bozze d'offerta generate si completano e pubblicano dalla tab "Le mie Offerte".
         </p>
+        ${renderIntegrationStatus()}
         ${renderSyncedProductsTable()}
       </div>
     ` : ''}
+  `;
+}
+
+function renderIntegrationStatus() {
+  if (!myIntegrationCache) {
+    return `<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; margin-top:15px; font-size:0.82rem; color:#64748b;">
+      Nessuna sincronizzazione ricevuta finora. Appena il gestionale chiama /inventory-sync per la prima volta, questa sezione si popola da sola.
+    </div>`;
+  }
+
+  const statusColor = myIntegrationCache.status === 'active' ? '#10b981' : (myIntegrationCache.status === 'error' ? '#ef4444' : '#94a3b8');
+  const lastSync = myIntegrationCache.lastSyncAt ? new Date(myIntegrationCache.lastSyncAt).toLocaleString() : 'mai';
+
+  return `
+    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; margin-top:15px; display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
+      <div>
+        <div style="font-size:0.7rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.03em;">Stato</div>
+        <div style="font-weight:700; color:${statusColor};">${myIntegrationCache.status.toUpperCase()}</div>
+      </div>
+      <div>
+        <div style="font-size:0.7rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.03em;">Ultima sincronizzazione</div>
+        <div style="font-size:0.85rem;">${lastSync}</div>
+      </div>
+      <div style="flex:1 1 220px; display:flex; gap:8px; align-items:center;">
+        <input type="text" id="integrationProviderInput" value="${myIntegrationCache.provider}"
+               placeholder="es. Tilby, TeamSystem..."
+               style="flex:1; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:0.85rem;">
+        <button class="btn outline" style="padding:8px 14px; font-size:0.8rem;" onclick="saveIntegrationProvider()">Salva</button>
+      </div>
+    </div>
   `;
 }
 
