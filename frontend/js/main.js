@@ -799,6 +799,44 @@ async function refreshMyTeam() {
   if (state.mode === 'store') renderStoreView();
 }
 
+let myProductsCache = [];
+
+// Prodotti sincronizzati dal gestionale del negozio (tabella "products", sola lettura lato partner:
+// la scrittura la fa solo la Edge Function inventory-sync via service role).
+async function refreshMyProducts() {
+  const partner = getCurrentPartner();
+  if (!partner) {
+    myProductsCache = [];
+    return;
+  }
+
+  const { data: rows, error } = await storeAuthClient
+    .from('products')
+    .select('*')
+    .eq('store_id', partner.id)
+    .order('updated_at', { ascending: false })
+    .limit(200);
+
+  if (error) {
+    console.error("Errore caricamento prodotti sincronizzati:", error);
+    return;
+  }
+
+  myProductsCache = (rows || []).map(r => ({
+    id: r.id,
+    sku: r.sku,
+    name: r.name,
+    price: r.price,
+    originalPrice: r.original_price,
+    quantity: r.quantity,
+    unit: r.unit_of_measure,
+    linkedOfferId: r.linked_offer_id,
+    updatedAt: r.updated_at
+  }));
+
+  if (state.mode === 'store') renderStoreView();
+}
+
 // 2. Funzione per verificare i limiti del piano prima di creare un'offerta
 function canCreateOffer(plan, currentCount) {
   // Rimuovi ogni vincolo per i piani premium
@@ -5762,6 +5800,7 @@ window.switchStoreTab = (tab) => {
   if (tab === 'offers' || tab === 'home') refreshMyOffers();
   if (tab === 'trash') refreshMyTrash();
   if (tab === 'team') refreshMyTeam();
+  if (tab === 'api') refreshMyProducts();
 
   if (state.mode === 'store') {
     renderStoreView();
@@ -7760,6 +7799,38 @@ function renderApiTab() {
             <pre style="color: #94a3b8; margin: 8px 0 0 55px; white-space: pre-wrap;">curl -X DELETE "https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/offers/ID_OFFERTA" \
   -H "x-api-key: LA_TUA_API_KEY"</pre>
           </div>
+
+          <div style="margin-bottom: 10px;">
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
+              <span style="background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">POST</span>
+              <span style="color: #e2e8f0; font-weight: bold;">/inventory-sync</span>
+              <span style="color: #64748b; font-size: 0.7rem;">(piano Enterprise)</span>
+            </div>
+            <div style="color: #94a3b8; margin-left: 55px;">
+              Sincronizza scorte dal tuo gestionale (singolo oggetto oppure { "items": [...] }, max 500 per richiesta).
+              Un prodotto nuovo con quantity > 0 crea una bozza d'offerta da completare e pubblicare qui nel pannello (mai pubblicata in automatico).
+              Se un prodotto già collegato a un'offerta scende a quantity 0, l'offerta viene messa in pausa da sola.
+            </div>
+            <pre style="color: #94a3b8; margin: 8px 0 0 55px; white-space: pre-wrap;">curl -X POST "https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/inventory-sync" \
+  -H "x-api-key: LA_TUA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [{
+      "sku": "COD-GESTIONALE-001",
+      "name": "Pasta De Cecco 500g",
+      "price": 0.99,
+      "original_price": 1.49,
+      "quantity": 12,
+      "location_id": "uuid-della-tua-sede",
+      "external_event_id": "id-univoco-evento-facoltativo"
+    }]
+  }'</pre>
+            <div style="color: #64748b; margin: 6px 0 0 55px; font-size: 0.72rem;">
+              Campi obbligatori per un prodotto nuovo: "sku", "name", "price". Per un aggiornamento basta "sku" e "quantity".
+              "location_id" può essere omesso solo se hai una sola sede; con più sedi è obbligatorio, altrimenti il prodotto viene comunque salvato ma senza bozza d'offerta collegata.
+              "external_event_id" è facoltativo: se lo mandi, rimandare lo stesso evento due volte non lo processa due volte.
+            </div>
+          </div>
         </div>
         <p style="font-size: 0.72rem; color: #94a3b8; margin-top: 10px;">
           Limite: 120 richieste al minuto per chiave. Massimo 500 prodotti per singola chiamata POST.
@@ -7802,6 +7873,50 @@ function renderApiTab() {
         </p>
       </div>
     ` : ''}
+
+    <!-- MAGAZZINO SINCRONIZZATO DAL GESTIONALE (Solo Enterprise) -->
+    ${isEnterprise ? `
+      <div class="card-saas" style="margin-top: 25px;">
+        <h3 style="margin-top:0; font-size: 1rem; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.plug} Magazzino sincronizzato</h3>
+        <p style="color: #64748b; font-size: 0.85rem;">
+          Prodotti ricevuti dal tuo gestionale via /inventory-sync. Sola lettura: le bozze d'offerta generate si completano e pubblicano dalla tab "Le mie Offerte".
+        </p>
+        ${renderSyncedProductsTable()}
+      </div>
+    ` : ''}
+  `;
+}
+
+function renderSyncedProductsTable() {
+  if (!myProductsCache.length) {
+    return `<div class="empty-state" style="margin-top:15px;">Nessun prodotto sincronizzato finora. Appena il gestionale manda il primo evento a /inventory-sync, comparirà qui.</div>`;
+  }
+
+  const rows = myProductsCache.map(p => {
+    const isOut = p.quantity <= 0;
+    const offerBadge = p.linkedOfferId
+      ? `<span style="font-size:0.7rem; color:#1e3a8a;">${PANEL_ICONS.tag} collegato</span>`
+      : `<span style="font-size:0.7rem; color:#94a3b8;">nessuna offerta</span>`;
+    return `
+      <tr>
+        <td style="font-family:monospace; font-size:0.8rem;">${p.sku}</td>
+        <td>${p.name}</td>
+        <td style="${isOut ? 'color:#ef4444; font-weight:700;' : ''}">${p.quantity} ${UNIT_LABELS[p.unit] || ''}</td>
+        <td><strong style="color:var(--primary);">${formatPrice(p.price)}</strong></td>
+        <td>${offerBadge}</td>
+        <td style="font-size:0.75rem; color:#64748b;">${new Date(p.updatedAt).toLocaleString()}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <table class="offer-table" style="margin-top:15px;">
+      <thead>
+        <tr><th>SKU</th><th>Prodotto</th><th>Scorta</th><th>Prezzo</th><th>Offerta</th><th>Ultimo aggiornamento</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p style="font-size:0.72rem; color:#94a3b8; margin-top:10px;">Mostrati al massimo gli ultimi 200 prodotti aggiornati.</p>
   `;
 }
 
