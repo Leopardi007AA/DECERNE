@@ -799,6 +799,40 @@ async function refreshMyTeam() {
   if (state.mode === 'store') renderStoreView();
 }
 
+let mySyncLogCache = [];
+
+// Storico eventi ricevuti dal gestionale (tabella "inventory_sync_log"), sola lettura.
+async function refreshMySyncLog() {
+  const partner = getCurrentPartner();
+  if (!partner) {
+    mySyncLogCache = [];
+    return;
+  }
+
+  const { data: rows, error } = await storeAuthClient
+    .from('inventory_sync_log')
+    .select('*')
+    .eq('store_id', partner.id)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error("Errore caricamento storico sincronizzazioni:", error);
+    return;
+  }
+
+  mySyncLogCache = (rows || []).map(r => ({
+    sku: r.product_sku,
+    name: r.product_name,
+    quantity: r.quantity,
+    action: r.action,
+    detail: r.detail,
+    createdAt: r.created_at
+  }));
+
+  if (state.mode === 'store') renderStoreView();
+}
+
 let myIntegrationCache = null;
 
 // Config dell'integrazione col gestionale (tabella "store_integrations"). Può non esistere
@@ -5853,7 +5887,7 @@ window.switchStoreTab = (tab) => {
   if (tab === 'offers' || tab === 'home') refreshMyOffers();
   if (tab === 'trash') refreshMyTrash();
   if (tab === 'team') refreshMyTeam();
-  if (tab === 'api') { refreshMyProducts(); refreshMyIntegration(); }
+  if (tab === 'api') { refreshMyProducts(); refreshMyIntegration(); refreshMySyncLog(); }
 
   if (state.mode === 'store') {
     renderStoreView();
@@ -7937,7 +7971,49 @@ function renderApiTab() {
         ${renderIntegrationStatus()}
         ${renderSyncedProductsTable()}
       </div>
+
+      <div class="card-saas" style="margin-top: 20px;">
+        <h3 style="margin-top:0; font-size: 1rem; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.plug} Storico sincronizzazioni</h3>
+        <p style="color: #64748b; font-size: 0.85rem;">Ultimi 50 eventi ricevuti dal tuo gestionale.</p>
+        ${renderSyncLogTable()}
+      </div>
     ` : ''}
+  `;
+}
+
+function renderSyncLogTable() {
+  if (!mySyncLogCache.length) {
+    return `<div class="empty-state" style="margin-top:15px;">Nessun evento registrato finora.</div>`;
+  }
+
+  const ACTION_LABELS = {
+    updated: { text: 'Aggiornato', color: '#3b82f6' },
+    draft_created: { text: 'Bozza creata', color: '#8b5cf6' },
+    offer_deactivated: { text: 'Offerta messa in pausa', color: '#f59e0b' },
+    removed: { text: 'Rimosso', color: '#ef4444' },
+    error: { text: 'Errore', color: '#ef4444' }
+  };
+
+  const rows = mySyncLogCache.map(l => {
+    const label = ACTION_LABELS[l.action] || { text: l.action, color: '#64748b' };
+    return `
+      <tr>
+        <td style="font-size:0.75rem; color:#64748b;">${new Date(l.createdAt).toLocaleString()}</td>
+        <td style="font-family:monospace; font-size:0.8rem;">${l.sku}</td>
+        <td>${l.name || '-'}</td>
+        <td>${l.quantity ?? '-'}</td>
+        <td><span style="color:${label.color}; font-weight:600; font-size:0.8rem;">${label.text}</span></td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <table class="offer-table" style="margin-top:15px;">
+      <thead>
+        <tr><th>Data/Ora</th><th>SKU</th><th>Prodotto</th><th>Quantità</th><th>Evento</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
   `;
 }
 
