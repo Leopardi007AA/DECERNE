@@ -138,7 +138,7 @@ function checkPermission(requiredPlan, showAlert = true) {
   // Se il permesso è negato
   if (showAlert) {
     showConfirm(
-      `🔒 Funzione Premium: Questa operazione richiede il piano ${requiredPlan}. Vuoi passare alla pagina degli abbonamenti?`,
+      `Questa è una funzione del piano ${requiredPlan}. Vuoi passare alla pagina degli abbonamenti?`,
       () => { switchStoreTab('sub'); }
     );
   }
@@ -399,7 +399,7 @@ async function checkRateLimit(partnerId) {
 
     if (data.status === 'limited') {
       showConfirm(
-        `⚠️ ATTIVITÀ SOSPETTA: Hai eseguito troppe modifiche in poco tempo. L'account è sospeso per 5 minuti per motivi di sicurezza.`,
+        `Hai eseguito troppe modifiche in poco tempo: l'account resta sospeso per 5 minuti per motivi di sicurezza.`,
         () => { location.reload(); }
       );
       return false;
@@ -2422,7 +2422,7 @@ async function logoutUser() {
 }
 
 function deleteAccount() {
-  showConfirm("ATTENZIONE: Sei sicuro di voler eliminare definitivamente il tuo account?", async () => {
+  showConfirm("Sei sicuro di voler eliminare definitivamente il tuo account? L'operazione non si può annullare.", async () => {
     try {
       const userId = state.currentUser?.id;
       if (!userId) throw new Error("Sessione non valida.");
@@ -5091,7 +5091,7 @@ const isAnnual = isAnnualView;
       <div class="pricing-grid">
         <!-- STARTER -->
         <div class="pricing-card">
-          <div class="plan-type">🟦 STARTER</div>
+          <div class="plan-type">STARTER</div>
           <div class="price-block">
             ${isAnnual ? `
             <div class="price">€199,99 <span>/ anno</span></div>
@@ -5113,7 +5113,7 @@ const isAnnual = isAnnualView;
         <!-- STANDARD -->
         <div class="pricing-card popular">
           <div class="popular-badge">MIGLIOR VALORE</div>
-          <div class="plan-type">🔵 STANDARD</div>
+          <div class="plan-type">STANDARD</div>
           <div class="price-block">
             <div class="price">${isAnnual ? '€499,99 <span>/ anno</span>' : '€49,99 <span>/ mese</span>'}</div>
           </div>
@@ -5129,7 +5129,7 @@ const isAnnual = isAnnualView;
 
         <!-- PROFESSIONAL -->
         <div class="pricing-card">
-          <div class="plan-type">🔷 PROFESSIONAL</div>
+          <div class="plan-type">PROFESSIONAL</div>
           <div class="price-block">
             <div class="price">${isAnnual ? '€1.499,99 <span>/ anno</span>' : '€149,99 <span>/ mese</span>'}</div>
           </div>
@@ -5145,7 +5145,7 @@ const isAnnual = isAnnualView;
 
         <!-- ENTERPRISE -->
         <div class="pricing-card">
-          <div class="plan-type">🔶 ENTERPRISE</div>
+          <div class="plan-type">ENTERPRISE</div>
           <div class="price-block">
             <div class="price">Custom</div>
           </div>
@@ -5349,7 +5349,7 @@ function renderOnboarding(container) {
 
           <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-top:10px;">
             <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">
-              📍 Facoltativo ma consigliato: le coordinate esatte rendono il tuo negozio localizzabile con precisione sulla mappa dei clienti.
+              Facoltativo ma consigliato: le coordinate esatte rendono il tuo negozio localizzabile con precisione sulla mappa dei clienti.
               <a href="javascript:void(0)" onclick="openOnboardingGoogleMapsHelper()">Trova le tue coordinate su Google Maps →</a>
             </p>
             <div class="form-row">
@@ -6162,8 +6162,8 @@ function renderStoreLoginForm(container) {
     }
 
     if (result.reason === 'expired') {
-      toast.error("ACCOUNT SCADUTO!");
-      errBox.innerHTML = `⚠️ <strong>Accesso Negato:</strong> Il tuo periodo di prova o abbonamento è terminato.<br><br>
+      toast.error("Il tuo abbonamento è scaduto.");
+      errBox.innerHTML = `<strong>Accesso negato:</strong> il periodo di prova o l'abbonamento sono terminati.<br><br>
                           <button class="btn outline" style="padding:5px 10px; font-size:0.7rem;" 
                           onclick="storeData.step='pricing'; renderStoreView();">Rinnova ora</button>`;
     } else if (result.reason === 'credentials') {
@@ -6171,7 +6171,7 @@ function renderStoreLoginForm(container) {
       errBox.innerText = "Email o password non corretti.";
     } else if (result.reason === 'no-store') {
       toast.error("Nessun account supermercato trovato.");
-      errBox.innerHTML = `⚠️ Non esiste un account supermercato collegato a questa email.<br><br>
+      errBox.innerHTML = `Non esiste un account supermercato collegato a questa email.<br><br>
                           <button class="btn outline" style="padding:5px 10px; font-size:0.7rem;" 
                           onclick="storeData.step='pricing'; renderStoreView();">Registra il tuo negozio</button>`;
     } else {
@@ -6680,7 +6680,7 @@ window.promptUpgradeToStandard = function(partnerId) {
       await refreshMyOffers();
       renderOffers();
 
-      toast.success("Abbonamento attivato! Tutte le funzioni sono ora sbloccate. 🚀");
+      toast.success("Abbonamento attivato: tutte le funzioni sono sbloccate.");
       storeData.activeTab = 'home';
       renderStoreView();
     }
@@ -6931,7 +6931,7 @@ ${plan === 'Enterprise' ? `
 
     ${!isProfessional ? `
       <div class="upgrade-banner banner-info" style="margin-top: 20px;">
-        <div>🚀 <strong>Vuoi gestire più punti vendita?</strong> Passa al piano Professional per sbloccare la gestione multi-sede e pubblicare offerte per tutte le tue filiali.</div>
+        <div><strong>Vuoi gestire più punti vendita?</strong> Passa al piano Professional per pubblicare offerte su tutte le tue filiali.</div>
       </div>
     ` : ''}
   `;
