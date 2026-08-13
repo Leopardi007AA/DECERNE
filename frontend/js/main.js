@@ -1488,6 +1488,16 @@ function renderOffersTab() {
       <button class="btn outline" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" onclick="bulkSetOfferStatus('active')">Attiva</button>
       <button class="btn outline" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" onclick="bulkSetOfferStatus('draft')">Bozza</button>
       <button class="btn outline" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" onclick="bulkSetOfferStatus('paused')">Pausa</button>
+      <div class="status-pub-dropdown" style="position:relative;">
+        <button class="btn outline" style="padding:8px 18px; min-width:170px;" onclick="toggleStatoPubblicazioneMenu()">${PANEL_ICONS.calendar} Pianifica pubblicazione</button>
+        <div id="statoPubblicazioneMenu" style="display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:60; background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:14px; min-width:250px; box-shadow:0 10px 24px rgba(0,0,0,0.12);">
+          <button class="btn outline" style="width:100%;" onclick="toggleBulkScheduleFields()">Pianifica pubblicazione futura</button>
+          <div id="bulkScheduleFields" style="display:none; flex-direction:column; gap:8px; margin-top:10px;">
+            <input type="datetime-local" id="bulkScheduleDateTime" step="300" style="padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:0.85rem;">
+            <button class="btn" style="width:100%;" onclick="bulkSchedulePublish()">Conferma pianificazione</button>
+          </div>
+        </div>
+      </div>
       <button class="btn danger" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" onclick="bulkDeleteOffers()">${PANEL_ICONS.trash} Rimuovi</button>
     </div>
 
@@ -2821,8 +2831,15 @@ async function renderCartContent() {
 
 async function tryGeocodeQuery(query) {
   try {
-    const { data: sessionData } = await supabaseClient.auth.getSession();
-    const token = sessionData?.session?.access_token;
+    // Controlliamo entrambi i client: un cliente loggato ha sessione solo su supabaseClient,
+    // un partner loggato ha sessione solo su storeAuthClient. Prima serviva solo il primo,
+    // quindi la geocodifica automatica non partiva mai per un partner che aggiunge/modifica
+    // una sede da loggato (bug reale, non solo teorico).
+    const [{ data: customerSessionData }, { data: storeSessionData }] = await Promise.all([
+      supabaseClient.auth.getSession(),
+      storeAuthClient.auth.getSession()
+    ]);
+    const token = storeSessionData?.session?.access_token || customerSessionData?.session?.access_token;
     if (!token) return null; // la geocodifica passa dal backend solo per utenti autenticati
 
     const res = await fetch('https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/geocode', {
