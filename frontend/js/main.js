@@ -2576,13 +2576,25 @@ async function completeEmailVerification(email, token) {
     toast.success("Email verificata! Benvenuto su Decerne.");
     closeFullPageModal();
   } else if (pendingVerification.type === 'store') {
-    await finalizeStoreRegistration(data.user.id);
+    await finalizeStoreRegistration(data.user.id, data.session);
   }
 }
 
-async function finalizeStoreRegistration(authUserId) {
+async function finalizeStoreRegistration(authUserId, authSession) {
   const d = pendingVerification.storeInsertData;
   try {
+    // BUG CRITICO: la sessione dell'OTP appena verificato vive solo su supabaseClient.
+    // storeAuthClient (il client che TUTTE le altre operazioni del partner usano per
+    // scrivere) resterebbe senza sessione, e il primo salvataggio dopo la registrazione
+    // fallirebbe finché il partner non fa logout e login manuale. La sincronizziamo qui,
+    // prima di qualunque altra cosa.
+    if (authSession?.access_token && authSession?.refresh_token) {
+      await storeAuthClient.auth.setSession({
+        access_token: authSession.access_token,
+        refresh_token: authSession.refresh_token
+      });
+    }
+
     const { data: storeRow, error: storeError } = await supabaseClient
       .from('stores')
       .insert({
