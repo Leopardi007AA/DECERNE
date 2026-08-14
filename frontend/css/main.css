@@ -10,6 +10,29 @@
   --z-drawer: 1100;
   --z-navbar: 1200;
   --z-modal: 1300;
+
+  /* Scala tipografica (font invariato, solo formalizzato in variabili) */
+  --font-body: 'Inter', system-ui, sans-serif;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.85rem;
+  --fs-base: 1rem;
+  --fs-md: 1.1rem;
+  --fs-lg: 1.3rem;
+  --fs-xl: 1.6rem;
+  --fs-2xl: 2rem;
+
+  /* Scala raggi (valori più ricorrenti nel CSS attuale) */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* Scala ombre (valori più ricorrenti nel CSS attuale) */
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 12px 30px rgba(0, 0, 0, 0.2);
 }
 
 * { box-sizing: border-box; }
