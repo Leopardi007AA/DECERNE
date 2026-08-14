@@ -21,6 +21,20 @@ const storeAuthClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBL
   }
 }); 
 
+// Se una sessione salvata nel browser risulta scaduta/corrotta, la puliamo subito.
+// Senza questo controllo il token rotto veniva riusato per OGNI chiamata successiva
+// (anche quelle pubbliche, es. lista offerte), bloccando tutto il sito con errori 401
+// finché non si svuotava a mano il local storage.
+async function clearBrokenSession(client, error) {
+  const msg = (error?.message || '').toLowerCase();
+  const looksLikeAuthError = error?.status === 401 || msg.includes('jwt') || msg.includes('token');
+  if (looksLikeAuthError) {
+    console.warn('Sessione non valida rilevata, pulizia automatica in corso...');
+    await client.auth.signOut();
+  }
+  return looksLikeAuthError;
+} 
+
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 const DEV_MODE = false;
@@ -2381,9 +2395,15 @@ async function loginUser(email, password) {
       .eq('id', data.user.id)
       .single();
 
-    if (profileError) console.error("Errore recupero profilo:", profileError);
-
-    state.currentUser = {
+      if (profileError) {
+        console.error("Errore recupero profilo:", profileError);
+        if (await clearBrokenSession(supabaseClient, profileError)) {
+          state.currentUser = null;
+          return;
+        }
+      }
+  
+      state.currentUser = {
       id: data.user.id,
       email: data.user.email,
       nome: profile?.name || '',
@@ -4470,10 +4490,11 @@ async function refreshPartnerSession(storeId) {
     .eq('id', storeId)
     .single();
 
-  if (error || !storeRow) {
-    console.error("Errore aggiornamento sessione negozio:", error);
-    return null;
-  }
+    if (error || !storeRow) {
+      console.error("Errore aggiornamento sessione negozio:", error);
+      await clearBrokenSession(storeAuthClient, error);
+      return null;
+    }
 
   const { data: locationsRows } = await storeAuthClient
     .from('store_locations')
