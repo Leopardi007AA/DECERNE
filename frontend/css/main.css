@@ -2209,7 +2209,6 @@ hr {
 /* --- STILE PROFESSIONALE --- */
 .offer-row.offer-featured {
   border: 1px solid #fff;
-  background: #f0f7ff; /* Sfondo azzurro leggerissimo, uguale a Enterprise */
   box-shadow: var(--shadow-sm);
   position: relative;
 }
@@ -2286,7 +2285,6 @@ hr {
 /* Stile della card Enterprise nella lista */
 .offer-row.offer-enterprise {
   border: 1px solid #fff;
-  background: #f0f7ff; /* Sfondo azzurro leggerissimo */
   box-shadow: var(--shadow-sm);
 }
 
