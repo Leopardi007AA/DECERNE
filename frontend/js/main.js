@@ -1544,7 +1544,7 @@ function renderOffersTable(limit = 999) {
       <tr>
         <td><input type="checkbox" class="offer-select-checkbox" ${isSelected ? 'checked' : ''} onchange="toggleOfferSelection('${o.id}', this.checked)"></td>
         <td>
-          <img src="${getSafeImageUrl(o.img)}" 
+          <img src="${getSafeImageUrl(o.img)}" alt="${o.product}"
                style="width:40px; height:40px; border-radius:4px; object-fit:cover; border:1px solid #eee;">
         </td>
         <td>
@@ -4440,7 +4440,7 @@ window.showOfferPreview = () => {
   container.innerHTML = `
     <div class="offer-row" style="width: 100%; max-width: 600px;">
       <div class="product-image-container">
-        <img src="${imageSrc}" class="product-img">
+        <img src="${imageSrc}" class="product-img" alt="${offerData?.product || 'Prodotto'}">
         ${percSconto > 0 ? `<span class="perc-badge">-${percSconto}%</span>` : ''}
       </div>
       <div class="product-info">
@@ -6532,6 +6532,7 @@ const toast = {
     const closeBtn = document.createElement("button");
     closeBtn.className = "toast-close";
     closeBtn.textContent = "×";
+    closeBtn.setAttribute("aria-label", "Chiudi notifica");
     
     const progress = document.createElement("div");
     progress.className = "toast-progress";

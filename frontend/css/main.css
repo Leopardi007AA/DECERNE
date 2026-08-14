@@ -37,6 +37,14 @@
 
 * { box-sizing: border-box; }
 
+/* Contorno visibile quando si naviga con Tab (accessibilità da tastiera),
+   solo per chi naviga a tastiera — il mouse non lo attiva */
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 html {
   height: 100%;
 }
@@ -264,6 +272,17 @@ body {
   border-radius: var(--radius);
   cursor: pointer;
   font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 /* VIEWS & CARDS */
