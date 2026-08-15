@@ -33,6 +33,11 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.12);
   --shadow-xl: 0 12px 30px rgba(0, 0, 0, 0.2);
+
+  /* Scala blur per i materiali translucidi (backdrop-filter) */
+  --blur-sm: 4px;
+  --blur-md: 8px;
+  --blur-lg: 20px;
 }
 
 * { box-sizing: border-box; }
@@ -123,6 +128,17 @@ body {
 .icon-btn:hover {
   background: rgba(255,255,255,0.15);
 }
+
+/* FEEDBACK DI PRESSIONE — risponde su :active invece che solo su :hover,
+   perché su touch :hover spesso non scatta mai prima del tap */
+   .icon-btn:active,
+   .hamburger-btn:active,
+   .nav-menu li:active,
+   .stat-card.clickable:active,
+   .store-nav-btn:active {
+     transform: scale(0.96);
+     transition: transform 0.1s ease-out;
+   }
 
 /* Su schermi piccoli la navbar mostra solo Menu e Carrello */
 @media (max-width: 768px) {
@@ -1085,6 +1101,7 @@ select.location-field-input {
   font-size: 2.4rem;
   margin: 15px 0;
   color: var(--primary-dark);
+  letter-spacing: -0.02em;
 }
 
 .pricing-header p {
@@ -1525,16 +1542,6 @@ body.drawer-open:not(.mode-chisiamo) .navbar {
   z-index: 1550; /* Sopra il drawer (1500), solo mentre il drawer è aperto sulle pagine standard. Su Chi Siamo (.mode-chisiamo) resta sotto #chisiamo-view (1400) */
 }
 
-/* POPUP A TUTTO SCHERMO: Coprono anche la navbar */
-.full-page-modal {
-  position: fixed;
-  inset: 0;
-  background: white;
-  z-index: 1600; 
-  display: none;
-  flex-direction: column;
-}
-
 /* DRAWER (Menu Laterale) */
 #drawer {
   position: fixed;
@@ -1709,7 +1716,7 @@ hr {
     justify-content: center;
     padding: 24px;
     background: rgba(10, 15, 30, 0.6);
-    backdrop-filter: blur(3px);
+    backdrop-filter: blur(var(--blur-sm));
   }
   
   .full-page-modal.auth-modal .modal-card {
@@ -1862,7 +1869,7 @@ hr {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.9);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(var(--blur-md));
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -2462,7 +2469,7 @@ hr {
    ============================================================ */
    #drawer.drawer-dark {
     background: rgba(2, 6, 23, 0.97);
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(var(--blur-lg));
     box-shadow: -5px 0 25px rgba(34, 211, 238, 0.15);
     border-left: 1px solid rgba(34, 211, 238, 0.15);
   }
@@ -2597,7 +2604,7 @@ hr {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(var(--blur-sm));
   z-index: 1700; /* Sopra il popup offerta (1600) */
   display: flex;
   align-items: center;
@@ -3015,3 +3022,25 @@ hr {
   pointer-events: auto;
 }
 .info-popover p { margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .full-page-modal.auth-modal,
+  #previewOverlay,
+  #drawer.drawer-dark,
+  .store-info-overlay {
+    backdrop-filter: none;
+  }
+  .full-page-modal.auth-modal { background: rgba(10, 15, 30, 0.92); }
+  #previewOverlay { background: rgba(15, 23, 42, 0.97); }
+  #drawer.drawer-dark { background: rgba(2, 6, 23, 1); }
+  .store-info-overlay { background: rgba(15, 23, 42, 0.92); }
+}

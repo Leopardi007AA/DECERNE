@@ -4170,6 +4170,12 @@ function openFullPageModal(type) {
   modal.classList.toggle("auth-modal", type === 'profile');
   modal.style.display = "flex";
   document.body.style.overflow = 'hidden';
+  // Doppio rAF: forza un frame di layout con display:flex e opacity:0
+  // prima di aggiungere is-visible, altrimenti browser e CSS collassano
+  // "display:none -> flex + opacity:1" nello stesso frame e non si vede la transizione.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => modal.classList.add('is-visible'));
+  });
 
   if (type === 'profile') {
     if (state.currentUser) renderProfileInfo();
@@ -4224,10 +4230,16 @@ async function validateRegistration() {
 
 function closeFullPageModal() {
   try {
-    $("#fullPagePopup").style.display = "none";
-    $("#fullPagePopup").classList.remove("auth-modal");
+    const modal = $("#fullPagePopup");
+    modal.classList.remove('is-visible');
     // RIPRISTINA SCORRIMENTO
     document.body.style.overflow = '';
+    // Aspetta la fine della transizione di uscita (0.25s, vedi .full-page-modal in CSS)
+    // prima di nascondere davvero l'elemento con display:none, altrimenti sparisce di scatto.
+    setTimeout(() => {
+      modal.style.display = "none";
+      modal.classList.remove("auth-modal");
+    }, 250);
   } catch (e) { console.error(e); }
 }
 
