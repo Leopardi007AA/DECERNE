@@ -1854,6 +1854,9 @@ window.openOfferModal = (offer = null) => {
   const modal = $("#offerModal");
   const partner = getCurrentPartner();
   modal.style.display = "flex";
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => modal.classList.add('is-visible'));
+  });
 
   document.body.style.overflow = 'hidden';
 
@@ -1955,9 +1958,10 @@ window.showExpiredStatusInfo = () => {
 
 window.closeOfferModal = () => {
   try {
-    $("#offerModal").style.display = "none";
-    // RIPRISTINA SCORRIMENTO
+    const modal = $("#offerModal");
+    modal.classList.remove('is-visible');
     document.body.style.overflow = '';
+    setTimeout(() => { modal.style.display = "none"; }, 250);
   } catch (e) { console.error(e); }
 };
 
@@ -4287,8 +4291,104 @@ function toggleMenu() {
   }
 }
 
+// Molla critically-damped generica: anima una proprietà numerica verso un target,
+// partendo dal valore e dalla velocità attuali — mai da zero, per restare interrompibile.
+function springTo(getValue, setValue, target, initialVelocity = 0, { stiffness = 300, damping = 34, mass = 1, onComplete } = {}) {
+  let value = getValue();
+  let velocity = initialVelocity;
+  let frame;
+  function step() {
+    const force = -stiffness * (value - target);
+    const damp = -damping * velocity;
+    velocity += (force + damp) / mass * (1 / 60);
+    value += velocity * (1 / 60);
+    setValue(value);
+    if (Math.abs(value - target) < 0.5 && Math.abs(velocity) < 20) {
+      setValue(target);
+      if (onComplete) onComplete();
+      return;
+    }
+    frame = requestAnimationFrame(step);
+  }
+  step();
+  return () => cancelAnimationFrame(frame);
+}
+
+function getDrawerTranslateX(drawer) {
+  const t = getComputedStyle(drawer).transform;
+  if (t === 'none') return 0;
+  return new DOMMatrixReadOnly(t).m41;
+}
+
+function setupDrawerDrag() {
+  const drawer = $("#drawer");
+  if (!drawer) return;
+  const DRAWER_WIDTH = 320;
+  let startX = 0, startTransform = 0, history = [], dragging = false, cancelSpring = null;
+
+  drawer.addEventListener('pointerdown', (e) => {
+    // Non intercettare il drag se si parte da link, bottoni o campi — devono restare cliccabili normalmente
+    if (e.target.closest('a, button, input, select, textarea')) return;
+    if (cancelSpring) cancelSpring();
+    dragging = true;
+    startX = e.clientX;
+    startTransform = getDrawerTranslateX(drawer);
+    history = [{ x: e.clientX, t: performance.now() }];
+    drawer.setPointerCapture(e.pointerId);
+    drawer.classList.add('dragging');
+  });
+
+  drawer.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const delta = e.clientX - startX;
+    let next = startTransform + delta;
+    if (next < 0) next *= 0.3; // rubber-band: resiste se si trascina oltre il bordo aperto
+    drawer.style.transform = `translateX(${next}px)`;
+    history.push({ x: e.clientX, t: performance.now() });
+    if (history.length > 5) history.shift();
+  });
+
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    drawer.classList.remove('dragging');
+    const current = getDrawerTranslateX(drawer);
+
+    const first = history[0], last = history[history.length - 1];
+    const dt = (last.t - first.t) / 1000;
+    const velocity = dt > 0 ? (last.x - first.x) / dt : 0;
+
+    // Proiezione del punto di arrivo dal momentum del gesto (SKILL.md §6)
+    const projected = current + (velocity / 1000) * 0.998 / (1 - 0.998);
+    const shouldClose = projected > DRAWER_WIDTH / 2 || velocity > 500;
+    const target = shouldClose ? DRAWER_WIDTH : 0;
+
+    cancelSpring = springTo(
+      () => getDrawerTranslateX(drawer),
+      (v) => { drawer.style.transform = `translateX(${v}px)`; },
+      target,
+      velocity,
+      {
+        onComplete: () => {
+          if (shouldClose) {
+            $("#overlay").style.display = "none";
+            $("#menuBtn").classList.remove("open");
+            document.body.style.overflow = '';
+            document.body.classList.remove('drawer-open');
+            notifyChiSiamoDrawerState(false);
+          }
+        }
+      }
+    );
+  }
+
+  drawer.addEventListener('pointerup', endDrag);
+  drawer.addEventListener('pointercancel', endDrag);
+}
+
 // Nel tuo init() o a fine file, imposta i listener così:
 function setupEventListeners() {
+  setupDrawerDrag();
   setupManualLocationInput();
 
   // Logo DECERNE: ricarica la pagina

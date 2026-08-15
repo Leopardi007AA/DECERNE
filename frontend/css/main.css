@@ -1558,6 +1558,13 @@ body.drawer-open:not(.mode-chisiamo) .navbar {
   box-shadow: -12px 0 40px rgba(15, 23, 42, 0.18);
 }
 
+#drawer {
+  touch-action: pan-y; /* lascia lo scroll verticale al contenuto, cattura solo il trascinamento orizzontale */
+}
+#drawer.dragging {
+  transition: none; /* durante il drag il transform lo pilota il JS frame per frame, non la transition CSS */
+}
+
 /* SISTEMAZIONE MENU: Rimuove la traslazione a destra */
 .nav-menu {
   list-style: none;
