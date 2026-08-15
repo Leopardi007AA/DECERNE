@@ -8549,6 +8549,125 @@ window.hideLoading = () => {
   }
 };
 
+// ============ TOUR GUIDATO PRIMO ACCESSO ============
+// Si mostra una sola volta, solo per chi arriva sulla Home Utenti (non nel
+// Pannello Partner né su Chi Siamo), dopo che il banner cookie è stato chiuso.
+const maybeStartTour = (function () {
+  const STORAGE_KEY = "decerne_tour_seen";
+
+  const steps = [
+    {
+      title: "Benvenuto su DECERNE",
+      text: "Qui trovi le offerte reali dei supermercati vicino a te, caricate direttamente dai negozi. Ci vogliono pochi secondi per mostrarti come funziona.",
+      highlight: null
+    },
+    {
+      title: "Imposta dove sei",
+      text: "Scrivi qui la tua città o il CAP (oppure consenti la posizione quando te lo chiediamo): le offerte si ordinano in base a quanto sono vicine.",
+      highlight: "#locationInput"
+    },
+    {
+      title: "Cerca un prodotto",
+      text: "Se ti serve qualcosa di preciso — pasta, detersivo, quello che vuoi — scrivilo qui e la lista si filtra da sola.",
+      highlight: "#searchInput"
+    },
+    {
+      title: "Apri un'offerta",
+      text: "Ogni scheda è un'offerta vera. Toccala per vedere prezzo, sconto e scadenza. Da lì puoi anche toccare il nome del negozio per avere indirizzo, telefono e orari.",
+      highlight: "#offersGrid"
+    },
+    {
+      title: "La Lista Intelligente",
+      text: "Salva i prodotti che ti servono, poi apri la Lista Intelligente da qui: scrivi cosa ti manca e ti diciamo in quali negozi conviene andare, tenendo conto anche del carburante se vuoi. Il percorso lo tracci sulla mappa in un tocco.",
+      highlight: "#cartBtn"
+    },
+    {
+      title: "Il resto è qui",
+      text: "Dal menu trovi il tuo profilo, l'accesso e tutto quello che manca. Buona spesa.",
+      highlight: "#menuBtn"
+    }
+  ];
+
+  let current = 0;
+  let highlightedEl = null;
+
+  function clearHighlight() {
+    if (highlightedEl) {
+      highlightedEl.classList.remove("tour-highlight");
+      highlightedEl = null;
+    }
+  }
+
+  function renderStep() {
+    const step = steps[current];
+    clearHighlight();
+
+    $("#tourTitle").textContent = step.title;
+    $("#tourText").textContent = step.text;
+
+    const dotsEl = $("#tourDots");
+    if (dotsEl) {
+      dotsEl.innerHTML = steps.map((_, i) =>
+        `<span class="${i === current ? 'active' : ''}"></span>`
+      ).join("");
+    }
+
+    const nextBtn = $("#tourNextBtn");
+    if (nextBtn) nextBtn.textContent = current === steps.length - 1 ? "Inizia a cercare" : "Avanti";
+
+    if (step.highlight) {
+      const el = document.querySelector(step.highlight);
+      if (el) {
+        el.classList.add("tour-highlight");
+        highlightedEl = el;
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }
+
+  function closeTour() {
+    clearHighlight();
+    $("#tourOverlay")?.classList.add("hidden");
+    $("#tourCard")?.classList.add("hidden");
+    try { localStorage.setItem(STORAGE_KEY, "1"); } catch (e) {}
+  }
+
+  function nextStep() {
+    if (current === steps.length - 1) {
+      closeTour();
+      return;
+    }
+    current++;
+    renderStep();
+  }
+
+  function startTour() {
+    current = 0;
+    $("#tourOverlay")?.classList.remove("hidden");
+    $("#tourCard")?.classList.remove("hidden");
+    renderStep();
+    $("#tourSkipBtn")?.addEventListener("click", closeTour, { once: true });
+    $("#tourNextBtn")?.addEventListener("click", nextStep);
+  }
+
+  return function () {
+    let alreadySeen = false;
+    try { alreadySeen = !!localStorage.getItem(STORAGE_KEY); } catch (e) {}
+    if (alreadySeen) return;
+    if (!$("#tourOverlay") || !$("#tourCard")) return;
+
+    // Il tour riguarda solo chi sta guardando le offerte come utente,
+    // non il Pannello Partner né la pagina Chi Siamo
+    const storeView = document.getElementById("store-view");
+    const chisiamoView = document.getElementById("chisiamo-view");
+    const inUserMode = (!storeView || storeView.classList.contains("hidden")) &&
+                        (!chisiamoView || chisiamoView.classList.contains("hidden"));
+    if (!inUserMode) return;
+
+    setTimeout(startTour, 400);
+  };
+})();
+
 // ============ BANNER CONSENSO COOKIE ============
 // Si ripresenta ad ogni nuova visita (nuova sessione di navigazione), ma non
 // ad ogni refresh della pagina: usiamo sessionStorage, che sopravvive ai
@@ -8575,12 +8694,15 @@ window.hideLoading = () => {
     logChoice(choice);
     $("#cookieBanner")?.classList.add("hidden");
     $("#cookieOverlay")?.classList.add("hidden");
+    maybeStartTour();
   }
 
   document.addEventListener("DOMContentLoaded", () => {
     if (!getStoredChoice()) {
       $("#cookieBanner")?.classList.remove("hidden");
       $("#cookieOverlay")?.classList.remove("hidden");
+    } else {
+      maybeStartTour();
     }
     $("#cookieAcceptBtn")?.addEventListener("click", () => closeBanner("accept_all"));
     $("#cookieEssentialBtn")?.addEventListener("click", () => closeBanner("essential_only"));
