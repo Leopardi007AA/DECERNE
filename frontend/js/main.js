@@ -4233,7 +4233,7 @@ function closeFullPageModal() {
 
 function openDrawer() {
   try {
-    $("#drawer").style.right = "0";
+    $("#drawer").style.transform = "translateX(0)";
     $("#overlay").style.display = "block";
     $("#menuBtn").classList.add("open");
     document.body.style.overflow = 'hidden';
@@ -4244,7 +4244,7 @@ function openDrawer() {
 
 function closeDrawer() {
   try {
-    $("#drawer").style.right = "-320px";
+    $("#drawer").style.transform = "translateX(320px)";
     $("#overlay").style.display = "none";
     $("#menuBtn").classList.remove("open");
     document.body.style.overflow = '';

@@ -144,6 +144,14 @@ body {
   z-index: 1600; 
   display: none;
   flex-direction: column;
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.full-page-modal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 @keyframes slideIn {
@@ -326,12 +334,14 @@ body {
 #drawer {
   position: fixed;
   top: 0; 
-  right: -320px;
+  right: 0;
+  transform: translateX(320px);
   width: 320px;
   height: 100%;
   background: #fff;
   padding: 80px 0 20px 0;
-  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
   z-index: 1500; /* Sopra #chisiamo-view (1400) così è visibile anche da quella pagina */
   box-shadow: -5px 0 15px rgba(0,0,0,0.1);
   display: flex;
@@ -1529,12 +1539,13 @@ body.drawer-open:not(.mode-chisiamo) .navbar {
 #drawer {
   position: fixed;
   top: 0; 
-  right: -320px;
+  right: 0;
+  transform: translateX(320px);
   width: 320px;
   height: 100%;
   background: #fff;
   padding: 80px 0 20px 0; /* Spazio per la navbar in alto */
-  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1500; /* Sopra #chisiamo-view (1400) così è visibile anche da quella pagina */
   border-radius: 20px 0 0 20px;
   box-shadow: -12px 0 40px rgba(15, 23, 42, 0.18);
