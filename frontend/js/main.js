@@ -1171,7 +1171,9 @@ async function fetchRecommendedOffers() {
 
   try {
     const userCap = getCleanUserCap();
-    const { data, error } = await supabaseClient.rpc('get_recommended_offers', { p_limit: 4, p_cap: userCap });
+    // La RPC non sa ancora filtrare per CAP lato database: chiediamo un pool più
+    // ampio (20) e filtriamo qui per CAP corrente, poi teniamo solo le prime 4.
+    const { data, error } = await supabaseClient.rpc('get_recommended_offers', { p_limit: 20 });
 
     if (error) {
       console.warn("Errore caricamento offerte consigliate:", error);
@@ -1179,7 +1181,7 @@ async function fetchRecommendedOffers() {
       return;
     }
 
-    const recommended = (data || []).map(r => ({
+    let recommended = (data || []).map(r => ({
       id: r.id,
       product: r.product,
       price: r.price,
@@ -1199,7 +1201,13 @@ async function fetchRecommendedOffers() {
       limitedQuantity: r.limited_quantity || false
     }));
 
-    renderRecommendedOffers(recommended);
+    // Se l'utente ha un CAP di ricerca impostato, le consigliate devono essere
+    // di quel CAP — non del CAP preimpostato o di uno generico.
+    if (userCap) {
+      recommended = recommended.filter(o => o.storeCap === userCap);
+    }
+
+    renderRecommendedOffers(recommended.slice(0, 4));
   } catch (e) {
     console.warn("Errore imprevisto nelle offerte consigliate:", e);
     section.classList.add("hidden");
