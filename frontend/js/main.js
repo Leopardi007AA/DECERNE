@@ -1171,40 +1171,40 @@ async function fetchRecommendedOffers() {
 
   try {
     const userCap = getCleanUserCap();
-    // La RPC non sa ancora filtrare per CAP lato database: chiediamo un pool più
-    // ampio (20) e filtriamo qui per CAP corrente, poi teniamo solo le prime 4.
-    const { data, error } = await supabaseClient.rpc('get_recommended_offers', { p_limit: 20 });
+    let recommended = [];
 
-    if (error) {
-      console.warn("Errore caricamento offerte consigliate:", error);
-      section.classList.add("hidden");
-      return;
-    }
-
-    let recommended = (data || []).map(r => ({
-      id: r.id,
-      product: r.product,
-      price: r.price,
-      originalPrice: r.original_price,
-      category: r.category,
-      startDate: r.start_date,
-      endDate: r.end_date,
-      description: r.description,
-      img: r.img_url,
-      status: r.status,
-      storeName: r.store_name || "",
-      storeCity: r.store_city ? r.store_city.toLowerCase() : "",
-      storeCap: r.store_cap || "",
-      storeAddress: r.store_address || "",
-      plan: r.plan || "Starter",
-      cardRequirement: r.card_requirement || null,
-      limitedQuantity: r.limited_quantity || false
-    }));
-
-    // Se l'utente ha un CAP di ricerca impostato, le consigliate devono essere
-    // di quel CAP — non del CAP preimpostato o di uno generico.
     if (userCap) {
-      recommended = recommended.filter(o => o.storeCap === userCap);
+      // Un CAP di ricerca è impostato: le consigliate devono essere offerte
+      // vere di quel CAP. La RPC qui sotto è personalizzata sul profilo
+      // dell'utente e non sa nulla del CAP cercato — quindi la aggiriamo
+      // e interroghiamo le offerte di quel CAP direttamente.
+      recommended = await fetchOffersByCap(userCap);
+    } else {
+      const { data, error } = await supabaseClient.rpc('get_recommended_offers', { p_limit: 4 });
+      if (error) {
+        console.warn("Errore caricamento offerte consigliate:", error);
+        section.classList.add("hidden");
+        return;
+      }
+      recommended = (data || []).map(r => ({
+        id: r.id,
+        product: r.product,
+        price: r.price,
+        originalPrice: r.original_price,
+        category: r.category,
+        startDate: r.start_date,
+        endDate: r.end_date,
+        description: r.description,
+        img: r.img_url,
+        status: r.status,
+        storeName: r.store_name || "",
+        storeCity: r.store_city ? r.store_city.toLowerCase() : "",
+        storeCap: r.store_cap || "",
+        storeAddress: r.store_address || "",
+        plan: r.plan || "Starter",
+        cardRequirement: r.card_requirement || null,
+        limitedQuantity: r.limited_quantity || false
+      }));
     }
 
     renderRecommendedOffers(recommended.slice(0, 4));
@@ -1212,6 +1212,57 @@ async function fetchRecommendedOffers() {
     console.warn("Errore imprevisto nelle offerte consigliate:", e);
     section.classList.add("hidden");
   }
+}
+
+// Offerte attive di un CAP specifico, ordinate per sconto più alto — usata al
+// posto della RPC personalizzata quando l'utente ha un CAP di ricerca impostato,
+// perché la RPC non lo conosce e non può filtrare su di esso.
+async function fetchOffersByCap(cap) {
+  const today = new Date().toISOString().split("T")[0];
+  const { data: rows, error } = await supabaseClient
+    .from('offers')
+    .select('*')
+    .eq('status', 'active')
+    .is('deleted_at', null)
+    .lte('start_date', today)
+    .gte('end_date', today);
+
+  if (error) {
+    console.warn("Errore caricamento offerte per CAP:", error);
+    return [];
+  }
+
+  const locationsById = await fetchPublicLocationsMap((rows || []).map(r => r.location_id));
+
+  return (rows || [])
+    .map(r => {
+      const loc = locationsById[r.location_id] || {};
+      return {
+        id: r.id,
+        product: r.product,
+        price: r.price,
+        originalPrice: r.original_price,
+        category: r.category,
+        startDate: r.start_date,
+        endDate: r.end_date,
+        description: r.description,
+        img: r.img_url,
+        status: r.status,
+        storeName: loc.name || "",
+        storeCity: loc.city ? loc.city.toLowerCase() : "",
+        storeCap: loc.cap || "",
+        storeAddress: loc.address || "",
+        plan: loc.plan || "Starter",
+        cardRequirement: r.card_requirement || null,
+        limitedQuantity: r.limited_quantity || false
+      };
+    })
+    .filter(o => o.storeCap === cap)
+    .sort((a, b) => {
+      const discA = a.originalPrice > a.price ? (a.originalPrice - a.price) / a.originalPrice : 0;
+      const discB = b.originalPrice > b.price ? (b.originalPrice - b.price) / b.originalPrice : 0;
+      return discB - discA; // le offerte con lo sconto più alto vengono mostrate per prime
+    });
 }
 
 function renderRecommendedOffers(offers) {
