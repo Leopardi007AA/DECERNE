@@ -1170,7 +1170,8 @@ async function fetchRecommendedOffers() {
   }
 
   try {
-    const { data, error } = await supabaseClient.rpc('get_recommended_offers', { p_limit: 4 });
+    const userCap = getCleanUserCap();
+    const { data, error } = await supabaseClient.rpc('get_recommended_offers', { p_limit: 4, p_cap: userCap });
 
     if (error) {
       console.warn("Errore caricamento offerte consigliate:", error);
@@ -1210,7 +1211,9 @@ function renderRecommendedOffers(offers) {
   const grid = $("#recommendedOffersGrid");
   if (!section || !grid) return;
 
-  if (!offers || offers.length === 0) {
+  // Sezione visibile solo con un podio completo: meno di 4 offerte per quel
+  // CAP non bastano a fare una raccomandazione credibile, meglio non mostrarla.
+  if (!offers || offers.length < 4) {
     section.classList.add("hidden");
     grid.innerHTML = "";
     return;
@@ -4820,6 +4823,7 @@ async function fetchAddress(lat, lon) {
       if (DEV_MODE) console.log("Posizione aggiornata:", finalAddr);
       state.currentPage = 1; 
       renderOffers();
+      fetchRecommendedOffers(); // Aggiorna "Offerte Consigliate" sul nuovo CAP
     } else {
       locInput.value = "Posizione non riconosciuta";
       toast.error("Non siamo riusciti a riconoscere il tuo indirizzo. Inseriscilo manualmente.");
@@ -4873,6 +4877,7 @@ function setupManualLocationInput() {
 
     state.currentPage = 1;
     renderOffers();
+    fetchRecommendedOffers(); // Aggiorna "Offerte Consigliate" sul nuovo CAP
   };
 
   locInput.addEventListener('keydown', (e) => {
