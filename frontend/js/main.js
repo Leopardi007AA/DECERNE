@@ -4335,24 +4335,38 @@ function setupDrawerDrag() {
   const drawer = $("#drawer");
   if (!drawer) return;
   const DRAWER_WIDTH = 320;
-  let startX = 0, startTransform = 0, history = [], dragging = false, cancelSpring = null;
+  const DRAG_THRESHOLD = 10; // px — sotto questa soglia è un tap, non uno swipe (SKILL.md §10)
+  let startX = 0, startY = 0, startTransform = 0, history = [], dragging = false, engaged = false, cancelSpring = null, pointerId = null;
 
   drawer.addEventListener('pointerdown', (e) => {
     // Non intercettare il drag se si parte da link, bottoni o campi — devono restare cliccabili normalmente
     if (e.target.closest('a, button, input, select, textarea')) return;
     if (cancelSpring) cancelSpring();
     dragging = true;
+    engaged = false;
+    pointerId = e.pointerId;
     startX = e.clientX;
+    startY = e.clientY;
     startTransform = getDrawerTranslateX(drawer);
     history = [{ x: e.clientX, t: performance.now() }];
-    drawer.setPointerCapture(e.pointerId);
-    drawer.classList.add('dragging');
+    // Niente setPointerCapture qui: solo se il gesto supera la soglia più sotto,
+    // così un tap su una voce del menu resta un tap normale.
   });
 
   drawer.addEventListener('pointermove', (e) => {
     if (!dragging) return;
-    const delta = e.clientX - startX;
-    let next = startTransform + delta;
+    const deltaX = e.clientX - startX;
+    const deltaY = e.clientY - startY;
+
+    if (!engaged) {
+      if (Math.abs(deltaX) < DRAG_THRESHOLD && Math.abs(deltaY) < DRAG_THRESHOLD) return; // ancora dentro la soglia, non è un drag
+      if (Math.abs(deltaY) > Math.abs(deltaX)) { dragging = false; return; } // movimento verticale = scroll del menu, non swipe
+      engaged = true;
+      drawer.setPointerCapture(pointerId);
+      drawer.classList.add('dragging');
+    }
+
+    let next = startTransform + deltaX;
     if (next < 0) next *= 0.3; // rubber-band: resiste se si trascina oltre il bordo aperto
     drawer.style.transform = `translateX(${next}px)`;
     history.push({ x: e.clientX, t: performance.now() });
@@ -4362,6 +4376,7 @@ function setupDrawerDrag() {
   function endDrag() {
     if (!dragging) return;
     dragging = false;
+    if (!engaged) return; // era solo un tap: nessuna animazione da completare, il click passa regolare
     drawer.classList.remove('dragging');
     const current = getDrawerTranslateX(drawer);
 
