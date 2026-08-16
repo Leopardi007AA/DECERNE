@@ -4607,13 +4607,14 @@ setupEventListeners = function() {
 // invece di usare solo quello che era stato salvato al login (poteva diventare
 // vecchio: piano, abbonamento, indirizzo, ecc. cambiati altrove non si vedevano).
 async function refreshPartnerSession(storeId) {
-  const { data: storeRow, error } = await storeAuthClient
-    .from('stores')
-    .select('*')
-    .eq('id', storeId)
-    .single();
-
-    if (error || !storeRow) {
+  try {
+   const { data: storeRow, error } = await storeAuthClient
+     .from('stores')
+     .select('*')
+     .eq('id', storeId)
+     .single();
+ 
+     if (error || !storeRow) {
       console.error("Errore aggiornamento sessione negozio:", error);
       await clearBrokenSession(storeAuthClient, error);
       return null;
@@ -4661,16 +4662,27 @@ async function refreshPartnerSession(storeId) {
   }
 
   return freshStore;
+ } catch (e) {
+   console.error("Errore imprevisto nel refresh della sessione negozio:", e);
+   return null;
+ }
 }
 
 // ---------- Init ----------
 async function init() {
   try {
-  console.log("Sistema Decerne in fase di avvio...");
-
-  setupEventListeners();
-
- // Se l'utente arriva dal link email di recupero password, mostra il form dedicato
+    console.log("Sistema Decerne in fase di avvio...");
+  
+    setupEventListeners();
+  
+    // Navigazione di base (Utente/Area Partner/Chi Siamo): collegata SUBITO,
+    // prima di qualunque chiamata a Supabase — se una di quelle fallisce più
+    // avanti, questi tre pulsanti devono continuare a funzionare comunque.
+    if($("#navModeUser")) $("#navModeUser").onclick = () => setMode("user");
+    if($("#navModeStore")) $("#navModeStore").onclick = () => setMode("store");
+    if($("#navModeChiSiamo")) $("#navModeChiSiamo").onclick = () => setMode("chisiamo");
+  
+   // Se l'utente arriva dal link email di recupero password, mostra il form dedicato
  const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('reset') === '1') {
     // Leggiamo NOI i token dal frammento URL (#access_token=...&refresh_token=...),
@@ -4722,11 +4734,6 @@ async function init() {
 
   // 3. Pulizia e Sincronizzazione Database
   syncShoppingList();
-
-  // 4. Configura Navigazione Modalità (Navbar click)
-  if($("#navModeUser")) $("#navModeUser").onclick = () => setMode("user");
-  if($("#navModeStore")) $("#navModeStore").onclick = () => setMode("store");
-  if($("#navModeChiSiamo")) $("#navModeChiSiamo").onclick = () => setMode("chisiamo");
 
   // 5. Configura Ricerca e Filtri della Homepage
   const searchInput = document.getElementById("searchInput");
