@@ -4314,7 +4314,12 @@ function openDrawer() {
     $("#drawer").style.transform = "translateX(0)";
     $("#overlay").style.display = "block";
     $("#menuBtn").classList.add("open");
-    document.body.style.overflow = 'hidden';
+    // Blocca lo scroll solo su schermi piccoli (drawer a schermo intero).
+    // Su schermi grandi la scrollbar resta visibile e il contenuto sotto
+    // il drawer, già oscurato dall'overlay, resta scorrevole.
+    if (window.innerWidth <= 768) {
+      document.body.style.overflow = 'hidden';
+    }
     document.body.classList.add('drawer-open');
     notifyChiSiamoDrawerState(true);
   } catch (e) { console.error(e); }
