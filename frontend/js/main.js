@@ -6409,9 +6409,13 @@ function displayProductInModal(product) {
         </div>
 
       </div>
+
     </div>
   `;
   modal.style.display = "flex";
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => modal.classList.add('is-visible'));
+  });
 }
 
 // Popup con le informazioni pubbliche del negozio (aperto cliccando sul nome nel dettaglio offerta)
