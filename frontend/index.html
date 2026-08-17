@@ -117,6 +117,29 @@
     
     <section id="user-view" class="view">
 
+      <!-- PROFILO PUBBLICO NEGOZIO: sostituisce Offerte Consigliate + Offerte Vicine
+           quando l'utente apre il profilo di un negozio (pulsante "Vedi Profilo" nel
+           mini popup, o riquadro-negozio in cima ai risultati di ricerca). Ripristinato
+           da closeStoreProfile() in main.js. -->
+      <section id="storeProfileSection" class="store-profile-section hidden">
+        <button class="store-profile-back" onclick="closeStoreProfile()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M15 18l-6-6 6-6"/></svg>
+          Torna a tutte le offerte
+        </button>
+
+        <div id="storeProfileCard" class="store-profile-card" onclick="toggleStoreProfileLocations()">
+          <!-- Popolato da renderStoreProfileCard() in main.js -->
+        </div>
+
+        <div id="storeProfileLocations" class="store-profile-locations hidden">
+          <!-- Popolato da renderStoreProfileCard(): elenco di tutte le sedi -->
+        </div>
+
+        <h2 style="margin: 28px 0 20px; color: var(--blue-900);" id="storeProfileOffersTitle">Offerte Vicine</h2>
+        <div id="storeProfileOffersGrid" class="offers-list-container"></div>
+        <div id="storeProfileEmptyMsg" class="empty" style="display:none;">Nessuna offerta di questo negozio nella tua zona.</div>
+      </section>
+
       <!-- OFFERTE CONSIGLIATE: podio personalizzato in base a ricerche, prodotti aperti
            e lista della spesa dell'utente loggato. Stessa identica card di "Offerte Vicine"
            (createOfferCardElement) — cambia solo lo sfondo del pannello, per dare l'idea
@@ -132,7 +155,7 @@
             <div id="recommendedOffersGrid" class="offers-list-container"></div>
           </section>
     
-      <h2 style="margin-bottom: 20px; color: var(--blue-900);">Offerte Vicine</h2>
+      <h2 style="margin-bottom: 20px; color: var(--blue-900);" id="offersGridTitle">Offerte Vicine</h2>
       <div id="offersGrid" class="offers-list-container"></div>
 
   <div id="paginationContainer" style="margin-top: 30px; text-align: center; display: none;">

@@ -2707,6 +2707,185 @@ hr {
 }
 
 /* ============================================================
+   PROFILO PUBBLICO NEGOZIO (Home Utenti)
+   ============================================================ */
+.store-profile-section {
+  margin-bottom: 10px;
+}
+
+.store-profile-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 18px;
+}
+.store-profile-back:hover { text-decoration: underline; }
+
+/* Card profilo: più grande e diversa dalle offerte normali, stile "YouTube"
+   (banner negozio + info), proporzionata sui piccoli schermi in colonna */
+.store-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background: linear-gradient(165deg, #eef4ff 0%, #f8faff 60%, #ffffff 100%);
+  border: 1px solid var(--panel-border-soft, rgba(15, 23, 42, 0.07));
+  border-radius: var(--panel-radius-a, 28px 14px 30px 12px);
+  padding: 28px 30px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: var(--panel-shadow-soft, 0 2px 8px rgba(15, 23, 42, 0.06), 0 10px 24px rgba(15, 23, 42, 0.05));
+}
+.store-profile-card:hover { transform: translateY(-2px); }
+
+.store-profile-logo {
+  width: 110px;
+  height: 110px;
+  min-width: 110px;
+  border-radius: 24px;
+  object-fit: cover;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+
+.store-profile-info { flex: 1; min-width: 0; }
+
+.store-profile-name {
+  font-size: 1.7rem;
+  font-weight: 900;
+  color: #1e293b;
+  margin: 0 0 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.store-profile-meta {
+  color: #64748b;
+  font-size: 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.store-profile-meta span { display: flex; align-items: center; gap: 8px; }
+
+.store-profile-expand-hint {
+  margin-top: 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.store-profile-locations {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-lg);
+  padding: 8px 20px;
+  margin-top: 10px;
+  margin-bottom: 8px;
+}
+
+.store-profile-location-row {
+  display: flex;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid #f1f5f9;
+}
+.store-profile-location-row:first-child { border-top: none; }
+
+.store-profile-location-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #0f62fe;
+  background: #e0ebff;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  margin-left: 8px;
+}
+
+@media (max-width: 600px) {
+  .store-profile-card {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 22px 18px;
+    border-radius: var(--panel-radius-b, 16px 30px 14px 26px);
+  }
+  .store-profile-logo { width: 84px; height: 84px; min-width: 84px; }
+  .store-profile-name { font-size: 1.3rem; }
+}
+
+/* --- RIQUADRO NEGOZIO NEI RISULTATI DI RICERCA (stile "canale" YouTube) --- */
+.store-search-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: #ffffff;
+  border: 1.5px solid #dbeafe;
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 14px rgba(15, 98, 254, 0.08);
+}
+.store-search-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15, 98, 254, 0.14);
+}
+
+.store-search-card-logo {
+  width: 84px;
+  height: 84px;
+  min-width: 84px;
+  border-radius: 18px;
+  object-fit: cover;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.store-search-card-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.store-search-card-sub {
+  color: #64748b;
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+.store-search-card-cta {
+  margin-left: auto;
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .store-search-card { padding: 14px 16px; gap: 14px; }
+  .store-search-card-logo { width: 60px; height: 60px; min-width: 60px; border-radius: 14px; }
+  .store-search-card-name { font-size: 1rem; }
+  .store-search-card-cta { display: none; }
+}
+
+/* ============================================================
    RESTYLE PANNELLO PARTNER — box organici, gerarchia visiva
    ============================================================ */
    :root {

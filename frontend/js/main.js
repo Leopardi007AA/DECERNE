@@ -1057,7 +1057,16 @@ let state = {
 
 function setMode(mode) {
   try {
-    
+
+    // Se si naviga su "Offerte" mentre il profilo di un negozio è aperto,
+    // torna alla home utenti normale invece di lasciarla bloccata sul profilo.
+    if (mode === 'user') {
+      const storeProfileSection = $("#storeProfileSection");
+      if (storeProfileSection && !storeProfileSection.classList.contains("hidden") && typeof closeStoreProfile === 'function') {
+        closeStoreProfile();
+      }
+    }
+
     state.mode = mode;
 
     const userView = $("#user-view");
@@ -1252,6 +1261,7 @@ async function fetchOffersByCap(cap) {
         storeCity: loc.city ? loc.city.toLowerCase() : "",
         storeCap: loc.cap || "",
         storeAddress: loc.address || "",
+        storeId: loc.store_id || "",
         plan: loc.plan || "Starter",
         cardRequirement: r.card_requirement || null,
         limitedQuantity: r.limited_quantity || false
@@ -1350,6 +1360,7 @@ async function renderOffers(page = state.currentPage, pageSize = state.pageSize)
         storeCity: loc.city ? loc.city.toLowerCase() : "",
         storeCap: loc.cap || "",
         storeAddress: loc.address || "",
+        storeId: loc.store_id || "",
         plan: loc.plan || "Starter",
         cardRequirement: r.card_requirement || null,
         limitedQuantity: r.limited_quantity || false
@@ -1385,9 +1396,18 @@ async function renderOffers(page = state.currentPage, pageSize = state.pageSize)
       filtered.sort((a, b) => (planWeight[b.plan] || 0) - (planWeight[a.plan] || 0));
     }
 
+    // Se la ricerca corrisponde al nome di un negozio, mostriamo in cima un
+    // riquadro "canale" stile YouTube (più grande delle offerte normali) che
+    // apre il profilo pubblico del negozio se cliccato.
+    const matchedStore = query.length >= 2
+      ? allOffers.find(o => o.storeId && o.storeName && o.storeName.toLowerCase().includes(query))
+      : null;
+    const storeCardEl = matchedStore ? await buildStoreSearchCardElement(matchedStore) : null;
+
     const emptyMsg = $("#emptyMsg");
     if (filtered.length === 0) {
       grid.innerHTML = "";
+      if (storeCardEl) grid.appendChild(storeCardEl);
       if (emptyMsg) {
         emptyMsg.style.display = "block";
         let msg = "Nessuna offerta disponibile.";
@@ -1409,6 +1429,7 @@ async function renderOffers(page = state.currentPage, pageSize = state.pageSize)
     const paginatedItems = filtered.slice(start, end);
 
     grid.innerHTML = "";
+    if (storeCardEl) grid.appendChild(storeCardEl);
     paginatedItems.forEach(o => {
       grid.appendChild(createOfferCardElement(o));
     });
@@ -1421,6 +1442,31 @@ async function renderOffers(page = state.currentPage, pageSize = state.pageSize)
   } catch (err) {
     console.error("Errore durante il rendering delle offerte:", err);
   }
+}
+
+// Riquadro "canale" (stile YouTube) che compare in cima ai risultati di
+// ricerca quando la query corrisponde al nome di un negozio. Cliccandolo si
+// apre il profilo pubblico del negozio (openStoreProfile).
+async function buildStoreSearchCardElement(offer) {
+  const storesById = await fetchPublicStoresMap([offer.storeId]);
+  const store = storesById[offer.storeId] || { name: offer.storeName, logo_url: "", address: offer.storeAddress, city: offer.storeCity, plan: offer.plan };
+  const isVerified = store.plan === 'Professional' || store.plan === 'Enterprise';
+
+  const card = document.createElement("div");
+  card.className = "store-search-card";
+  card.onclick = () => openStoreProfile(offer.storeId);
+  card.innerHTML = `
+    <img src="${getSafeImageUrl(store.logo_url)}" class="store-search-card-logo" alt="${store.name}">
+    <div>
+      <div class="store-search-card-name">
+        ${store.name || 'Supermercato'}
+        ${isVerified ? `<span class="store-verified-blue" style="color:#0f62fe; font-weight:800; font-size:0.7rem;">✓ Negozio Verificato</span>` : ''}
+      </div>
+      <div class="store-search-card-sub">${store.address || ''}${store.city ? `, ${store.city}` : ''}</div>
+    </div>
+    <span class="store-search-card-cta">Vedi profilo →</span>
+  `;
+  return card;
 }
 
 /**
@@ -6427,6 +6473,7 @@ function displayProductInModal(product) {
   title.innerText = "Dettaglio Offerta";
   // Rende disponibili i dati del negozio al popup informazioni (aperto cliccando sul nome)
   window.__currentOfferStoreInfo = {
+    id: product.storeId,
     name: product.storeName,
     address: product.storeAddress,
     city: product.storeCity,
@@ -6534,6 +6581,7 @@ window.showStoreInfoPopup = (store) => {
     ${row(PANEL_ICONS.pin, 'Indirizzo', addressLine)}
     ${row(PANEL_ICONS.phone, 'Telefono', store.phone)}
     ${row(PANEL_ICONS.clock, 'Orari', store.hours)}
+    ${store.id ? `<button class="btn full-width" style="margin-top:14px;" onclick="openStoreProfile('${store.id}')">Vedi Profilo</button>` : ''}
   `;
 
   overlay.classList.remove("hidden");
@@ -6545,6 +6593,189 @@ window.closeStoreInfoPopup = () => {
   if (overlay) overlay.classList.add("hidden");
   document.body.style.overflow = '';
 };
+
+// ============================================================
+// PROFILO PUBBLICO NEGOZIO (Home Utenti)
+// ============================================================
+// Aperto dal pulsante "Vedi Profilo" del mini popup negozio, oppure cliccando
+// sul riquadro-negozio che compare in cima ai risultati quando si cerca un
+// nome di negozio nella barra di ricerca. Sostituisce "Offerte Consigliate" e
+// "Offerte Vicine" con il profilo pubblico del negozio + le offerte di quel
+// negozio nelle sedi che ricadono nel CAP impostato dall'utente.
+let currentStoreProfileId = null;
+
+async function openStoreProfile(storeId) {
+  if (!storeId) return;
+
+  // Chiude eventuali popup/modal aperti sopra la home
+  closeStoreInfoPopup();
+  closeFullPageModal();
+
+  if (state.mode !== 'user') setMode('user');
+
+  const { data: storeRow, error } = await supabaseClient
+    .from('public_stores')
+    .select('id, name, address, city, cap, plan, logo_url, phone, hours, membership_card_name, membership_card_image_url')
+    .eq('id', storeId)
+    .single();
+
+  if (error || !storeRow) {
+    toast.error("Profilo negozio non disponibile.");
+    return;
+  }
+
+  const { data: locationRows, error: locError } = await supabaseClient
+    .from('public_store_locations')
+    .select('location_id, location_name, address, city, cap, is_primary')
+    .eq('store_id', storeId)
+    .order('is_primary', { ascending: false });
+
+  if (locError) console.warn("Errore caricamento sedi negozio:", locError);
+
+  currentStoreProfileId = storeId;
+
+  // Nasconde Offerte Consigliate + Offerte Vicine "normali"
+  $("#recommendedOffersSection")?.classList.add("hidden");
+  $("#offersGridTitle")?.classList.add("hidden");
+  $("#offersGrid")?.classList.add("hidden");
+  $("#paginationContainer")?.classList.add("hidden");
+  const mainEmptyMsg = $("#emptyMsg");
+  if (mainEmptyMsg) mainEmptyMsg.style.display = "none";
+
+  renderStoreProfileCard(storeRow, locationRows || []);
+
+  $("#storeProfileSection")?.classList.remove("hidden");
+  $("#storeProfileLocations")?.classList.add("hidden");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  await loadStoreProfileOffers(storeRow);
+}
+window.openStoreProfile = openStoreProfile;
+
+function renderStoreProfileCard(store, locations) {
+  const card = $("#storeProfileCard");
+  const locWrap = $("#storeProfileLocations");
+  if (!card || !locWrap) return;
+
+  const isVerified = store.plan === 'Professional' || store.plan === 'Enterprise';
+  const primary = locations.find(l => l.is_primary) || locations[0] || {};
+
+  card.innerHTML = `
+    <img src="${getSafeImageUrl(store.logo_url)}" class="store-profile-logo" alt="${store.name}">
+    <div class="store-profile-info">
+      <h2 class="store-profile-name">
+        ${store.name || 'Supermercato'}
+        ${isVerified ? `<span class="store-verified-blue" style="color:#0f62fe; font-weight:800; font-size:0.75rem;">✓ Negozio Verificato</span>` : ''}
+      </h2>
+      <div class="store-profile-meta">
+        <span>${PANEL_ICONS.pin} ${primary.address || store.address || 'Indirizzo non specificato'}</span>
+        ${store.phone ? `<span>${PANEL_ICONS.phone} ${store.phone}</span>` : ''}
+        ${store.hours ? `<span>${PANEL_ICONS.clock} ${store.hours}</span>` : ''}
+      </div>
+      <span class="store-profile-expand-hint">
+        ${locations.length > 1 ? `Vedi tutte le ${locations.length} sedi` : 'Vedi dettagli sede'}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M6 9l6 6 6-6"/></svg>
+      </span>
+    </div>
+  `;
+
+  locWrap.innerHTML = locations.map(l => `
+    <div class="store-profile-location-row">
+      <div class="store-info-row-icon">${PANEL_ICONS.pin}</div>
+      <div>
+        <div class="store-info-row-label">${l.location_name || 'Sede'}${l.is_primary ? '<span class="store-profile-location-badge">Principale</span>' : ''}</div>
+        <div class="store-info-row-value">${l.address || 'Indirizzo non specificato'}${l.city ? `, ${l.city}` : ''}${l.cap ? ` (${l.cap})` : ''}</div>
+      </div>
+    </div>
+  `).join("") || `<p style="color:#94a3b8; padding: 14px 0;">Nessuna sede pubblicata.</p>`;
+}
+
+function toggleStoreProfileLocations() {
+  $("#storeProfileLocations")?.classList.toggle("hidden");
+}
+window.toggleStoreProfileLocations = toggleStoreProfileLocations;
+
+// Offerte del negozio nelle SOLE sedi che ricadono nel CAP impostato
+// dall'utente che sta guardando il profilo (getCleanUserCap()). Se l'utente
+// non ha impostato un CAP, mostra tutte le offerte attive del negozio.
+async function loadStoreProfileOffers(store) {
+  const grid = $("#storeProfileOffersGrid");
+  const emptyMsg = $("#storeProfileEmptyMsg");
+  const title = $("#storeProfileOffersTitle");
+  if (!grid) return;
+
+  const userCap = getCleanUserCap();
+  if (title) title.textContent = userCap ? `Offerte Vicine di ${store.name}` : `Offerte di ${store.name}`;
+
+  const today = new Date().toISOString().split("T")[0];
+  const { data: rows, error } = await supabaseClient
+    .from('offers')
+    .select('*')
+    .eq('status', 'active')
+    .is('deleted_at', null)
+    .lte('start_date', today)
+    .gte('end_date', today);
+
+  if (error) {
+    console.warn("Errore caricamento offerte del negozio:", error);
+    grid.innerHTML = "";
+    return;
+  }
+
+  const locationsById = await fetchPublicLocationsMap((rows || []).map(r => r.location_id));
+
+  let storeOffers = (rows || [])
+    .map(r => {
+      const loc = locationsById[r.location_id] || {};
+      return {
+        id: r.id,
+        product: r.product,
+        price: r.price,
+        originalPrice: r.original_price,
+        category: r.category,
+        startDate: r.start_date,
+        endDate: r.end_date,
+        description: r.description,
+        img: r.img_url,
+        status: r.status,
+        storeName: loc.name || "",
+        storeCity: loc.city ? loc.city.toLowerCase() : "",
+        storeCap: loc.cap || "",
+        storeAddress: loc.address || "",
+        storeId: loc.store_id || "",
+        plan: loc.plan || "Starter",
+        cardRequirement: r.card_requirement || null,
+        limitedQuantity: r.limited_quantity || false
+      };
+    })
+    .filter(o => o.storeId === store.id);
+
+  if (userCap) storeOffers = storeOffers.filter(o => o.storeCap === userCap);
+
+  grid.innerHTML = "";
+  if (storeOffers.length === 0) {
+    if (emptyMsg) emptyMsg.style.display = "block";
+    return;
+  }
+  if (emptyMsg) emptyMsg.style.display = "none";
+  storeOffers.forEach(o => grid.appendChild(createOfferCardElement(o)));
+}
+
+function closeStoreProfile() {
+  currentStoreProfileId = null;
+  $("#storeProfileSection")?.classList.add("hidden");
+  $("#storeProfileLocations")?.classList.add("hidden");
+
+  $("#offersGridTitle")?.classList.remove("hidden");
+  $("#offersGrid")?.classList.remove("hidden");
+  $("#paginationContainer")?.classList.remove("hidden");
+
+  state.currentPage = 1;
+  renderOffers();
+  fetchRecommendedOffers();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+window.closeStoreProfile = closeStoreProfile;
 
 // 1. Funzione per aggiornare la UI del Drawer in base al login
 function updateDrawerUI() {
@@ -7027,6 +7258,7 @@ window.openProductDetail = async (id) => {
     storeCity: loc.city || "",
     storeCap: loc.cap || "",
     storeAddress: loc.address || "",
+    storeId: loc.store_id || "",
     storeLogo: loc.logo || "",
     storePhone: loc.phone || "",
     storeHours: loc.hours || "",
