@@ -4863,8 +4863,23 @@ async function init() {
       state.currentPage = 1; // Resetta la paginazione quando cerchi
       renderOffers();
     }, 300);
-  
+
+    // Quando il profilo di un negozio è aperto, la ricerca prodotto filtra
+    // SOLO le sue offerte (già limitate al CAP dell'utente), non la griglia globale.
+    const debouncedStoreProfileSearch = debounce(() => {
+      if (currentStoreProfileData) {
+        loadStoreProfileOffers(currentStoreProfileData, searchInput.value);
+      }
+    }, 300);
+
     searchInput.oninput = () => {
+      // Se il profilo di un negozio è aperto, la ricerca resta scoped a quel negozio
+      if (currentStoreProfileId) {
+        debouncedStoreProfileSearch();
+        logSearchQuery();
+        return;
+      }
+
       // Nasconde/mostra "Offerte Consigliate" SUBITO (non debounced): appena si
       // scrive la prima lettera deve sparire; appena si svuota il campo torna.
       const hasQuery = searchInput.value.trim().length > 0;
@@ -6603,6 +6618,7 @@ window.closeStoreInfoPopup = () => {
 // "Offerte Vicine" con il profilo pubblico del negozio + le offerte di quel
 // negozio nelle sedi che ricadono nel CAP impostato dall'utente.
 let currentStoreProfileId = null;
+let currentStoreProfileData = null;
 
 async function openStoreProfile(storeId) {
   if (!storeId) return;
@@ -6633,6 +6649,7 @@ async function openStoreProfile(storeId) {
   if (locError) console.warn("Errore caricamento sedi negozio:", locError);
 
   currentStoreProfileId = storeId;
+  currentStoreProfileData = storeRow;
 
   // Nasconde Offerte Consigliate + Offerte Vicine "normali"
   $("#recommendedOffersSection")?.classList.add("hidden");
@@ -6684,7 +6701,7 @@ function renderStoreProfileCard(store, locations) {
       <div class="store-info-row-icon">${PANEL_ICONS.pin}</div>
       <div>
         <div class="store-info-row-label">${l.location_name || 'Sede'}${l.is_primary ? '<span class="store-profile-location-badge">Principale</span>' : ''}</div>
-        <div class="store-info-row-value">${l.address || 'Indirizzo non specificato'}${l.city ? `, ${l.city}` : ''}${l.cap ? ` (${l.cap})` : ''}</div>
+        <div class="store-info-row-value">${l.address || 'Indirizzo non specificato'}${(l.city || l.cap) ? ` (${[l.city, l.cap].filter(Boolean).join(', ')})` : ''}</div>
       </div>
     </div>
   `).join("") || `<p style="color:#94a3b8; padding: 14px 0;">Nessuna sede pubblicata.</p>`;
@@ -6698,7 +6715,10 @@ window.toggleStoreProfileLocations = toggleStoreProfileLocations;
 // Offerte del negozio nelle SOLE sedi che ricadono nel CAP impostato
 // dall'utente che sta guardando il profilo (getCleanUserCap()). Se l'utente
 // non ha impostato un CAP, mostra tutte le offerte attive del negozio.
-async function loadStoreProfileOffers(store) {
+// productQuery (opzionale): quando si cerca un prodotto nella barra in alto
+// mentre il profilo è aperto, filtra le offerte del negozio per nome
+// prodotto, mantenendo comunque il filtro per CAP.
+async function loadStoreProfileOffers(store, productQuery = "") {
   const grid = $("#storeProfileOffersGrid");
   const emptyMsg = $("#storeProfileEmptyMsg");
   const title = $("#storeProfileOffersTitle");
@@ -6752,9 +6772,17 @@ async function loadStoreProfileOffers(store) {
 
   if (userCap) storeOffers = storeOffers.filter(o => o.storeCap === userCap);
 
+  const cleanQuery = (productQuery || "").toLowerCase().trim();
+  if (cleanQuery) storeOffers = storeOffers.filter(o => (o.product || "").toLowerCase().includes(cleanQuery));
+
   grid.innerHTML = "";
   if (storeOffers.length === 0) {
-    if (emptyMsg) emptyMsg.style.display = "block";
+    if (emptyMsg) {
+      emptyMsg.style.display = "block";
+      emptyMsg.innerText = cleanQuery
+        ? `Nessun prodotto "${productQuery.trim()}" trovato da questo negozio nella tua zona.`
+        : "Nessuna offerta di questo negozio nella tua zona.";
+    }
     return;
   }
   if (emptyMsg) emptyMsg.style.display = "none";
@@ -6763,6 +6791,7 @@ async function loadStoreProfileOffers(store) {
 
 function closeStoreProfile() {
   currentStoreProfileId = null;
+  currentStoreProfileData = null;
   $("#storeProfileSection")?.classList.add("hidden");
   $("#storeProfileLocations")?.classList.add("hidden");
 
