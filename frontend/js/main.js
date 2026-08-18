@@ -6696,15 +6696,22 @@ function renderStoreProfileCard(store, locations) {
     </div>
   `;
 
-  locWrap.innerHTML = locations.map(l => `
+  locWrap.innerHTML = locations.map(l => {
+    // Se il nome della sede è già "Principale" (o simile), non aggiungere di
+    // nuovo il badge per evitare "Sede PrincipalePrincipale".
+    const alreadySaysPrimary = /principal/i.test(l.location_name || '');
+    const badge = (l.is_primary && !alreadySaysPrimary) ? '<span class="store-profile-location-badge">Principale</span>' : '';
+
+    return `
     <div class="store-profile-location-row">
       <div class="store-info-row-icon">${PANEL_ICONS.pin}</div>
       <div>
-        <div class="store-info-row-label">${l.location_name || 'Sede'}${l.is_primary ? '<span class="store-profile-location-badge">Principale</span>' : ''}</div>
-        <div class="store-info-row-value">${l.address || 'Indirizzo non specificato'}${(l.city || l.cap) ? ` (${[l.city, l.cap].filter(Boolean).join(', ')})` : ''}</div>
+        <div class="store-info-row-label">${l.location_name || 'Sede'}${badge}</div>
+        <div class="store-info-row-value">${l.address || 'Indirizzo non specificato'}</div>
       </div>
     </div>
-  `).join("") || `<p style="color:#94a3b8; padding: 14px 0;">Nessuna sede pubblicata.</p>`;
+  `;
+  }).join("") || `<p style="color:#94a3b8; padding: 14px 0;">Nessuna sede pubblicata.</p>`;
 }
 
 function toggleStoreProfileLocations() {
