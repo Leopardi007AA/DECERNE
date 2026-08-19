@@ -662,7 +662,13 @@ const {
     // principale (setMode/openDrawer), altrimenti ripieghiamo su una navigazione diretta.
     const parentWin = window.parent && window.parent !== window ? window.parent : null;
     const handleLogoClick = () => {
-      window.location.reload();
+      // Come il logo di Home Utenti, deve ricaricare la pagina principale
+      // (che di default riparte su Home Utenti), non solo l'iframe di Chi Siamo.
+      if (parentWin) {
+        parentWin.location.reload();
+      } else {
+        window.location.href = 'index.html';
+      }
     };
     const goToParentMode = mode => {
       try {

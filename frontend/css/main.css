@@ -675,14 +675,24 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
   }
 
   #offersGrid.offers-list-container,
-  #recommendedOffersGrid.offers-list-container {
+  #recommendedOffersGrid.offers-list-container,
+  #storeProfileOffersGrid.offers-list-container {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
   }
 
+  /* Il riquadro "canale" del negozio trovato in ricerca deve restare largo
+     quanto tutta la riga (non un item della griglia a 2 colonne come le
+     offerte), altrimenti finisce schiacciato in una colonna con un'offerta
+     accanto invece di stare sopra, a piena larghezza. */
+  #offersGrid .store-search-card {
+    grid-column: 1 / -1;
+  }
+
   #offersGrid .offer-row,
-  #recommendedOffersGrid .offer-row {
+  #recommendedOffersGrid .offer-row,
+  #storeProfileOffersGrid .offer-row {
     flex-direction: column;
     align-items: stretch;
     margin-bottom: 0;

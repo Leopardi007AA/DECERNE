@@ -1400,7 +1400,11 @@ async function renderOffers(page = state.currentPage, pageSize = state.pageSize)
     // riquadro "canale" stile YouTube (più grande delle offerte normali) che
     // apre il profilo pubblico del negozio se cliccato.
     const matchedStore = query.length >= 2
-      ? allOffers.find(o => o.storeId && o.storeName && o.storeName.toLowerCase().includes(query))
+      ? allOffers.find(o =>
+          o.storeId && o.storeName && o.storeName.toLowerCase().includes(query) &&
+          (!userCity || o.storeCity === userCity) &&
+          (!userCap || o.storeCap === userCap)
+        )
       : null;
     const storeCardEl = matchedStore ? await buildStoreSearchCardElement(matchedStore) : null;
 
@@ -2547,7 +2551,17 @@ async function logoutUser() {
 
   closeFullPageModal();
   updateDrawerUI();
-  updateLocationUI("Posizione non impostata");
+
+  // Se l'utente aveva già dato il consenso alla geolocalizzazione, dopo il
+  // logout riprendiamo subito la posizione reale del dispositivo invece di
+  // azzerarla su "Posizione non impostata" (che bloccava il rilevamento
+  // automatico finché non si ricaricava la pagina).
+  if (localStorage.getItem("decerne_loc_consent") === "allowed") {
+    getGeoLocation();
+  } else {
+    updateLocationUI("Posizione non impostata");
+  }
+
   renderOffers();
   renderRecommendedOffers([]); // Nasconde "Offerte Consigliate" dopo il logout
   toast.info(TEXT.auth.logoutBtn);
@@ -4969,8 +4983,14 @@ async function fetchAddress(lat, lon) {
       locInput.value = finalAddr || "Posizione rilevata";
       if (DEV_MODE) console.log("Posizione aggiornata:", finalAddr);
       state.currentPage = 1; 
-      renderOffers();
-      fetchRecommendedOffers(); // Aggiorna "Offerte Consigliate" sul nuovo CAP
+      if (currentStoreProfileId && currentStoreProfileData) {
+        // Il profilo di un negozio è aperto: le sue offerte vanno ricaricate
+        // sul nuovo CAP invece della griglia globale (che resta nascosta).
+        loadStoreProfileOffers(currentStoreProfileData, $("#searchInput")?.value || "");
+      } else {
+        renderOffers();
+        fetchRecommendedOffers(); // Aggiorna "Offerte Consigliate" sul nuovo CAP
+      }
     } else {
       locInput.value = "Posizione non riconosciuta";
       toast.error("Non siamo riusciti a riconoscere il tuo indirizzo. Inseriscilo manualmente.");
@@ -5023,8 +5043,14 @@ function setupManualLocationInput() {
     if (coords) state.manualUserCoords = coords;
 
     state.currentPage = 1;
-    renderOffers();
-    fetchRecommendedOffers(); // Aggiorna "Offerte Consigliate" sul nuovo CAP
+    if (currentStoreProfileId && currentStoreProfileData) {
+      // Il profilo di un negozio è aperto: le sue offerte vanno ricaricate
+      // sul nuovo CAP invece della griglia globale (che resta nascosta).
+      loadStoreProfileOffers(currentStoreProfileData, $("#searchInput")?.value || "");
+    } else {
+      renderOffers();
+      fetchRecommendedOffers(); // Aggiorna "Offerte Consigliate" sul nuovo CAP
+    }
   };
 
   locInput.addEventListener('keydown', (e) => {
