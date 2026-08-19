@@ -2628,7 +2628,14 @@ async function updateProfile(updatedData) {
     state.currentUser = { ...state.currentUser, ...updatedData };
     updateLocationUI(`${updatedData.cap} ${updatedData.citta}`);
     updateDrawerUI();
-    renderOffers();
+
+    if (currentStoreProfileId && currentStoreProfileData) {
+      // Il profilo di un negozio è aperto: le sue offerte vanno ricaricate
+      // sul nuovo CAP invece della griglia globale (che resta nascosta).
+      loadStoreProfileOffers(currentStoreProfileData, $("#searchInput")?.value || "");
+    } else {
+      renderOffers();
+    }
 
     return true;
   } catch (e) {
