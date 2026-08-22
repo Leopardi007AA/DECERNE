@@ -736,7 +736,7 @@ function App() {
     ref: trackRef,
     className: "dc-track",
     style: {
-      height: `${N * 100}vh`
+      height: `${N * 100 + 15}vh`
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "dc-sticky"
