@@ -641,22 +641,7 @@ function App() {
 
   // Rimpicciolisce la spirale sugli schermi piccoli, così resta tutta visibile
   const cylinderScale = viewportWidth <= 480 ? 0.48 : viewportWidth <= 768 ? 0.6 : viewportWidth <= 1024 ? 0.82 : 1;
-  // Oltre ai pannelli, la sezione ha uno spazio di scroll extra (BUFFER_VH) dedicato
-  // a far sparire la scena (spirale + pannello) mentre è ancora ferma/agganciata a schermo,
-  // così quando si stacca per far entrare il footer è già invisibile: niente più sovrapposizioni.
-  const BUFFER_VH = 70;
-  const CONTENT_VH = (N - 1) * 100;
-  const contentFraction = CONTENT_VH / (CONTENT_VH + BUFFER_VH);
-  let rawProgress;
-  let sceneOpacity;
-  if (progress <= contentFraction) {
-    rawProgress = (progress / contentFraction) * (N - 1);
-    sceneOpacity = 1;
-  } else {
-    rawProgress = N - 1;
-    const bufferP = (progress - contentFraction) / (1 - contentFraction);
-    sceneOpacity = Math.max(0, 1 - bufferP);
-  }
+  const rawProgress = progress * (N - 1);
   // "Sosta" leggermente più a lungo quando si arriva esattamente su un pannello:
   // rallenta l'avanzamento vicino agli indici interi, lo accelera tra un pannello e l'altro.
   // Il percorso totale (0 -> N-1) resta identico, cambia solo la velocità percepita.
@@ -751,7 +736,7 @@ function App() {
     ref: trackRef,
     className: "dc-track",
     style: {
-      height: `${N * 100 + BUFFER_VH}vh`
+      height: `${N * 100}vh`
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "dc-sticky"
