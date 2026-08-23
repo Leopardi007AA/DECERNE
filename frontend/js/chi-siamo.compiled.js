@@ -597,6 +597,7 @@ function App() {
   const trackRef = useRef(null);
   const rafRef = useRef(null);
   const [progress, setProgress] = useState(0);
+  const [stickyOpacity, setStickyOpacity] = useState(1);
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   useEffect(() => {
@@ -619,6 +620,13 @@ function App() {
       const total = rect.height - window.innerHeight;
       const p = total > 0 ? Math.min(1, Math.max(0, -rect.top / total)) : 0;
       setProgress(p);
+      // Oltre il fondo del track, .dc-sticky si sgancia e scorre via
+      // normalmente: è nativo di position:sticky e non si elimina,
+      // ma lo facciamo sparire in dissolvenza prima che si veda
+      // tagliato a metà dal bordo dello schermo.
+      const overshoot = total > 0 ? Math.max(0, -rect.top - total) : 0;
+      const unstickFade = Math.min(1, overshoot / 260);
+      setStickyOpacity(1 - unstickFade);
     });
   }, []);
   useEffect(() => {
@@ -817,7 +825,7 @@ function App() {
   }, PASSI.map((_, i) => /*#__PURE__*/React.createElement("span", {
     key: i,
     className: i <= activeIndex ? "done" : ""
-  }))))), /*#__PURE__*/React.createElement("footer", {
+  }))))), /*#__PURE__*/React.createElement("div", { className: "dc-footer-spacer" }), /*#__PURE__*/React.createElement("footer", {
     className: "dc-footer",
     dangerouslySetInnerHTML: {
       __html: "<div class=\"dc-footer-inner\">" +
