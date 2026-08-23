@@ -1310,35 +1310,44 @@ const logSearchQuery = debounce(async () => {
     if (error) console.warn("Errore salvataggio ricerca:", error);
   }, 700);
   
-  // --- Animazione di comparsa offerte allo scroll (solo Home Utenti, solo schermi grandi) ---
-  let offerRevealObserver = null;
-  
-  function initOfferRevealObserver() {
-    if (offerRevealObserver) offerRevealObserver.disconnect();
-    offerRevealObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting) return;
-        const el = entry.target;
-        el.classList.add('in-view');
-        offerRevealObserver.unobserve(el);
-        el.addEventListener('transitionend', function onDone(e) {
-          if (e.propertyName !== 'transform') return;
-          el.classList.remove('scroll-reveal', 'from-left', 'from-right', 'in-view');
-          el.removeEventListener('transitionend', onDone);
-        });
-      });
-    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
-  }
-  
-  function applyOfferRevealAnimation(grid) {
-    if (window.innerWidth < 769) return; // per ora solo schermi grandi
-    initOfferRevealObserver();
-    const cards = grid.querySelectorAll(':scope > .offer-row');
-    cards.forEach((card, idx) => {
-      card.classList.add('scroll-reveal', idx % 2 === 0 ? 'from-left' : 'from-right');
-      offerRevealObserver.observe(card);
+  // --- Animazione di comparsa/uscita offerte allo scroll (solo Home Utenti, solo schermi grandi) ---
+let offerRevealObserver = null;
+let lastScrollYForReveal = window.scrollY;
+let currentScrollVelocity = 0; // px per frame (~16ms), aggiornata di continuo
+
+(function trackScrollVelocity() {
+  const y = window.scrollY;
+  currentScrollVelocity = Math.abs(y - lastScrollYForReveal);
+  lastScrollYForReveal = y;
+  requestAnimationFrame(trackScrollVelocity);
+})();
+
+function initOfferRevealObserver() {
+  if (offerRevealObserver) offerRevealObserver.disconnect();
+  offerRevealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const el = entry.target;
+      // Scroll veloce (scatto/flick): accorciamo l'animazione per non lasciare
+      // spazi vuoti in griglia mentre l'utente ha già superato la card.
+      const fastScroll = currentScrollVelocity > 18; // soglia in px/frame, regolabile
+      el.style.setProperty('--reveal-duration', fastScroll ? '0.2s' : '1.6s');
+      // Nessun unobserve/cleanup: la card entra ed esce ogni volta che
+      // attraversa il punto di trigger, in entrambe le direzioni di scroll,
+      // così l'effetto resta attivo per sempre e non solo la prima volta.
+      el.classList.toggle('in-view', entry.isIntersecting);
     });
-  }
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+}
+
+function applyOfferRevealAnimation(grid) {
+  if (window.innerWidth < 769) return; // per ora solo schermi grandi
+  initOfferRevealObserver();
+  const cards = grid.querySelectorAll(':scope > .offer-row');
+  cards.forEach((card, idx) => {
+    card.classList.add('scroll-reveal', idx % 2 === 0 ? 'from-left' : 'from-right');
+    offerRevealObserver.observe(card);
+  });
+}
   
   async function renderOffers(page = state.currentPage, pageSize = state.pageSize) {
   try {
