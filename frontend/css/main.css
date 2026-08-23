@@ -584,6 +584,28 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
   transform: translateY(-2px);
 }
 
+/* --- Comparsa offerte allo scroll in Home Utenti (solo schermi grandi) --- */
+@media (min-width: 769px) {
+  #offersGrid > .offer-row.scroll-reveal {
+    opacity: 0;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+    transition: opacity 0.5s cubic-bezier(.22,.9,.34,1),
+                transform 0.5s cubic-bezier(.22,.9,.34,1),
+                box-shadow 0.5s ease-out;
+  }
+  #offersGrid > .offer-row.scroll-reveal.from-left {
+    transform: translateX(-60px) rotate(-2deg);
+  }
+  #offersGrid > .offer-row.scroll-reveal.from-right {
+    transform: translateX(60px) rotate(2deg);
+  }
+  #offersGrid > .offer-row.scroll-reveal.in-view {
+    opacity: 1;
+    transform: translateX(0) rotate(0deg);
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12), 0 4px 8px rgba(15, 23, 42, 0.06);
+  }
+}
+
 /* --- OFFERTE CONSIGLIATE: pannello "sovrapposto" sopra Offerte Vicine --- */
 .recommended-offers-panel {
   position: relative;

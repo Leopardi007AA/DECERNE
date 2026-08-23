@@ -1307,10 +1307,40 @@ const logSearchQuery = debounce(async () => {
     .from('user_search_events')
     .insert({ user_id: state.currentUser.id, query });
 
-  if (error) console.warn("Errore salvataggio ricerca:", error);
-}, 700);
-
-async function renderOffers(page = state.currentPage, pageSize = state.pageSize) {
+    if (error) console.warn("Errore salvataggio ricerca:", error);
+  }, 700);
+  
+  // --- Animazione di comparsa offerte allo scroll (solo Home Utenti, solo schermi grandi) ---
+  let offerRevealObserver = null;
+  
+  function initOfferRevealObserver() {
+    if (offerRevealObserver) offerRevealObserver.disconnect();
+    offerRevealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const el = entry.target;
+        el.classList.add('in-view');
+        offerRevealObserver.unobserve(el);
+        el.addEventListener('transitionend', function onDone(e) {
+          if (e.propertyName !== 'transform') return;
+          el.classList.remove('scroll-reveal', 'from-left', 'from-right', 'in-view');
+          el.removeEventListener('transitionend', onDone);
+        });
+      });
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+  }
+  
+  function applyOfferRevealAnimation(grid) {
+    if (window.innerWidth < 769) return; // per ora solo schermi grandi
+    initOfferRevealObserver();
+    const cards = grid.querySelectorAll(':scope > .offer-row');
+    cards.forEach((card, idx) => {
+      card.classList.add('scroll-reveal', idx % 2 === 0 ? 'from-left' : 'from-right');
+      offerRevealObserver.observe(card);
+    });
+  }
+  
+  async function renderOffers(page = state.currentPage, pageSize = state.pageSize) {
   try {
     const grid = $("#offersGrid");
     if(!grid) return;
@@ -1437,6 +1467,7 @@ async function renderOffers(page = state.currentPage, pageSize = state.pageSize)
     paginatedItems.forEach(o => {
       grid.appendChild(createOfferCardElement(o));
     });
+    applyOfferRevealAnimation(grid);
 
     const pagContainer = $("#paginationContainer");
     if (pagContainer) {
