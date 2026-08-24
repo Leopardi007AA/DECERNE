@@ -244,224 +244,228 @@ const clean = (str) => {
 
 // --- Selettore prefisso telefonico con bandiera ---
 // Usato in ogni punto in cui un negozio inserisce un numero (registrazione/abbonamento, Impostazioni Account, ecc.)
-// Elenco ordinato numericamente per prefisso (da +1 in su)
+// Elenco ordinato numericamente per prefisso (da +1 in su). maxDigits verificato per ogni nazione
+// sui dati ufficiali di numerazione telefonica (libphonenumber/Google): per l'Italia impostato a 10
+// per policy interna, per le altre nazioni corrisponde alla lunghezza massima reale del numero nazionale.
 const PHONE_COUNTRIES = [
-  { dial: '+1', flag: '🇺🇸', name: 'Stati Uniti / Canada' },
-  { dial: '+7', flag: '🇰🇿', name: 'Kazakistan' },
-  { dial: '+7', flag: '🇷🇺', name: 'Russia' },
-  { dial: '+20', flag: '🇪🇬', name: 'Egitto' },
-  { dial: '+27', flag: '🇿🇦', name: 'Sudafrica' },
-  { dial: '+30', flag: '🇬🇷', name: 'Grecia' },
-  { dial: '+31', flag: '🇳🇱', name: 'Paesi Bassi' },
-  { dial: '+32', flag: '🇧🇪', name: 'Belgio' },
-  { dial: '+33', flag: '🇫🇷', name: 'Francia' },
-  { dial: '+34', flag: '🇪🇸', name: 'Spagna' },
-  { dial: '+36', flag: '🇭🇺', name: 'Ungheria' },
-  { dial: '+39', flag: '🇮🇹', name: 'Italia' },
-  { dial: '+40', flag: '🇷🇴', name: 'Romania' },
-  { dial: '+41', flag: '🇨🇭', name: 'Svizzera' },
-  { dial: '+43', flag: '🇦🇹', name: 'Austria' },
-  { dial: '+44', flag: '🇬🇧', name: 'Regno Unito' },
-  { dial: '+45', flag: '🇩🇰', name: 'Danimarca' },
-  { dial: '+46', flag: '🇸🇪', name: 'Svezia' },
-  { dial: '+47', flag: '🇳🇴', name: 'Norvegia' },
-  { dial: '+48', flag: '🇵🇱', name: 'Polonia' },
-  { dial: '+49', flag: '🇩🇪', name: 'Germania' },
-  { dial: '+51', flag: '🇵🇪', name: 'Perù' },
-  { dial: '+52', flag: '🇲🇽', name: 'Messico' },
-  { dial: '+53', flag: '🇨🇺', name: 'Cuba' },
-  { dial: '+54', flag: '🇦🇷', name: 'Argentina' },
-  { dial: '+55', flag: '🇧🇷', name: 'Brasile' },
-  { dial: '+56', flag: '🇨🇱', name: 'Cile' },
-  { dial: '+57', flag: '🇨🇴', name: 'Colombia' },
-  { dial: '+58', flag: '🇻🇪', name: 'Venezuela' },
-  { dial: '+60', flag: '🇲🇾', name: 'Malesia' },
-  { dial: '+61', flag: '🇦🇺', name: 'Australia' },
-  { dial: '+62', flag: '🇮🇩', name: 'Indonesia' },
-  { dial: '+63', flag: '🇵🇭', name: 'Filippine' },
-  { dial: '+64', flag: '🇳🇿', name: 'Nuova Zelanda' },
-  { dial: '+65', flag: '🇸🇬', name: 'Singapore' },
-  { dial: '+66', flag: '🇹🇭', name: 'Thailandia' },
-  { dial: '+81', flag: '🇯🇵', name: 'Giappone' },
-  { dial: '+82', flag: '🇰🇷', name: 'Corea del Sud' },
-  { dial: '+84', flag: '🇻🇳', name: 'Vietnam' },
-  { dial: '+86', flag: '🇨🇳', name: 'Cina' },
-  { dial: '+90', flag: '🇹🇷', name: 'Turchia' },
-  { dial: '+91', flag: '🇮🇳', name: 'India' },
-  { dial: '+92', flag: '🇵🇰', name: 'Pakistan' },
-  { dial: '+93', flag: '🇦🇫', name: 'Afghanistan' },
-  { dial: '+94', flag: '🇱🇰', name: 'Sri Lanka' },
-  { dial: '+95', flag: '🇲🇲', name: 'Myanmar' },
-  { dial: '+98', flag: '🇮🇷', name: 'Iran' },
-  { dial: '+211', flag: '🇸🇸', name: 'Sudan del Sud' },
-  { dial: '+212', flag: '🇲🇦', name: 'Marocco' },
-  { dial: '+213', flag: '🇩🇿', name: 'Algeria' },
-  { dial: '+216', flag: '🇹🇳', name: 'Tunisia' },
-  { dial: '+218', flag: '🇱🇾', name: 'Libia' },
-  { dial: '+220', flag: '🇬🇲', name: 'Gambia' },
-  { dial: '+221', flag: '🇸🇳', name: 'Senegal' },
-  { dial: '+222', flag: '🇲🇷', name: 'Mauritania' },
-  { dial: '+223', flag: '🇲🇱', name: 'Mali' },
-  { dial: '+224', flag: '🇬🇳', name: 'Guinea' },
-  { dial: '+225', flag: '🇨🇮', name: 'Costa d\'Avorio' },
-  { dial: '+226', flag: '🇧🇫', name: 'Burkina Faso' },
-  { dial: '+227', flag: '🇳🇪', name: 'Niger' },
-  { dial: '+228', flag: '🇹🇬', name: 'Togo' },
-  { dial: '+229', flag: '🇧🇯', name: 'Benin' },
-  { dial: '+230', flag: '🇲🇺', name: 'Mauritius' },
-  { dial: '+231', flag: '🇱🇷', name: 'Liberia' },
-  { dial: '+232', flag: '🇸🇱', name: 'Sierra Leone' },
-  { dial: '+233', flag: '🇬🇭', name: 'Ghana' },
-  { dial: '+234', flag: '🇳🇬', name: 'Nigeria' },
-  { dial: '+235', flag: '🇹🇩', name: 'Ciad' },
-  { dial: '+236', flag: '🇨🇫', name: 'Repubblica Centrafricana' },
-  { dial: '+237', flag: '🇨🇲', name: 'Camerun' },
-  { dial: '+238', flag: '🇨🇻', name: 'Capo Verde' },
-  { dial: '+239', flag: '🇸🇹', name: 'São Tomé e Príncipe' },
-  { dial: '+240', flag: '🇬🇶', name: 'Guinea Equatoriale' },
-  { dial: '+241', flag: '🇬🇦', name: 'Gabon' },
-  { dial: '+242', flag: '🇨🇬', name: 'Repubblica del Congo' },
-  { dial: '+243', flag: '🇨🇩', name: 'Repubblica Democratica del Congo' },
-  { dial: '+244', flag: '🇦🇴', name: 'Angola' },
-  { dial: '+245', flag: '🇬🇼', name: 'Guinea-Bissau' },
-  { dial: '+248', flag: '🇸🇨', name: 'Seychelles' },
-  { dial: '+249', flag: '🇸🇩', name: 'Sudan' },
-  { dial: '+250', flag: '🇷🇼', name: 'Ruanda' },
-  { dial: '+251', flag: '🇪🇹', name: 'Etiopia' },
-  { dial: '+252', flag: '🇸🇴', name: 'Somalia' },
-  { dial: '+253', flag: '🇩🇯', name: 'Gibuti' },
-  { dial: '+254', flag: '🇰🇪', name: 'Kenya' },
-  { dial: '+255', flag: '🇹🇿', name: 'Tanzania' },
-  { dial: '+256', flag: '🇺🇬', name: 'Uganda' },
-  { dial: '+257', flag: '🇧🇮', name: 'Burundi' },
-  { dial: '+258', flag: '🇲🇿', name: 'Mozambico' },
-  { dial: '+260', flag: '🇿🇲', name: 'Zambia' },
-  { dial: '+261', flag: '🇲🇬', name: 'Madagascar' },
-  { dial: '+263', flag: '🇿🇼', name: 'Zimbabwe' },
-  { dial: '+264', flag: '🇳🇦', name: 'Namibia' },
-  { dial: '+265', flag: '🇲🇼', name: 'Malawi' },
-  { dial: '+266', flag: '🇱🇸', name: 'Lesotho' },
-  { dial: '+267', flag: '🇧🇼', name: 'Botswana' },
-  { dial: '+268', flag: '🇸🇿', name: 'Eswatini' },
-  { dial: '+269', flag: '🇰🇲', name: 'Comore' },
-  { dial: '+290', flag: '🇸🇭', name: 'Sant\'Elena' },
-  { dial: '+291', flag: '🇪🇷', name: 'Eritrea' },
-  { dial: '+297', flag: '🇦🇼', name: 'Aruba' },
-  { dial: '+298', flag: '🇫🇴', name: 'Isole Faroe' },
-  { dial: '+299', flag: '🇬🇱', name: 'Groenlandia' },
-  { dial: '+350', flag: '🇬🇮', name: 'Gibilterra' },
-  { dial: '+351', flag: '🇵🇹', name: 'Portogallo' },
-  { dial: '+352', flag: '🇱🇺', name: 'Lussemburgo' },
-  { dial: '+353', flag: '🇮🇪', name: 'Irlanda' },
-  { dial: '+354', flag: '🇮🇸', name: 'Islanda' },
-  { dial: '+355', flag: '🇦🇱', name: 'Albania' },
-  { dial: '+356', flag: '🇲🇹', name: 'Malta' },
-  { dial: '+357', flag: '🇨🇾', name: 'Cipro' },
-  { dial: '+358', flag: '🇫🇮', name: 'Finlandia' },
-  { dial: '+359', flag: '🇧🇬', name: 'Bulgaria' },
-  { dial: '+370', flag: '🇱🇹', name: 'Lituania' },
-  { dial: '+371', flag: '🇱🇻', name: 'Lettonia' },
-  { dial: '+372', flag: '🇪🇪', name: 'Estonia' },
-  { dial: '+373', flag: '🇲🇩', name: 'Moldavia' },
-  { dial: '+374', flag: '🇦🇲', name: 'Armenia' },
-  { dial: '+375', flag: '🇧🇾', name: 'Bielorussia' },
-  { dial: '+376', flag: '🇦🇩', name: 'Andorra' },
-  { dial: '+377', flag: '🇲🇨', name: 'Monaco' },
-  { dial: '+378', flag: '🇸🇲', name: 'San Marino' },
-  { dial: '+379', flag: '🇻🇦', name: 'Città del Vaticano' },
-  { dial: '+380', flag: '🇺🇦', name: 'Ucraina' },
-  { dial: '+381', flag: '🇷🇸', name: 'Serbia' },
-  { dial: '+382', flag: '🇲🇪', name: 'Montenegro' },
-  { dial: '+383', flag: '🇽🇰', name: 'Kosovo' },
-  { dial: '+385', flag: '🇭🇷', name: 'Croazia' },
-  { dial: '+386', flag: '🇸🇮', name: 'Slovenia' },
-  { dial: '+387', flag: '🇧🇦', name: 'Bosnia ed Erzegovina' },
-  { dial: '+389', flag: '🇲🇰', name: 'Macedonia del Nord' },
-  { dial: '+420', flag: '🇨🇿', name: 'Repubblica Ceca' },
-  { dial: '+421', flag: '🇸🇰', name: 'Slovacchia' },
-  { dial: '+423', flag: '🇱🇮', name: 'Liechtenstein' },
-  { dial: '+500', flag: '🇫🇰', name: 'Isole Falkland' },
-  { dial: '+501', flag: '🇧🇿', name: 'Belize' },
-  { dial: '+502', flag: '🇬🇹', name: 'Guatemala' },
-  { dial: '+503', flag: '🇸🇻', name: 'El Salvador' },
-  { dial: '+504', flag: '🇭🇳', name: 'Honduras' },
-  { dial: '+505', flag: '🇳🇮', name: 'Nicaragua' },
-  { dial: '+506', flag: '🇨🇷', name: 'Costa Rica' },
-  { dial: '+507', flag: '🇵🇦', name: 'Panama' },
-  { dial: '+509', flag: '🇭🇹', name: 'Haiti' },
-  { dial: '+591', flag: '🇧🇴', name: 'Bolivia' },
-  { dial: '+592', flag: '🇬🇾', name: 'Guyana' },
-  { dial: '+593', flag: '🇪🇨', name: 'Ecuador' },
-  { dial: '+595', flag: '🇵🇾', name: 'Paraguay' },
-  { dial: '+597', flag: '🇸🇷', name: 'Suriname' },
-  { dial: '+598', flag: '🇺🇾', name: 'Uruguay' },
-  { dial: '+670', flag: '🇹🇱', name: 'Timor Est' },
-  { dial: '+673', flag: '🇧🇳', name: 'Brunei' },
-  { dial: '+674', flag: '🇳🇷', name: 'Nauru' },
-  { dial: '+675', flag: '🇵🇬', name: 'Papua Nuova Guinea' },
-  { dial: '+676', flag: '🇹🇴', name: 'Tonga' },
-  { dial: '+677', flag: '🇸🇧', name: 'Isole Salomone' },
-  { dial: '+678', flag: '🇻🇺', name: 'Vanuatu' },
-  { dial: '+679', flag: '🇫🇯', name: 'Figi' },
-  { dial: '+680', flag: '🇵🇼', name: 'Palau' },
-  { dial: '+682', flag: '🇨🇰', name: 'Isole Cook' },
-  { dial: '+685', flag: '🇼🇸', name: 'Samoa' },
-  { dial: '+686', flag: '🇰🇮', name: 'Kiribati' },
-  { dial: '+687', flag: '🇳🇨', name: 'Nuova Caledonia' },
-  { dial: '+689', flag: '🇵🇫', name: 'Polinesia Francese' },
-  { dial: '+691', flag: '🇫🇲', name: 'Micronesia' },
-  { dial: '+692', flag: '🇲🇭', name: 'Isole Marshall' },
-  { dial: '+850', flag: '🇰🇵', name: 'Corea del Nord' },
-  { dial: '+852', flag: '🇭🇰', name: 'Hong Kong' },
-  { dial: '+853', flag: '🇲🇴', name: 'Macao' },
-  { dial: '+855', flag: '🇰🇭', name: 'Cambogia' },
-  { dial: '+856', flag: '🇱🇦', name: 'Laos' },
-  { dial: '+880', flag: '🇧🇩', name: 'Bangladesh' },
-  { dial: '+886', flag: '🇹🇼', name: 'Taiwan' },
-  { dial: '+960', flag: '🇲🇻', name: 'Maldive' },
-  { dial: '+961', flag: '🇱🇧', name: 'Libano' },
-  { dial: '+962', flag: '🇯🇴', name: 'Giordania' },
-  { dial: '+963', flag: '🇸🇾', name: 'Siria' },
-  { dial: '+964', flag: '🇮🇶', name: 'Iraq' },
-  { dial: '+965', flag: '🇰🇼', name: 'Kuwait' },
-  { dial: '+966', flag: '🇸🇦', name: 'Arabia Saudita' },
-  { dial: '+967', flag: '🇾🇪', name: 'Yemen' },
-  { dial: '+968', flag: '🇴🇲', name: 'Oman' },
-  { dial: '+970', flag: '🇵🇸', name: 'Palestina' },
-  { dial: '+971', flag: '🇦🇪', name: 'Emirati Arabi Uniti' },
-  { dial: '+972', flag: '🇮🇱', name: 'Israele' },
-  { dial: '+973', flag: '🇧🇭', name: 'Bahrein' },
-  { dial: '+974', flag: '🇶🇦', name: 'Qatar' },
-  { dial: '+975', flag: '🇧🇹', name: 'Bhutan' },
-  { dial: '+976', flag: '🇲🇳', name: 'Mongolia' },
-  { dial: '+977', flag: '🇳🇵', name: 'Nepal' },
-  { dial: '+992', flag: '🇹🇯', name: 'Tagikistan' },
-  { dial: '+993', flag: '🇹🇲', name: 'Turkmenistan' },
-  { dial: '+994', flag: '🇦🇿', name: 'Azerbaigian' },
-  { dial: '+995', flag: '🇬🇪', name: 'Georgia' },
-  { dial: '+996', flag: '🇰🇬', name: 'Kirghizistan' },
-  { dial: '+998', flag: '🇺🇿', name: 'Uzbekistan' }
+  { dial: '+1', iso2: 'US', name: 'Stati Uniti / Canada', maxDigits: 10 },
+  { dial: '+7', iso2: 'KZ', name: 'Kazakistan', maxDigits: 10 },
+  { dial: '+7', iso2: 'RU', name: 'Russia', maxDigits: 10 },
+  { dial: '+20', iso2: 'EG', name: 'Egitto', maxDigits: 10 },
+  { dial: '+27', iso2: 'ZA', name: 'Sudafrica', maxDigits: 9 },
+  { dial: '+30', iso2: 'GR', name: 'Grecia', maxDigits: 10 },
+  { dial: '+31', iso2: 'NL', name: 'Paesi Bassi', maxDigits: 11 },
+  { dial: '+32', iso2: 'BE', name: 'Belgio', maxDigits: 9 },
+  { dial: '+33', iso2: 'FR', name: 'Francia', maxDigits: 9 },
+  { dial: '+34', iso2: 'ES', name: 'Spagna', maxDigits: 9 },
+  { dial: '+36', iso2: 'HU', name: 'Ungheria', maxDigits: 9 },
+  { dial: '+39', iso2: 'IT', name: 'Italia', maxDigits: 10 },
+  { dial: '+40', iso2: 'RO', name: 'Romania', maxDigits: 9 },
+  { dial: '+41', iso2: 'CH', name: 'Svizzera', maxDigits: 9 },
+  { dial: '+43', iso2: 'AT', name: 'Austria', maxDigits: 13 },
+  { dial: '+44', iso2: 'GB', name: 'Regno Unito', maxDigits: 10 },
+  { dial: '+45', iso2: 'DK', name: 'Danimarca', maxDigits: 8 },
+  { dial: '+46', iso2: 'SE', name: 'Svezia', maxDigits: 9 },
+  { dial: '+47', iso2: 'NO', name: 'Norvegia', maxDigits: 8 },
+  { dial: '+48', iso2: 'PL', name: 'Polonia', maxDigits: 9 },
+  { dial: '+49', iso2: 'DE', name: 'Germania', maxDigits: 15 },
+  { dial: '+51', iso2: 'PE', name: 'Perù', maxDigits: 9 },
+  { dial: '+52', iso2: 'MX', name: 'Messico', maxDigits: 10 },
+  { dial: '+53', iso2: 'CU', name: 'Cuba', maxDigits: 10 },
+  { dial: '+54', iso2: 'AR', name: 'Argentina', maxDigits: 11 },
+  { dial: '+55', iso2: 'BR', name: 'Brasile', maxDigits: 11 },
+  { dial: '+56', iso2: 'CL', name: 'Cile', maxDigits: 9 },
+  { dial: '+57', iso2: 'CO', name: 'Colombia', maxDigits: 10 },
+  { dial: '+58', iso2: 'VE', name: 'Venezuela', maxDigits: 10 },
+  { dial: '+60', iso2: 'MY', name: 'Malesia', maxDigits: 10 },
+  { dial: '+61', iso2: 'AU', name: 'Australia', maxDigits: 9 },
+  { dial: '+62', iso2: 'ID', name: 'Indonesia', maxDigits: 12 },
+  { dial: '+63', iso2: 'PH', name: 'Filippine', maxDigits: 10 },
+  { dial: '+64', iso2: 'NZ', name: 'Nuova Zelanda', maxDigits: 10 },
+  { dial: '+65', iso2: 'SG', name: 'Singapore', maxDigits: 8 },
+  { dial: '+66', iso2: 'TH', name: 'Thailandia', maxDigits: 9 },
+  { dial: '+81', iso2: 'JP', name: 'Giappone', maxDigits: 10 },
+  { dial: '+82', iso2: 'KR', name: 'Corea del Sud', maxDigits: 10 },
+  { dial: '+84', iso2: 'VN', name: 'Vietnam', maxDigits: 10 },
+  { dial: '+86', iso2: 'CN', name: 'Cina', maxDigits: 11 },
+  { dial: '+90', iso2: 'TR', name: 'Turchia', maxDigits: 10 },
+  { dial: '+91', iso2: 'IN', name: 'India', maxDigits: 10 },
+  { dial: '+92', iso2: 'PK', name: 'Pakistan', maxDigits: 10 },
+  { dial: '+93', iso2: 'AF', name: 'Afghanistan', maxDigits: 9 },
+  { dial: '+94', iso2: 'LK', name: 'Sri Lanka', maxDigits: 9 },
+  { dial: '+95', iso2: 'MM', name: 'Myanmar', maxDigits: 10 },
+  { dial: '+98', iso2: 'IR', name: 'Iran', maxDigits: 10 },
+  { dial: '+211', iso2: 'SS', name: 'Sudan del Sud', maxDigits: 9 },
+  { dial: '+212', iso2: 'MA', name: 'Marocco', maxDigits: 9 },
+  { dial: '+213', iso2: 'DZ', name: 'Algeria', maxDigits: 9 },
+  { dial: '+216', iso2: 'TN', name: 'Tunisia', maxDigits: 8 },
+  { dial: '+218', iso2: 'LY', name: 'Libia', maxDigits: 9 },
+  { dial: '+220', iso2: 'GM', name: 'Gambia', maxDigits: 9 },
+  { dial: '+221', iso2: 'SN', name: 'Senegal', maxDigits: 9 },
+  { dial: '+222', iso2: 'MR', name: 'Mauritania', maxDigits: 8 },
+  { dial: '+223', iso2: 'ML', name: 'Mali', maxDigits: 8 },
+  { dial: '+224', iso2: 'GN', name: 'Guinea', maxDigits: 9 },
+  { dial: '+225', iso2: 'CI', name: 'Costa d\'Avorio', maxDigits: 10 },
+  { dial: '+226', iso2: 'BF', name: 'Burkina Faso', maxDigits: 8 },
+  { dial: '+227', iso2: 'NE', name: 'Niger', maxDigits: 8 },
+  { dial: '+228', iso2: 'TG', name: 'Togo', maxDigits: 8 },
+  { dial: '+229', iso2: 'BJ', name: 'Benin', maxDigits: 10 },
+  { dial: '+230', iso2: 'MU', name: 'Mauritius', maxDigits: 8 },
+  { dial: '+231', iso2: 'LR', name: 'Liberia', maxDigits: 9 },
+  { dial: '+232', iso2: 'SL', name: 'Sierra Leone', maxDigits: 8 },
+  { dial: '+233', iso2: 'GH', name: 'Ghana', maxDigits: 9 },
+  { dial: '+234', iso2: 'NG', name: 'Nigeria', maxDigits: 10 },
+  { dial: '+235', iso2: 'TD', name: 'Ciad', maxDigits: 8 },
+  { dial: '+236', iso2: 'CF', name: 'Repubblica Centrafricana', maxDigits: 8 },
+  { dial: '+237', iso2: 'CM', name: 'Camerun', maxDigits: 9 },
+  { dial: '+238', iso2: 'CV', name: 'Capo Verde', maxDigits: 7 },
+  { dial: '+239', iso2: 'ST', name: 'São Tomé e Príncipe', maxDigits: 7 },
+  { dial: '+240', iso2: 'GQ', name: 'Guinea Equatoriale', maxDigits: 9 },
+  { dial: '+241', iso2: 'GA', name: 'Gabon', maxDigits: 8 },
+  { dial: '+242', iso2: 'CG', name: 'Repubblica del Congo', maxDigits: 9 },
+  { dial: '+243', iso2: 'CD', name: 'Repubblica Democratica del Congo', maxDigits: 10 },
+  { dial: '+244', iso2: 'AO', name: 'Angola', maxDigits: 9 },
+  { dial: '+245', iso2: 'GW', name: 'Guinea-Bissau', maxDigits: 9 },
+  { dial: '+248', iso2: 'SC', name: 'Seychelles', maxDigits: 7 },
+  { dial: '+249', iso2: 'SD', name: 'Sudan', maxDigits: 9 },
+  { dial: '+250', iso2: 'RW', name: 'Ruanda', maxDigits: 9 },
+  { dial: '+251', iso2: 'ET', name: 'Etiopia', maxDigits: 9 },
+  { dial: '+252', iso2: 'SO', name: 'Somalia', maxDigits: 9 },
+  { dial: '+253', iso2: 'DJ', name: 'Gibuti', maxDigits: 8 },
+  { dial: '+254', iso2: 'KE', name: 'Kenya', maxDigits: 9 },
+  { dial: '+255', iso2: 'TZ', name: 'Tanzania', maxDigits: 9 },
+  { dial: '+256', iso2: 'UG', name: 'Uganda', maxDigits: 9 },
+  { dial: '+257', iso2: 'BI', name: 'Burundi', maxDigits: 8 },
+  { dial: '+258', iso2: 'MZ', name: 'Mozambico', maxDigits: 9 },
+  { dial: '+260', iso2: 'ZM', name: 'Zambia', maxDigits: 9 },
+  { dial: '+261', iso2: 'MG', name: 'Madagascar', maxDigits: 9 },
+  { dial: '+263', iso2: 'ZW', name: 'Zimbabwe', maxDigits: 10 },
+  { dial: '+264', iso2: 'NA', name: 'Namibia', maxDigits: 9 },
+  { dial: '+265', iso2: 'MW', name: 'Malawi', maxDigits: 9 },
+  { dial: '+266', iso2: 'LS', name: 'Lesotho', maxDigits: 8 },
+  { dial: '+267', iso2: 'BW', name: 'Botswana', maxDigits: 8 },
+  { dial: '+268', iso2: 'SZ', name: 'Eswatini', maxDigits: 8 },
+  { dial: '+269', iso2: 'KM', name: 'Comore', maxDigits: 7 },
+  { dial: '+290', iso2: 'SH', name: 'Sant\'Elena', maxDigits: 5 },
+  { dial: '+291', iso2: 'ER', name: 'Eritrea', maxDigits: 7 },
+  { dial: '+297', iso2: 'AW', name: 'Aruba', maxDigits: 7 },
+  { dial: '+298', iso2: 'FO', name: 'Isole Faroe', maxDigits: 6 },
+  { dial: '+299', iso2: 'GL', name: 'Groenlandia', maxDigits: 6 },
+  { dial: '+350', iso2: 'GI', name: 'Gibilterra', maxDigits: 8 },
+  { dial: '+351', iso2: 'PT', name: 'Portogallo', maxDigits: 9 },
+  { dial: '+352', iso2: 'LU', name: 'Lussemburgo', maxDigits: 11 },
+  { dial: '+353', iso2: 'IE', name: 'Irlanda', maxDigits: 10 },
+  { dial: '+354', iso2: 'IS', name: 'Islanda', maxDigits: 9 },
+  { dial: '+355', iso2: 'AL', name: 'Albania', maxDigits: 9 },
+  { dial: '+356', iso2: 'MT', name: 'Malta', maxDigits: 8 },
+  { dial: '+357', iso2: 'CY', name: 'Cipro', maxDigits: 8 },
+  { dial: '+358', iso2: 'FI', name: 'Finlandia', maxDigits: 10 },
+  { dial: '+359', iso2: 'BG', name: 'Bulgaria', maxDigits: 9 },
+  { dial: '+370', iso2: 'LT', name: 'Lituania', maxDigits: 8 },
+  { dial: '+371', iso2: 'LV', name: 'Lettonia', maxDigits: 8 },
+  { dial: '+372', iso2: 'EE', name: 'Estonia', maxDigits: 8 },
+  { dial: '+373', iso2: 'MD', name: 'Moldavia', maxDigits: 8 },
+  { dial: '+374', iso2: 'AM', name: 'Armenia', maxDigits: 8 },
+  { dial: '+375', iso2: 'BY', name: 'Bielorussia', maxDigits: 9 },
+  { dial: '+376', iso2: 'AD', name: 'Andorra', maxDigits: 9 },
+  { dial: '+377', iso2: 'MC', name: 'Monaco', maxDigits: 9 },
+  { dial: '+378', iso2: 'SM', name: 'San Marino', maxDigits: 10 },
+  { dial: '+379', iso2: 'VA', name: 'Città del Vaticano', maxDigits: 11 },
+  { dial: '+380', iso2: 'UA', name: 'Ucraina', maxDigits: 9 },
+  { dial: '+381', iso2: 'RS', name: 'Serbia', maxDigits: 12 },
+  { dial: '+382', iso2: 'ME', name: 'Montenegro', maxDigits: 8 },
+  { dial: '+383', iso2: 'XK', name: 'Kosovo', maxDigits: 12 },
+  { dial: '+385', iso2: 'HR', name: 'Croazia', maxDigits: 9 },
+  { dial: '+386', iso2: 'SI', name: 'Slovenia', maxDigits: 8 },
+  { dial: '+387', iso2: 'BA', name: 'Bosnia ed Erzegovina', maxDigits: 9 },
+  { dial: '+389', iso2: 'MK', name: 'Macedonia del Nord', maxDigits: 8 },
+  { dial: '+420', iso2: 'CZ', name: 'Repubblica Ceca', maxDigits: 9 },
+  { dial: '+421', iso2: 'SK', name: 'Slovacchia', maxDigits: 9 },
+  { dial: '+423', iso2: 'LI', name: 'Liechtenstein', maxDigits: 9 },
+  { dial: '+500', iso2: 'FK', name: 'Isole Falkland', maxDigits: 5 },
+  { dial: '+501', iso2: 'BZ', name: 'Belize', maxDigits: 7 },
+  { dial: '+502', iso2: 'GT', name: 'Guatemala', maxDigits: 8 },
+  { dial: '+503', iso2: 'SV', name: 'El Salvador', maxDigits: 8 },
+  { dial: '+504', iso2: 'HN', name: 'Honduras', maxDigits: 8 },
+  { dial: '+505', iso2: 'NI', name: 'Nicaragua', maxDigits: 8 },
+  { dial: '+506', iso2: 'CR', name: 'Costa Rica', maxDigits: 8 },
+  { dial: '+507', iso2: 'PA', name: 'Panama', maxDigits: 8 },
+  { dial: '+509', iso2: 'HT', name: 'Haiti', maxDigits: 8 },
+  { dial: '+591', iso2: 'BO', name: 'Bolivia', maxDigits: 8 },
+  { dial: '+592', iso2: 'GY', name: 'Guyana', maxDigits: 7 },
+  { dial: '+593', iso2: 'EC', name: 'Ecuador', maxDigits: 9 },
+  { dial: '+595', iso2: 'PY', name: 'Paraguay', maxDigits: 9 },
+  { dial: '+597', iso2: 'SR', name: 'Suriname', maxDigits: 7 },
+  { dial: '+598', iso2: 'UY', name: 'Uruguay', maxDigits: 8 },
+  { dial: '+670', iso2: 'TL', name: 'Timor Est', maxDigits: 8 },
+  { dial: '+673', iso2: 'BN', name: 'Brunei', maxDigits: 7 },
+  { dial: '+674', iso2: 'NR', name: 'Nauru', maxDigits: 7 },
+  { dial: '+675', iso2: 'PG', name: 'Papua Nuova Guinea', maxDigits: 8 },
+  { dial: '+676', iso2: 'TO', name: 'Tonga', maxDigits: 7 },
+  { dial: '+677', iso2: 'SB', name: 'Isole Salomone', maxDigits: 7 },
+  { dial: '+678', iso2: 'VU', name: 'Vanuatu', maxDigits: 7 },
+  { dial: '+679', iso2: 'FJ', name: 'Figi', maxDigits: 7 },
+  { dial: '+680', iso2: 'PW', name: 'Palau', maxDigits: 7 },
+  { dial: '+682', iso2: 'CK', name: 'Isole Cook', maxDigits: 5 },
+  { dial: '+685', iso2: 'WS', name: 'Samoa', maxDigits: 10 },
+  { dial: '+686', iso2: 'KI', name: 'Kiribati', maxDigits: 8 },
+  { dial: '+687', iso2: 'NC', name: 'Nuova Caledonia', maxDigits: 6 },
+  { dial: '+689', iso2: 'PF', name: 'Polinesia Francese', maxDigits: 8 },
+  { dial: '+691', iso2: 'FM', name: 'Micronesia', maxDigits: 7 },
+  { dial: '+692', iso2: 'MH', name: 'Isole Marshall', maxDigits: 7 },
+  { dial: '+850', iso2: 'KP', name: 'Corea del Nord', maxDigits: 10 },
+  { dial: '+852', iso2: 'HK', name: 'Hong Kong', maxDigits: 8 },
+  { dial: '+853', iso2: 'MO', name: 'Macao', maxDigits: 8 },
+  { dial: '+855', iso2: 'KH', name: 'Cambogia', maxDigits: 9 },
+  { dial: '+856', iso2: 'LA', name: 'Laos', maxDigits: 10 },
+  { dial: '+880', iso2: 'BD', name: 'Bangladesh', maxDigits: 10 },
+  { dial: '+886', iso2: 'TW', name: 'Taiwan', maxDigits: 9 },
+  { dial: '+960', iso2: 'MV', name: 'Maldive', maxDigits: 7 },
+  { dial: '+961', iso2: 'LB', name: 'Libano', maxDigits: 8 },
+  { dial: '+962', iso2: 'JO', name: 'Giordania', maxDigits: 9 },
+  { dial: '+963', iso2: 'SY', name: 'Siria', maxDigits: 9 },
+  { dial: '+964', iso2: 'IQ', name: 'Iraq', maxDigits: 10 },
+  { dial: '+965', iso2: 'KW', name: 'Kuwait', maxDigits: 8 },
+  { dial: '+966', iso2: 'SA', name: 'Arabia Saudita', maxDigits: 9 },
+  { dial: '+967', iso2: 'YE', name: 'Yemen', maxDigits: 9 },
+  { dial: '+968', iso2: 'OM', name: 'Oman', maxDigits: 8 },
+  { dial: '+970', iso2: 'PS', name: 'Palestina', maxDigits: 9 },
+  { dial: '+971', iso2: 'AE', name: 'Emirati Arabi Uniti', maxDigits: 9 },
+  { dial: '+972', iso2: 'IL', name: 'Israele', maxDigits: 12 },
+  { dial: '+973', iso2: 'BH', name: 'Bahrein', maxDigits: 8 },
+  { dial: '+974', iso2: 'QA', name: 'Qatar', maxDigits: 8 },
+  { dial: '+975', iso2: 'BT', name: 'Bhutan', maxDigits: 8 },
+  { dial: '+976', iso2: 'MN', name: 'Mongolia', maxDigits: 10 },
+  { dial: '+977', iso2: 'NP', name: 'Nepal', maxDigits: 10 },
+  { dial: '+992', iso2: 'TJ', name: 'Tagikistan', maxDigits: 9 },
+  { dial: '+993', iso2: 'TM', name: 'Turkmenistan', maxDigits: 8 },
+  { dial: '+994', iso2: 'AZ', name: 'Azerbaigian', maxDigits: 9 },
+  { dial: '+995', iso2: 'GE', name: 'Georgia', maxDigits: 9 },
+  { dial: '+996', iso2: 'KG', name: 'Kirghizistan', maxDigits: 9 },
+  { dial: '+998', iso2: 'UZ', name: 'Uzbekistan', maxDigits: 9 }
 ];
 
-// Raggruppa le cifre come un numero italiano classico: 3-3-4 (le cifre oltre la decima restano nell'ultimo blocco)
-function formatPhoneDigits(raw) {
-  const digits = String(raw || '').replace(/\D/g, '').slice(0, 15);
+// Raggruppa le cifre in stile classico 3-3-(resto), troncando al massimo cifre della nazione scelta
+function formatPhoneDigits(raw, maxDigits) {
+  const limit = maxDigits || 15;
+  const digits = String(raw || '').replace(/\D/g, '').slice(0, limit);
   const p1 = digits.slice(0, 3);
   const p2 = digits.slice(3, 6);
   const p3 = digits.slice(6);
   return [p1, p2, p3].filter(Boolean).join(' ');
 }
 
-// Scompone un numero già salvato (es. "+39 333 111 2222") in prefisso + cifre formattate
+// Scompone un numero già salvato (es. "+39 333 111 2222") in prefisso + sole cifre (la formattazione
+// vera e propria avviene dopo, quando si conosce il maxDigits della nazione risolta)
 function splitPhoneValue(saved) {
   const trimmed = String(saved || '').trim();
-  if (!trimmed) return { dial: '+39', number: '' };
+  if (!trimmed) return { dial: '+39', digitsRaw: '' };
   const match = trimmed.match(/^(\+\d{1,4})\s*(.*)$/);
   if (match && PHONE_COUNTRIES.some(c => c.dial === match[1])) {
-    return { dial: match[1], number: formatPhoneDigits(match[2]) };
+    return { dial: match[1], digitsRaw: match[2].replace(/\D/g, '') };
   }
   // Numero salvato senza un prefisso riconosciuto: lo trattiamo come italiano
-  return { dial: '+39', number: formatPhoneDigits(trimmed) };
+  return { dial: '+39', digitsRaw: trimmed.replace(/\D/g, '') };
 }
 
 // Rimuove gli accenti per rendere la ricerca digitata insensibile a lettere accentate (es. "perù" -> "peru")
@@ -469,25 +473,34 @@ function stripDiacritics(str) {
   return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-// Genera le righe della tendina: bandiera, nome paese, prefisso tra parentesi
+// URL della bandiera reale (immagine SVG), non emoji: le emoji bandiera non sono renderizzate su
+// molti browser/sistemi Windows, che mostrano solo le due lettere del codice nazione
+function flagUrl(iso2) {
+  return `https://flagcdn.com/${iso2.toLowerCase()}.svg`;
+}
+
+// Genera le righe della tendina: bandiera reale, nome paese, prefisso tra parentesi
 function buildPhonePrefixOptionsList(selectedDial) {
   return PHONE_COUNTRIES.map(c => {
     const isSelected = c.dial === selectedDial;
-    return `<li role="option" class="phone-prefix-option${isSelected ? ' phone-opt-current' : ''}" data-dial="${c.dial}" data-search="${stripDiacritics(c.name).toLowerCase()}" aria-selected="${isSelected}">` +
-      `<span class="phone-opt-flag">${c.flag}</span><span class="phone-opt-name">${c.name}</span><span class="phone-opt-dial">(${c.dial})</span></li>`;
+    return `<li role="option" class="phone-prefix-option${isSelected ? ' phone-opt-current' : ''}" data-dial="${c.dial}" data-max-digits="${c.maxDigits}" data-search="${stripDiacritics(c.name).toLowerCase()}" aria-selected="${isSelected}">` +
+      `<img class="phone-opt-flag" src="${flagUrl(c.iso2)}" alt="" width="20" height="15" loading="lazy">` +
+      `<span class="phone-opt-name">${c.name}</span><span class="phone-opt-dial">(${c.dial})</span></li>`;
   }).join('');
 }
 
 // Genera il blocco "prefisso con bandiera + numero": da usare in qualsiasi form dove serve un telefono.
 // Da chiuso mostra solo bandiera+prefisso (mai il nome); il nome compare solo aprendo la tendina.
 function renderPhoneInputGroup(prefixId, numberId, savedPhone, placeholder) {
-  const { dial, number } = splitPhoneValue(savedPhone);
+  const { dial, digitsRaw } = splitPhoneValue(savedPhone);
   const country = PHONE_COUNTRIES.find(c => c.dial === dial) || PHONE_COUNTRIES.find(c => c.dial === '+39');
+  const number = formatPhoneDigits(digitsRaw, country.maxDigits);
   return `
     <div class="phone-input-group">
       <div class="phone-prefix-combo">
-        <button type="button" class="phone-prefix-btn" id="${prefixId}" data-dial="${country.dial}" aria-haspopup="listbox" aria-expanded="false" aria-label="Prefisso internazionale, attuale ${country.name} ${country.dial}">
-          <span class="phone-prefix-flag">${country.flag}</span><span class="phone-prefix-dial">${country.dial}</span>
+        <button type="button" class="phone-prefix-btn" id="${prefixId}" data-dial="${country.dial}" data-max-digits="${country.maxDigits}" aria-haspopup="listbox" aria-expanded="false" aria-label="Prefisso internazionale, attuale ${country.name} ${country.dial}">
+          <img class="phone-prefix-flag" src="${flagUrl(country.iso2)}" alt="" width="20" height="15">
+          <span class="phone-prefix-dial">${country.dial}</span>
         </button>
         <ul class="phone-prefix-list" role="listbox" hidden>${buildPhonePrefixOptionsList(country.dial)}</ul>
       </div>
@@ -503,13 +516,15 @@ function getPhoneInputValue(prefixId, numberId) {
   return number ? `${prefix} ${number}` : '';
 }
 
-// Formattazione live delegata: funziona su qualunque .phone-number-input presente ora o
-// aggiunto in futuro, anche dopo un innerHTML di ri-render, senza dover ricollegare listener
+// Formattazione live delegata: rispetta il numero massimo di cifre della nazione attualmente
+// selezionata (letto dal bottone prefisso affiancato), funziona anche dopo un innerHTML di ri-render
 document.addEventListener('input', (e) => {
   const el = e.target;
   if (!el || !el.classList || !el.classList.contains('phone-number-input')) return;
+  const btn = el.closest('.phone-input-group')?.querySelector('.phone-prefix-btn');
+  const maxDigits = parseInt(btn?.dataset.maxDigits, 10) || 15;
   const digitsBeforeCursor = el.value.slice(0, el.selectionStart).replace(/\D/g, '').length;
-  el.value = formatPhoneDigits(el.value);
+  el.value = formatPhoneDigits(el.value, maxDigits);
   let pos = 0, seen = 0;
   while (pos < el.value.length && seen < digitsBeforeCursor) {
     if (/\d/.test(el.value[pos])) seen++;
@@ -558,8 +573,14 @@ function selectPhoneOption(opt) {
   opt.classList.add('phone-opt-current');
   opt.setAttribute('aria-selected', 'true');
   btn.dataset.dial = opt.dataset.dial;
-  btn.querySelector('.phone-prefix-flag').textContent = opt.querySelector('.phone-opt-flag').textContent;
+  btn.dataset.maxDigits = opt.dataset.maxDigits;
+  btn.querySelector('.phone-prefix-flag').src = opt.querySelector('.phone-opt-flag').src;
   btn.querySelector('.phone-prefix-dial').textContent = opt.dataset.dial;
+  // Se il numero già digitato supera il nuovo limite di cifre della nazione appena scelta, lo tronca subito
+  const numberInput = combo.closest('.phone-input-group')?.querySelector('.phone-number-input');
+  if (numberInput) {
+    numberInput.value = formatPhoneDigits(numberInput.value, parseInt(btn.dataset.maxDigits, 10) || 15);
+  }
   closeAllPhoneLists();
   btn.focus();
 }
@@ -9552,18 +9573,19 @@ const maybeStartTour = (function () {
       position: "bottom"
     },
     {
-      title: "Apri un'offerta",
-      text: "Ogni scheda è un'offerta vera. Toccala per vedere prezzo, sconto e scadenza. Da lì puoi anche toccare il nome del negozio per avere indirizzo, telefono e orari.",
-      highlight: null,          // gestito dinamicamente su .offer-row
-      position: "top",          // sposta il popup in alto
-      injectDemoOffers: true
+      title: "Le offerte vicino a te",
+      text: "Qui trovi le offerte dei negozi della tua zona. Clicca su una per vederne prezzo, sconto e scadenza.",
+      highlight: null,
+      position: "top",
+      injectDemoOffers: true,
+      waitForModalClose: true
     },
     {
       title: "La Lista Intelligente",
       text: "Salva i prodotti che ti servono, poi apri la Lista Intelligente da qui: scrivi cosa ti manca e ti diciamo in quali negozi conviene andare, tenendo conto anche del carburante se vuoi. Il percorso lo tracci sulla mappa in un tocco.",
       highlight: "#cartBtn",
       position: "bottom",
-      waitForClick: "#cartBtn", // l'utente deve cliccare il carrello
+      waitForClick: "#cartBtn",
       injectDemoCart: true
     },
     {
@@ -9577,6 +9599,8 @@ const maybeStartTour = (function () {
   let current = 0;
   let highlightedEl = null;
   let savedCartOnclick = null;
+  let originalCloseFullPageModal = null;
+  let waitingForModalClose = false;
 
   function clearHighlight() {
     if (highlightedEl) {
@@ -9599,53 +9623,95 @@ const maybeStartTour = (function () {
     document.querySelectorAll("." + DEMO_OFFER_CLASS).forEach(el => el.remove());
   }
 
+  function openDemoProductDetail() {
+    const product = {
+      id: "demo-1",
+      product: "Pasta Barilla 500g",
+      price: 1.29,
+      originalPrice: 1.89,
+      category: "Pasta, Riso e Cereali",
+      startDate: "2026-01-01",
+      endDate: "2026-12-31",
+      description: "Pasta di semola di grano duro, ottima per ogni tipo di condimento. Prodotto 100% italiano.",
+      img: "https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=600&h=600&fit=crop",
+      status: "active",
+      storeName: "Supermercato Demo",
+      storeCity: "Milano",
+      storeCap: "20100",
+      storeAddress: "Via Roma 1",
+      storeId: "demo-store",
+      storeLogo: "",
+      storePhone: "02 1234567",
+      storeHours: "Lun-Sab 8:30-20:30",
+      plan: "Professional",
+      unit: "pezzo",
+      cardRequirement: null,
+      limitedQuantity: true,
+      storeCardName: "Carta Fedeltà Demo",
+      storeCardImage: ""
+    };
+    if (typeof displayProductInModal === "function") {
+      displayProductInModal(product);
+      // Mostra il modal (displayProductInModal non lo fa da sola)
+      const modal = $("#fullPagePopup");
+      if (modal) {
+        modal.style.display = "flex";
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => modal.classList.add("is-visible"));
+        });
+        document.body.style.overflow = "hidden";
+      }
+    }
+  }
+
   function injectDemoOffers() {
     const grid = $("#offersGrid");
     if (!grid) return;
-    // Se ci sono già offerte reali, non sporcare nulla
-    const realOffers = grid.querySelectorAll(".offer-row:not(." + DEMO_OFFER_CLASS + ")");
-    if (realOffers.length > 0) return;
+    removeDemoOffers();
 
     const demos = [
       {
         product: "Pasta Barilla 500g",
-        store_name: "Supermercato Demo",
+        store: "Supermercato Demo",
         price: 1.29,
         original_price: 1.89,
-        img_url: "https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=300&h=300&fit=crop",
-        end_date: "2026-12-31"
+        img: "https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=300&h=300&fit=crop"
       },
       {
         product: "Detersivo Piatti 1L",
-        store_name: "Supermercato Demo",
+        store: "Supermercato Demo",
         price: 2.49,
         original_price: 3.99,
-        img_url: "https://images.unsplash.com/photo-1583947581924-860bda6a26df?w=300&h=300&fit=crop",
-        end_date: "2026-12-31"
+        img: "https://images.unsplash.com/photo-1583947581924-860bda6a26df?w=300&h=300&fit=crop"
       }
     ];
 
-    demos.forEach(o => {
+    demos.forEach((o) => {
       const row = document.createElement("div");
       row.className = "offer-row " + DEMO_OFFER_CLASS;
       row.innerHTML = `
         <div class="product-image-container">
-          <img src="${o.img_url}" class="product-img" alt="">
+          <img src="${o.img}" class="product-img" alt="">
         </div>
         <div class="product-info">
           <div class="product-details">
             <h3>${o.product}</h3>
-            <div class="store-name">${o.store_name}</div>
+            <div class="store-name">${o.store}</div>
           </div>
           <div class="product-actions">
             <div style="text-align:right;">
-              <div class="price-tag">€ ${o.price.toFixed(2).replace('.', ',')}</div>
-              <div style="font-size:0.75rem;color:#94a3b8;text-decoration:line-through;">€ ${o.original_price.toFixed(2).replace('.', ',')}</div>
+              <div class="price-tag">€ ${o.price.toFixed(2).replace(".", ",")}</div>
+              <div style="font-size:0.75rem;color:#94a3b8;text-decoration:line-through;">€ ${o.original_price.toFixed(2).replace(".", ",")}</div>
             </div>
           </div>
         </div>
       `;
-      grid.appendChild(row);
+      row.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openDemoProductDetail();
+      });
+      grid.prepend(row);
     });
   }
 
@@ -9688,6 +9754,26 @@ const maybeStartTour = (function () {
     `;
   }
 
+  function hookModalClose() {
+    if (!originalCloseFullPageModal && typeof window.closeFullPageModal === "function") {
+      originalCloseFullPageModal = window.closeFullPageModal;
+      window.closeFullPageModal = function () {
+        originalCloseFullPageModal.apply(this, arguments);
+        if (waitingForModalClose) {
+          waitingForModalClose = false;
+          setTimeout(nextStep, 300);
+        }
+      };
+    }
+  }
+
+  function unhookModalClose() {
+    if (originalCloseFullPageModal) {
+      window.closeFullPageModal = originalCloseFullPageModal;
+      originalCloseFullPageModal = null;
+    }
+  }
+
   function renderStep() {
     const step = steps[current];
     clearHighlight();
@@ -9699,52 +9785,51 @@ const maybeStartTour = (function () {
     const dotsEl = $("#tourDots");
     if (dotsEl) {
       dotsEl.innerHTML = steps.map((_, i) =>
-        `<span class="${i === current ? 'active' : ''}"></span>`
+        `<span class="${i === current ? "active" : ""}"></span>`
       ).join("");
     }
 
     const nextBtn = $("#tourNextBtn");
     if (nextBtn) {
-      if (step.waitForClick) {
-        nextBtn.style.display = "none";          // NON permette di andare avanti
+      if (step.waitForClick || step.waitForModalClose) {
+        nextBtn.style.display = "none";
       } else {
         nextBtn.style.display = "";
         nextBtn.textContent = current === steps.length - 1 ? "Inizia a cercare" : "Avanti";
       }
     }
 
-    // Step 4: offerte — inietta demo se vuota ed evidenzia la prima card
     if (step.injectDemoOffers) {
       injectDemoOffers();
       const grid = $("#offersGrid");
       if (grid) {
-        const anyRow = grid.querySelector(".offer-row");
-        if (anyRow) {
-          anyRow.classList.add("tour-highlight");
-          highlightedEl = anyRow;
-          anyRow.scrollIntoView({ behavior: "smooth", block: "center" });
+        const firstRow = grid.querySelector(".offer-row");
+        if (firstRow) {
+          firstRow.classList.add("tour-highlight");
+          highlightedEl = firstRow;
+          firstRow.scrollIntoView({ behavior: "smooth", block: "center" });
         } else {
           grid.classList.add("tour-highlight");
           highlightedEl = grid;
           grid.scrollIntoView({ behavior: "smooth", block: "center" });
         }
       }
+      waitingForModalClose = true;
+      hookModalClose();
     }
-    // Step 5: carrello — evidenzia il bottone e prepara l'intercettazione click
     else if (step.waitForClick) {
       const btn = document.querySelector(step.waitForClick);
       if (btn) {
-        // Salva handler originale
         if (savedCartOnclick === null) savedCartOnclick = btn.onclick;
         btn.onclick = function () {
-          openFullPageModal('cart');
+          openFullPageModal("cart");
           setTimeout(() => {
             if (step.injectDemoCart) injectDemoCart();
-            nextStep();   // il tour continua automaticamente appena apre
           }, 60);
+          waitingForModalClose = true;
+          hookModalClose();
         };
       }
-      // Evidenzia comunque il bottone
       if (step.highlight) {
         const el = document.querySelector(step.highlight);
         if (el) {
@@ -9754,7 +9839,6 @@ const maybeStartTour = (function () {
         }
       }
     }
-    // Altri step: evidenziazione classica
     else if (step.highlight) {
       const el = document.querySelector(step.highlight);
       if (el) {
@@ -9768,28 +9852,19 @@ const maybeStartTour = (function () {
   function closeTour() {
     clearHighlight();
     removeDemoOffers();
-    // Ripristina handler originale del cartBtn se ancora salvato
     if (savedCartOnclick !== null) {
       const btn = document.querySelector("#cartBtn");
       if (btn) btn.onclick = savedCartOnclick;
       savedCartOnclick = null;
     }
+    unhookModalClose();
+    document.body.classList.remove("tour-active");
     $("#tourOverlay")?.classList.add("hidden");
     $("#tourCard")?.classList.add("hidden");
     try { localStorage.setItem(STORAGE_KEY, "1"); } catch (e) {}
   }
 
   function nextStep() {
-    // Pulizia dello step precedente (rimuovi handler temporanei)
-    const prev = steps[current];
-    if (prev && prev.waitForClick) {
-      const btn = document.querySelector(prev.waitForClick);
-      if (btn && savedCartOnclick !== null) {
-        btn.onclick = savedCartOnclick;
-        savedCartOnclick = null;
-      }
-    }
-
     if (current === steps.length - 1) {
       closeTour();
       return;
@@ -9801,6 +9876,7 @@ const maybeStartTour = (function () {
   function startTour() {
     current = 0;
     savedCartOnclick = null;
+    document.body.classList.add("tour-active");
     $("#tourOverlay")?.classList.remove("hidden");
     $("#tourCard")?.classList.remove("hidden");
     renderStep();
