@@ -244,66 +244,203 @@ const clean = (str) => {
 
 // --- Selettore prefisso telefonico con bandiera ---
 // Usato in ogni punto in cui un negozio inserisce un numero (registrazione/abbonamento, Impostazioni Account, ecc.)
+// Elenco ordinato numericamente per prefisso (da +1 in su)
 const PHONE_COUNTRIES = [
-  { dial: '+39', flag: '🇮🇹', name: 'Italia' },
-  { dial: '+378', flag: '🇸🇲', name: 'San Marino' },
-  { dial: '+379', flag: '🇻🇦', name: 'Città del Vaticano' },
+  { dial: '+1', flag: '🇺🇸', name: 'Stati Uniti / Canada' },
+  { dial: '+7', flag: '🇰🇿', name: 'Kazakistan' },
+  { dial: '+7', flag: '🇷🇺', name: 'Russia' },
+  { dial: '+20', flag: '🇪🇬', name: 'Egitto' },
+  { dial: '+27', flag: '🇿🇦', name: 'Sudafrica' },
+  { dial: '+30', flag: '🇬🇷', name: 'Grecia' },
+  { dial: '+31', flag: '🇳🇱', name: 'Paesi Bassi' },
+  { dial: '+32', flag: '🇧🇪', name: 'Belgio' },
   { dial: '+33', flag: '🇫🇷', name: 'Francia' },
-  { dial: '+49', flag: '🇩🇪', name: 'Germania' },
   { dial: '+34', flag: '🇪🇸', name: 'Spagna' },
-  { dial: '+351', flag: '🇵🇹', name: 'Portogallo' },
+  { dial: '+36', flag: '🇭🇺', name: 'Ungheria' },
+  { dial: '+39', flag: '🇮🇹', name: 'Italia' },
+  { dial: '+40', flag: '🇷🇴', name: 'Romania' },
   { dial: '+41', flag: '🇨🇭', name: 'Svizzera' },
   { dial: '+43', flag: '🇦🇹', name: 'Austria' },
   { dial: '+44', flag: '🇬🇧', name: 'Regno Unito' },
-  { dial: '+353', flag: '🇮🇪', name: 'Irlanda' },
-  { dial: '+31', flag: '🇳🇱', name: 'Paesi Bassi' },
-  { dial: '+32', flag: '🇧🇪', name: 'Belgio' },
-  { dial: '+352', flag: '🇱🇺', name: 'Lussemburgo' },
-  { dial: '+356', flag: '🇲🇹', name: 'Malta' },
-  { dial: '+30', flag: '🇬🇷', name: 'Grecia' },
-  { dial: '+48', flag: '🇵🇱', name: 'Polonia' },
-  { dial: '+420', flag: '🇨🇿', name: 'Repubblica Ceca' },
-  { dial: '+421', flag: '🇸🇰', name: 'Slovacchia' },
-  { dial: '+386', flag: '🇸🇮', name: 'Slovenia' },
-  { dial: '+385', flag: '🇭🇷', name: 'Croazia' },
-  { dial: '+36', flag: '🇭🇺', name: 'Ungheria' },
-  { dial: '+40', flag: '🇷🇴', name: 'Romania' },
-  { dial: '+359', flag: '🇧🇬', name: 'Bulgaria' },
   { dial: '+45', flag: '🇩🇰', name: 'Danimarca' },
   { dial: '+46', flag: '🇸🇪', name: 'Svezia' },
   { dial: '+47', flag: '🇳🇴', name: 'Norvegia' },
-  { dial: '+358', flag: '🇫🇮', name: 'Finlandia' },
-  { dial: '+372', flag: '🇪🇪', name: 'Estonia' },
-  { dial: '+371', flag: '🇱🇻', name: 'Lettonia' },
-  { dial: '+370', flag: '🇱🇹', name: 'Lituania' },
-  { dial: '+355', flag: '🇦🇱', name: 'Albania' },
-  { dial: '+381', flag: '🇷🇸', name: 'Serbia' },
-  { dial: '+382', flag: '🇲🇪', name: 'Montenegro' },
-  { dial: '+389', flag: '🇲🇰', name: 'Macedonia del Nord' },
-  { dial: '+387', flag: '🇧🇦', name: 'Bosnia ed Erzegovina' },
-  { dial: '+383', flag: '🇽🇰', name: 'Kosovo' },
-  { dial: '+90', flag: '🇹🇷', name: 'Turchia' },
-  { dial: '+7', flag: '🇷🇺', name: 'Russia' },
-  { dial: '+380', flag: '🇺🇦', name: 'Ucraina' },
-  { dial: '+1', flag: '🇺🇸', name: 'Stati Uniti / Canada' },
-  { dial: '+55', flag: '🇧🇷', name: 'Brasile' },
-  { dial: '+54', flag: '🇦🇷', name: 'Argentina' },
+  { dial: '+48', flag: '🇵🇱', name: 'Polonia' },
+  { dial: '+49', flag: '🇩🇪', name: 'Germania' },
+  { dial: '+51', flag: '🇵🇪', name: 'Perù' },
   { dial: '+52', flag: '🇲🇽', name: 'Messico' },
-  { dial: '+86', flag: '🇨🇳', name: 'Cina' },
+  { dial: '+53', flag: '🇨🇺', name: 'Cuba' },
+  { dial: '+54', flag: '🇦🇷', name: 'Argentina' },
+  { dial: '+55', flag: '🇧🇷', name: 'Brasile' },
+  { dial: '+56', flag: '🇨🇱', name: 'Cile' },
+  { dial: '+57', flag: '🇨🇴', name: 'Colombia' },
+  { dial: '+58', flag: '🇻🇪', name: 'Venezuela' },
+  { dial: '+60', flag: '🇲🇾', name: 'Malesia' },
+  { dial: '+61', flag: '🇦🇺', name: 'Australia' },
+  { dial: '+62', flag: '🇮🇩', name: 'Indonesia' },
+  { dial: '+63', flag: '🇵🇭', name: 'Filippine' },
+  { dial: '+64', flag: '🇳🇿', name: 'Nuova Zelanda' },
+  { dial: '+65', flag: '🇸🇬', name: 'Singapore' },
+  { dial: '+66', flag: '🇹🇭', name: 'Thailandia' },
   { dial: '+81', flag: '🇯🇵', name: 'Giappone' },
   { dial: '+82', flag: '🇰🇷', name: 'Corea del Sud' },
+  { dial: '+84', flag: '🇻🇳', name: 'Vietnam' },
+  { dial: '+86', flag: '🇨🇳', name: 'Cina' },
+  { dial: '+90', flag: '🇹🇷', name: 'Turchia' },
   { dial: '+91', flag: '🇮🇳', name: 'India' },
-  { dial: '+61', flag: '🇦🇺', name: 'Australia' },
-  { dial: '+64', flag: '🇳🇿', name: 'Nuova Zelanda' },
-  { dial: '+20', flag: '🇪🇬', name: 'Egitto' },
+  { dial: '+92', flag: '🇵🇰', name: 'Pakistan' },
+  { dial: '+93', flag: '🇦🇫', name: 'Afghanistan' },
+  { dial: '+94', flag: '🇱🇰', name: 'Sri Lanka' },
+  { dial: '+95', flag: '🇲🇲', name: 'Myanmar' },
+  { dial: '+98', flag: '🇮🇷', name: 'Iran' },
+  { dial: '+211', flag: '🇸🇸', name: 'Sudan del Sud' },
   { dial: '+212', flag: '🇲🇦', name: 'Marocco' },
-  { dial: '+216', flag: '🇹🇳', name: 'Tunisia' },
   { dial: '+213', flag: '🇩🇿', name: 'Algeria' },
+  { dial: '+216', flag: '🇹🇳', name: 'Tunisia' },
+  { dial: '+218', flag: '🇱🇾', name: 'Libia' },
+  { dial: '+220', flag: '🇬🇲', name: 'Gambia' },
+  { dial: '+221', flag: '🇸🇳', name: 'Senegal' },
+  { dial: '+222', flag: '🇲🇷', name: 'Mauritania' },
+  { dial: '+223', flag: '🇲🇱', name: 'Mali' },
+  { dial: '+224', flag: '🇬🇳', name: 'Guinea' },
+  { dial: '+225', flag: '🇨🇮', name: 'Costa d\'Avorio' },
+  { dial: '+226', flag: '🇧🇫', name: 'Burkina Faso' },
+  { dial: '+227', flag: '🇳🇪', name: 'Niger' },
+  { dial: '+228', flag: '🇹🇬', name: 'Togo' },
+  { dial: '+229', flag: '🇧🇯', name: 'Benin' },
+  { dial: '+230', flag: '🇲🇺', name: 'Mauritius' },
+  { dial: '+231', flag: '🇱🇷', name: 'Liberia' },
+  { dial: '+232', flag: '🇸🇱', name: 'Sierra Leone' },
+  { dial: '+233', flag: '🇬🇭', name: 'Ghana' },
   { dial: '+234', flag: '🇳🇬', name: 'Nigeria' },
-  { dial: '+27', flag: '🇿🇦', name: 'Sudafrica' },
-  { dial: '+971', flag: '🇦🇪', name: 'Emirati Arabi Uniti' },
+  { dial: '+235', flag: '🇹🇩', name: 'Ciad' },
+  { dial: '+236', flag: '🇨🇫', name: 'Repubblica Centrafricana' },
+  { dial: '+237', flag: '🇨🇲', name: 'Camerun' },
+  { dial: '+238', flag: '🇨🇻', name: 'Capo Verde' },
+  { dial: '+239', flag: '🇸🇹', name: 'São Tomé e Príncipe' },
+  { dial: '+240', flag: '🇬🇶', name: 'Guinea Equatoriale' },
+  { dial: '+241', flag: '🇬🇦', name: 'Gabon' },
+  { dial: '+242', flag: '🇨🇬', name: 'Repubblica del Congo' },
+  { dial: '+243', flag: '🇨🇩', name: 'Repubblica Democratica del Congo' },
+  { dial: '+244', flag: '🇦🇴', name: 'Angola' },
+  { dial: '+245', flag: '🇬🇼', name: 'Guinea-Bissau' },
+  { dial: '+248', flag: '🇸🇨', name: 'Seychelles' },
+  { dial: '+249', flag: '🇸🇩', name: 'Sudan' },
+  { dial: '+250', flag: '🇷🇼', name: 'Ruanda' },
+  { dial: '+251', flag: '🇪🇹', name: 'Etiopia' },
+  { dial: '+252', flag: '🇸🇴', name: 'Somalia' },
+  { dial: '+253', flag: '🇩🇯', name: 'Gibuti' },
+  { dial: '+254', flag: '🇰🇪', name: 'Kenya' },
+  { dial: '+255', flag: '🇹🇿', name: 'Tanzania' },
+  { dial: '+256', flag: '🇺🇬', name: 'Uganda' },
+  { dial: '+257', flag: '🇧🇮', name: 'Burundi' },
+  { dial: '+258', flag: '🇲🇿', name: 'Mozambico' },
+  { dial: '+260', flag: '🇿🇲', name: 'Zambia' },
+  { dial: '+261', flag: '🇲🇬', name: 'Madagascar' },
+  { dial: '+263', flag: '🇿🇼', name: 'Zimbabwe' },
+  { dial: '+264', flag: '🇳🇦', name: 'Namibia' },
+  { dial: '+265', flag: '🇲🇼', name: 'Malawi' },
+  { dial: '+266', flag: '🇱🇸', name: 'Lesotho' },
+  { dial: '+267', flag: '🇧🇼', name: 'Botswana' },
+  { dial: '+268', flag: '🇸🇿', name: 'Eswatini' },
+  { dial: '+269', flag: '🇰🇲', name: 'Comore' },
+  { dial: '+290', flag: '🇸🇭', name: 'Sant\'Elena' },
+  { dial: '+291', flag: '🇪🇷', name: 'Eritrea' },
+  { dial: '+297', flag: '🇦🇼', name: 'Aruba' },
+  { dial: '+298', flag: '🇫🇴', name: 'Isole Faroe' },
+  { dial: '+299', flag: '🇬🇱', name: 'Groenlandia' },
+  { dial: '+350', flag: '🇬🇮', name: 'Gibilterra' },
+  { dial: '+351', flag: '🇵🇹', name: 'Portogallo' },
+  { dial: '+352', flag: '🇱🇺', name: 'Lussemburgo' },
+  { dial: '+353', flag: '🇮🇪', name: 'Irlanda' },
+  { dial: '+354', flag: '🇮🇸', name: 'Islanda' },
+  { dial: '+355', flag: '🇦🇱', name: 'Albania' },
+  { dial: '+356', flag: '🇲🇹', name: 'Malta' },
+  { dial: '+357', flag: '🇨🇾', name: 'Cipro' },
+  { dial: '+358', flag: '🇫🇮', name: 'Finlandia' },
+  { dial: '+359', flag: '🇧🇬', name: 'Bulgaria' },
+  { dial: '+370', flag: '🇱🇹', name: 'Lituania' },
+  { dial: '+371', flag: '🇱🇻', name: 'Lettonia' },
+  { dial: '+372', flag: '🇪🇪', name: 'Estonia' },
+  { dial: '+373', flag: '🇲🇩', name: 'Moldavia' },
+  { dial: '+374', flag: '🇦🇲', name: 'Armenia' },
+  { dial: '+375', flag: '🇧🇾', name: 'Bielorussia' },
+  { dial: '+376', flag: '🇦🇩', name: 'Andorra' },
+  { dial: '+377', flag: '🇲🇨', name: 'Monaco' },
+  { dial: '+378', flag: '🇸🇲', name: 'San Marino' },
+  { dial: '+379', flag: '🇻🇦', name: 'Città del Vaticano' },
+  { dial: '+380', flag: '🇺🇦', name: 'Ucraina' },
+  { dial: '+381', flag: '🇷🇸', name: 'Serbia' },
+  { dial: '+382', flag: '🇲🇪', name: 'Montenegro' },
+  { dial: '+383', flag: '🇽🇰', name: 'Kosovo' },
+  { dial: '+385', flag: '🇭🇷', name: 'Croazia' },
+  { dial: '+386', flag: '🇸🇮', name: 'Slovenia' },
+  { dial: '+387', flag: '🇧🇦', name: 'Bosnia ed Erzegovina' },
+  { dial: '+389', flag: '🇲🇰', name: 'Macedonia del Nord' },
+  { dial: '+420', flag: '🇨🇿', name: 'Repubblica Ceca' },
+  { dial: '+421', flag: '🇸🇰', name: 'Slovacchia' },
+  { dial: '+423', flag: '🇱🇮', name: 'Liechtenstein' },
+  { dial: '+500', flag: '🇫🇰', name: 'Isole Falkland' },
+  { dial: '+501', flag: '🇧🇿', name: 'Belize' },
+  { dial: '+502', flag: '🇬🇹', name: 'Guatemala' },
+  { dial: '+503', flag: '🇸🇻', name: 'El Salvador' },
+  { dial: '+504', flag: '🇭🇳', name: 'Honduras' },
+  { dial: '+505', flag: '🇳🇮', name: 'Nicaragua' },
+  { dial: '+506', flag: '🇨🇷', name: 'Costa Rica' },
+  { dial: '+507', flag: '🇵🇦', name: 'Panama' },
+  { dial: '+509', flag: '🇭🇹', name: 'Haiti' },
+  { dial: '+591', flag: '🇧🇴', name: 'Bolivia' },
+  { dial: '+592', flag: '🇬🇾', name: 'Guyana' },
+  { dial: '+593', flag: '🇪🇨', name: 'Ecuador' },
+  { dial: '+595', flag: '🇵🇾', name: 'Paraguay' },
+  { dial: '+597', flag: '🇸🇷', name: 'Suriname' },
+  { dial: '+598', flag: '🇺🇾', name: 'Uruguay' },
+  { dial: '+670', flag: '🇹🇱', name: 'Timor Est' },
+  { dial: '+673', flag: '🇧🇳', name: 'Brunei' },
+  { dial: '+674', flag: '🇳🇷', name: 'Nauru' },
+  { dial: '+675', flag: '🇵🇬', name: 'Papua Nuova Guinea' },
+  { dial: '+676', flag: '🇹🇴', name: 'Tonga' },
+  { dial: '+677', flag: '🇸🇧', name: 'Isole Salomone' },
+  { dial: '+678', flag: '🇻🇺', name: 'Vanuatu' },
+  { dial: '+679', flag: '🇫🇯', name: 'Figi' },
+  { dial: '+680', flag: '🇵🇼', name: 'Palau' },
+  { dial: '+682', flag: '🇨🇰', name: 'Isole Cook' },
+  { dial: '+685', flag: '🇼🇸', name: 'Samoa' },
+  { dial: '+686', flag: '🇰🇮', name: 'Kiribati' },
+  { dial: '+687', flag: '🇳🇨', name: 'Nuova Caledonia' },
+  { dial: '+689', flag: '🇵🇫', name: 'Polinesia Francese' },
+  { dial: '+691', flag: '🇫🇲', name: 'Micronesia' },
+  { dial: '+692', flag: '🇲🇭', name: 'Isole Marshall' },
+  { dial: '+850', flag: '🇰🇵', name: 'Corea del Nord' },
+  { dial: '+852', flag: '🇭🇰', name: 'Hong Kong' },
+  { dial: '+853', flag: '🇲🇴', name: 'Macao' },
+  { dial: '+855', flag: '🇰🇭', name: 'Cambogia' },
+  { dial: '+856', flag: '🇱🇦', name: 'Laos' },
+  { dial: '+880', flag: '🇧🇩', name: 'Bangladesh' },
+  { dial: '+886', flag: '🇹🇼', name: 'Taiwan' },
+  { dial: '+960', flag: '🇲🇻', name: 'Maldive' },
+  { dial: '+961', flag: '🇱🇧', name: 'Libano' },
+  { dial: '+962', flag: '🇯🇴', name: 'Giordania' },
+  { dial: '+963', flag: '🇸🇾', name: 'Siria' },
+  { dial: '+964', flag: '🇮🇶', name: 'Iraq' },
+  { dial: '+965', flag: '🇰🇼', name: 'Kuwait' },
   { dial: '+966', flag: '🇸🇦', name: 'Arabia Saudita' },
-  { dial: '+972', flag: '🇮🇱', name: 'Israele' }
+  { dial: '+967', flag: '🇾🇪', name: 'Yemen' },
+  { dial: '+968', flag: '🇴🇲', name: 'Oman' },
+  { dial: '+970', flag: '🇵🇸', name: 'Palestina' },
+  { dial: '+971', flag: '🇦🇪', name: 'Emirati Arabi Uniti' },
+  { dial: '+972', flag: '🇮🇱', name: 'Israele' },
+  { dial: '+973', flag: '🇧🇭', name: 'Bahrein' },
+  { dial: '+974', flag: '🇶🇦', name: 'Qatar' },
+  { dial: '+975', flag: '🇧🇹', name: 'Bhutan' },
+  { dial: '+976', flag: '🇲🇳', name: 'Mongolia' },
+  { dial: '+977', flag: '🇳🇵', name: 'Nepal' },
+  { dial: '+992', flag: '🇹🇯', name: 'Tagikistan' },
+  { dial: '+993', flag: '🇹🇲', name: 'Turkmenistan' },
+  { dial: '+994', flag: '🇦🇿', name: 'Azerbaigian' },
+  { dial: '+995', flag: '🇬🇪', name: 'Georgia' },
+  { dial: '+996', flag: '🇰🇬', name: 'Kirghizistan' },
+  { dial: '+998', flag: '🇺🇿', name: 'Uzbekistan' }
 ];
 
 // Raggruppa le cifre come un numero italiano classico: 3-3-4 (le cifre oltre la decima restano nell'ultimo blocco)
@@ -327,18 +464,33 @@ function splitPhoneValue(saved) {
   return { dial: '+39', number: formatPhoneDigits(trimmed) };
 }
 
-function buildPhonePrefixOptions(selectedDial) {
-  return PHONE_COUNTRIES.map(c =>
-    `<option value="${c.dial}" ${c.dial === selectedDial ? 'selected' : ''}>${c.flag} ${c.dial}</option>`
-  ).join('');
+// Rimuove gli accenti per rendere la ricerca digitata insensibile a lettere accentate (es. "perù" -> "peru")
+function stripDiacritics(str) {
+  return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-// Genera il blocco "prefisso con bandiera + numero": da usare in qualsiasi form dove serve un telefono
+// Genera le righe della tendina: bandiera, nome paese, prefisso tra parentesi
+function buildPhonePrefixOptionsList(selectedDial) {
+  return PHONE_COUNTRIES.map(c => {
+    const isSelected = c.dial === selectedDial;
+    return `<li role="option" class="phone-prefix-option${isSelected ? ' phone-opt-current' : ''}" data-dial="${c.dial}" data-search="${stripDiacritics(c.name).toLowerCase()}" aria-selected="${isSelected}">` +
+      `<span class="phone-opt-flag">${c.flag}</span><span class="phone-opt-name">${c.name}</span><span class="phone-opt-dial">(${c.dial})</span></li>`;
+  }).join('');
+}
+
+// Genera il blocco "prefisso con bandiera + numero": da usare in qualsiasi form dove serve un telefono.
+// Da chiuso mostra solo bandiera+prefisso (mai il nome); il nome compare solo aprendo la tendina.
 function renderPhoneInputGroup(prefixId, numberId, savedPhone, placeholder) {
   const { dial, number } = splitPhoneValue(savedPhone);
+  const country = PHONE_COUNTRIES.find(c => c.dial === dial) || PHONE_COUNTRIES.find(c => c.dial === '+39');
   return `
     <div class="phone-input-group">
-      <select id="${prefixId}" class="phone-prefix-select" aria-label="Prefisso internazionale">${buildPhonePrefixOptions(dial)}</select>
+      <div class="phone-prefix-combo">
+        <button type="button" class="phone-prefix-btn" id="${prefixId}" data-dial="${country.dial}" aria-haspopup="listbox" aria-expanded="false" aria-label="Prefisso internazionale, attuale ${country.name} ${country.dial}">
+          <span class="phone-prefix-flag">${country.flag}</span><span class="phone-prefix-dial">${country.dial}</span>
+        </button>
+        <ul class="phone-prefix-list" role="listbox" hidden>${buildPhonePrefixOptionsList(country.dial)}</ul>
+      </div>
       <input type="tel" id="${numberId}" class="phone-number-input" inputmode="numeric" autocomplete="tel-national" placeholder="${placeholder || 'Numero di telefono'}" value="${number}">
     </div>
   `;
@@ -346,7 +498,7 @@ function renderPhoneInputGroup(prefixId, numberId, savedPhone, placeholder) {
 
 // Combina prefisso + numero in un'unica stringa da salvare (es. "+39 333 111 2222")
 function getPhoneInputValue(prefixId, numberId) {
-  const prefix = document.getElementById(prefixId)?.value || '+39';
+  const prefix = document.getElementById(prefixId)?.dataset.dial || '+39';
   const number = clean(document.getElementById(numberId)?.value || '').trim();
   return number ? `${prefix} ${number}` : '';
 }
@@ -364,6 +516,137 @@ document.addEventListener('input', (e) => {
     pos++;
   }
   el.setSelectionRange(pos, pos);
+});
+
+// --- Comportamento della tendina prefissi (apertura, selezione, ricerca da tastiera) ---
+let phoneSearchBuffer = '';
+let phoneSearchTimer = null;
+
+function closeAllPhoneLists() {
+  document.querySelectorAll('.phone-prefix-list').forEach(list => {
+    list.hidden = true;
+    list.querySelectorAll('.phone-prefix-option').forEach(o => {
+      o.classList.remove('phone-opt-highlighted', 'phone-opt-selected-match');
+    });
+  });
+  document.querySelectorAll('.phone-prefix-combo.open').forEach(combo => {
+    combo.classList.remove('open');
+    combo.querySelector('.phone-prefix-btn')?.setAttribute('aria-expanded', 'false');
+  });
+  phoneSearchBuffer = '';
+  clearTimeout(phoneSearchTimer);
+}
+
+function openPhoneList(combo) {
+  const btn = combo.querySelector('.phone-prefix-btn');
+  const list = combo.querySelector('.phone-prefix-list');
+  list.hidden = false;
+  combo.classList.add('open');
+  btn.setAttribute('aria-expanded', 'true');
+  const current = list.querySelector('.phone-opt-current');
+  if (current) current.scrollIntoView({ block: 'center' });
+}
+
+function selectPhoneOption(opt) {
+  const combo = opt.closest('.phone-prefix-combo');
+  const btn = combo.querySelector('.phone-prefix-btn');
+  const list = combo.querySelector('.phone-prefix-list');
+  list.querySelectorAll('.phone-opt-current').forEach(o => {
+    o.classList.remove('phone-opt-current');
+    o.setAttribute('aria-selected', 'false');
+  });
+  opt.classList.add('phone-opt-current');
+  opt.setAttribute('aria-selected', 'true');
+  btn.dataset.dial = opt.dataset.dial;
+  btn.querySelector('.phone-prefix-flag').textContent = opt.querySelector('.phone-opt-flag').textContent;
+  btn.querySelector('.phone-prefix-dial').textContent = opt.dataset.dial;
+  closeAllPhoneLists();
+  btn.focus();
+}
+
+// Cerca nella tendina aperta: cifra digitata -> cerca per prefisso, lettera digitata -> cerca per nome.
+// Il primo risultato viene centrato nella lista; se è l'unico a corrispondere, viene evidenziato in blu.
+function searchPhoneList(list, buffer, isDigit) {
+  const options = Array.from(list.querySelectorAll('.phone-prefix-option'));
+  const needle = isDigit ? buffer : stripDiacritics(buffer).toLowerCase();
+  const matches = options.filter(opt => {
+    if (isDigit) return opt.dataset.dial.replace('+', '').startsWith(needle);
+    return opt.dataset.search.startsWith(needle);
+  });
+  options.forEach(opt => opt.classList.remove('phone-opt-highlighted', 'phone-opt-selected-match'));
+  if (matches.length === 0) return;
+  const best = matches[0];
+  if (matches.length === 1) {
+    best.classList.add('phone-opt-selected-match');
+  } else {
+    best.classList.add('phone-opt-highlighted');
+  }
+  best.scrollIntoView({ block: 'center' });
+}
+
+function movePhoneHighlight(list, direction) {
+  const options = Array.from(list.querySelectorAll('.phone-prefix-option'));
+  if (!options.length) return;
+  let idx = options.findIndex(o => o.classList.contains('phone-opt-highlighted') || o.classList.contains('phone-opt-selected-match') || o.classList.contains('phone-opt-current'));
+  idx = idx === -1 ? 0 : Math.min(options.length - 1, Math.max(0, idx + direction));
+  options.forEach(o => o.classList.remove('phone-opt-highlighted', 'phone-opt-selected-match'));
+  options[idx].classList.add('phone-opt-selected-match');
+  options[idx].scrollIntoView({ block: 'center' });
+  phoneSearchBuffer = '';
+}
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.phone-prefix-btn');
+  if (btn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const combo = btn.closest('.phone-prefix-combo');
+    const alreadyOpen = combo.classList.contains('open');
+    closeAllPhoneLists();
+    if (!alreadyOpen) openPhoneList(combo);
+    return;
+  }
+  const opt = e.target.closest('.phone-prefix-option');
+  if (opt) {
+    e.preventDefault();
+    selectPhoneOption(opt);
+    return;
+  }
+  if (!e.target.closest('.phone-prefix-list')) {
+    closeAllPhoneLists();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  const openList = document.querySelector('.phone-prefix-list:not([hidden])');
+  if (!openList) return;
+  const combo = openList.closest('.phone-prefix-combo');
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeAllPhoneLists();
+    combo.querySelector('.phone-prefix-btn')?.focus();
+    return;
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const match = openList.querySelector('.phone-opt-selected-match') || openList.querySelector('.phone-opt-highlighted');
+    if (match) selectPhoneOption(match);
+    return;
+  }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    movePhoneHighlight(openList, e.key === 'ArrowDown' ? 1 : -1);
+    return;
+  }
+  if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key)) {
+    clearTimeout(phoneSearchTimer);
+    const isDigit = /[0-9]/.test(e.key);
+    const sameType = phoneSearchBuffer && (isDigit === /^[0-9]/.test(phoneSearchBuffer));
+    phoneSearchBuffer = sameType ? phoneSearchBuffer + e.key : e.key;
+    phoneSearchTimer = setTimeout(() => { phoneSearchBuffer = ''; }, 700);
+    searchPhoneList(openList, phoneSearchBuffer, isDigit);
+  }
 });
 
 /**

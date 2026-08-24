@@ -1112,16 +1112,110 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
   width: 100%;
 }
 
-.phone-prefix-select {
-  flex: 0 0 108px;
+.phone-prefix-combo {
+  position: relative;
+  flex: 0 0 104px;
+}
+
+.phone-prefix-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 14px 6px;
   border-radius: var(--radius-md);
   border: 1px solid #ddd;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-family: inherit;
   background: #fff;
   color: var(--text);
   cursor: pointer;
+}
+
+.phone-prefix-flag {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.phone-prefix-btn:focus,
+.phone-prefix-combo.open .phone-prefix-btn {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(15, 98, 254, 0.12);
+}
+
+.phone-prefix-list {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 280px;
+  max-width: 85vw;
+  max-height: 280px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+  padding: 6px 0;
+  margin: 0;
+  list-style: none;
+}
+
+.phone-prefix-list[hidden] {
+  display: none;
+}
+
+.phone-prefix-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 0.88rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.phone-opt-flag {
+  font-size: 1.05rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.phone-opt-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.phone-opt-dial {
+  flex: 0 0 auto;
+  color: #667;
+  font-size: 0.82rem;
+}
+
+.phone-prefix-option:hover {
+  background: #f0f4ff;
+}
+
+.phone-prefix-option.phone-opt-current {
+  background: #f5f8ff;
+  font-weight: 600;
+}
+
+.phone-prefix-option.phone-opt-highlighted {
+  background: #eaf1ff;
+}
+
+.phone-prefix-option.phone-opt-selected-match {
+  background: var(--primary);
+  color: #fff;
+}
+
+.phone-prefix-option.phone-opt-selected-match .phone-opt-dial {
+  color: #dbe9ff;
 }
 
 .phone-number-input {
@@ -1135,7 +1229,6 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
   letter-spacing: 0.3px;
 }
 
-.phone-prefix-select:focus,
 .phone-number-input:focus {
   outline: none;
   border-color: var(--primary);
@@ -1146,9 +1239,13 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
   .phone-input-group {
     flex-wrap: wrap;
   }
-  .phone-prefix-select,
+  .phone-prefix-combo,
   .phone-number-input {
     flex: 1 1 100%;
+  }
+  .phone-prefix-list {
+    width: 100%;
+    max-width: 100%;
   }
 }
 
