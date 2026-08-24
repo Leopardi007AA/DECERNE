@@ -242,6 +242,130 @@ const clean = (str) => {
   return str.replace(/<\/?[^>]+(>|$)/g, ""); 
 };
 
+// --- Selettore prefisso telefonico con bandiera ---
+// Usato in ogni punto in cui un negozio inserisce un numero (registrazione/abbonamento, Impostazioni Account, ecc.)
+const PHONE_COUNTRIES = [
+  { dial: '+39', flag: '🇮🇹', name: 'Italia' },
+  { dial: '+378', flag: '🇸🇲', name: 'San Marino' },
+  { dial: '+379', flag: '🇻🇦', name: 'Città del Vaticano' },
+  { dial: '+33', flag: '🇫🇷', name: 'Francia' },
+  { dial: '+49', flag: '🇩🇪', name: 'Germania' },
+  { dial: '+34', flag: '🇪🇸', name: 'Spagna' },
+  { dial: '+351', flag: '🇵🇹', name: 'Portogallo' },
+  { dial: '+41', flag: '🇨🇭', name: 'Svizzera' },
+  { dial: '+43', flag: '🇦🇹', name: 'Austria' },
+  { dial: '+44', flag: '🇬🇧', name: 'Regno Unito' },
+  { dial: '+353', flag: '🇮🇪', name: 'Irlanda' },
+  { dial: '+31', flag: '🇳🇱', name: 'Paesi Bassi' },
+  { dial: '+32', flag: '🇧🇪', name: 'Belgio' },
+  { dial: '+352', flag: '🇱🇺', name: 'Lussemburgo' },
+  { dial: '+356', flag: '🇲🇹', name: 'Malta' },
+  { dial: '+30', flag: '🇬🇷', name: 'Grecia' },
+  { dial: '+48', flag: '🇵🇱', name: 'Polonia' },
+  { dial: '+420', flag: '🇨🇿', name: 'Repubblica Ceca' },
+  { dial: '+421', flag: '🇸🇰', name: 'Slovacchia' },
+  { dial: '+386', flag: '🇸🇮', name: 'Slovenia' },
+  { dial: '+385', flag: '🇭🇷', name: 'Croazia' },
+  { dial: '+36', flag: '🇭🇺', name: 'Ungheria' },
+  { dial: '+40', flag: '🇷🇴', name: 'Romania' },
+  { dial: '+359', flag: '🇧🇬', name: 'Bulgaria' },
+  { dial: '+45', flag: '🇩🇰', name: 'Danimarca' },
+  { dial: '+46', flag: '🇸🇪', name: 'Svezia' },
+  { dial: '+47', flag: '🇳🇴', name: 'Norvegia' },
+  { dial: '+358', flag: '🇫🇮', name: 'Finlandia' },
+  { dial: '+372', flag: '🇪🇪', name: 'Estonia' },
+  { dial: '+371', flag: '🇱🇻', name: 'Lettonia' },
+  { dial: '+370', flag: '🇱🇹', name: 'Lituania' },
+  { dial: '+355', flag: '🇦🇱', name: 'Albania' },
+  { dial: '+381', flag: '🇷🇸', name: 'Serbia' },
+  { dial: '+382', flag: '🇲🇪', name: 'Montenegro' },
+  { dial: '+389', flag: '🇲🇰', name: 'Macedonia del Nord' },
+  { dial: '+387', flag: '🇧🇦', name: 'Bosnia ed Erzegovina' },
+  { dial: '+383', flag: '🇽🇰', name: 'Kosovo' },
+  { dial: '+90', flag: '🇹🇷', name: 'Turchia' },
+  { dial: '+7', flag: '🇷🇺', name: 'Russia' },
+  { dial: '+380', flag: '🇺🇦', name: 'Ucraina' },
+  { dial: '+1', flag: '🇺🇸', name: 'Stati Uniti / Canada' },
+  { dial: '+55', flag: '🇧🇷', name: 'Brasile' },
+  { dial: '+54', flag: '🇦🇷', name: 'Argentina' },
+  { dial: '+52', flag: '🇲🇽', name: 'Messico' },
+  { dial: '+86', flag: '🇨🇳', name: 'Cina' },
+  { dial: '+81', flag: '🇯🇵', name: 'Giappone' },
+  { dial: '+82', flag: '🇰🇷', name: 'Corea del Sud' },
+  { dial: '+91', flag: '🇮🇳', name: 'India' },
+  { dial: '+61', flag: '🇦🇺', name: 'Australia' },
+  { dial: '+64', flag: '🇳🇿', name: 'Nuova Zelanda' },
+  { dial: '+20', flag: '🇪🇬', name: 'Egitto' },
+  { dial: '+212', flag: '🇲🇦', name: 'Marocco' },
+  { dial: '+216', flag: '🇹🇳', name: 'Tunisia' },
+  { dial: '+213', flag: '🇩🇿', name: 'Algeria' },
+  { dial: '+234', flag: '🇳🇬', name: 'Nigeria' },
+  { dial: '+27', flag: '🇿🇦', name: 'Sudafrica' },
+  { dial: '+971', flag: '🇦🇪', name: 'Emirati Arabi Uniti' },
+  { dial: '+966', flag: '🇸🇦', name: 'Arabia Saudita' },
+  { dial: '+972', flag: '🇮🇱', name: 'Israele' }
+];
+
+// Raggruppa le cifre come un numero italiano classico: 3-3-4 (le cifre oltre la decima restano nell'ultimo blocco)
+function formatPhoneDigits(raw) {
+  const digits = String(raw || '').replace(/\D/g, '').slice(0, 15);
+  const p1 = digits.slice(0, 3);
+  const p2 = digits.slice(3, 6);
+  const p3 = digits.slice(6);
+  return [p1, p2, p3].filter(Boolean).join(' ');
+}
+
+// Scompone un numero già salvato (es. "+39 333 111 2222") in prefisso + cifre formattate
+function splitPhoneValue(saved) {
+  const trimmed = String(saved || '').trim();
+  if (!trimmed) return { dial: '+39', number: '' };
+  const match = trimmed.match(/^(\+\d{1,4})\s*(.*)$/);
+  if (match && PHONE_COUNTRIES.some(c => c.dial === match[1])) {
+    return { dial: match[1], number: formatPhoneDigits(match[2]) };
+  }
+  // Numero salvato senza un prefisso riconosciuto: lo trattiamo come italiano
+  return { dial: '+39', number: formatPhoneDigits(trimmed) };
+}
+
+function buildPhonePrefixOptions(selectedDial) {
+  return PHONE_COUNTRIES.map(c =>
+    `<option value="${c.dial}" ${c.dial === selectedDial ? 'selected' : ''}>${c.flag} ${c.dial}</option>`
+  ).join('');
+}
+
+// Genera il blocco "prefisso con bandiera + numero": da usare in qualsiasi form dove serve un telefono
+function renderPhoneInputGroup(prefixId, numberId, savedPhone, placeholder) {
+  const { dial, number } = splitPhoneValue(savedPhone);
+  return `
+    <div class="phone-input-group">
+      <select id="${prefixId}" class="phone-prefix-select" aria-label="Prefisso internazionale">${buildPhonePrefixOptions(dial)}</select>
+      <input type="tel" id="${numberId}" class="phone-number-input" inputmode="numeric" autocomplete="tel-national" placeholder="${placeholder || 'Numero di telefono'}" value="${number}">
+    </div>
+  `;
+}
+
+// Combina prefisso + numero in un'unica stringa da salvare (es. "+39 333 111 2222")
+function getPhoneInputValue(prefixId, numberId) {
+  const prefix = document.getElementById(prefixId)?.value || '+39';
+  const number = clean(document.getElementById(numberId)?.value || '').trim();
+  return number ? `${prefix} ${number}` : '';
+}
+
+// Formattazione live delegata: funziona su qualunque .phone-number-input presente ora o
+// aggiunto in futuro, anche dopo un innerHTML di ri-render, senza dover ricollegare listener
+document.addEventListener('input', (e) => {
+  const el = e.target;
+  if (!el || !el.classList || !el.classList.contains('phone-number-input')) return;
+  const digitsBeforeCursor = el.value.slice(0, el.selectionStart).replace(/\D/g, '').length;
+  el.value = formatPhoneDigits(el.value);
+  let pos = 0, seen = 0;
+  while (pos < el.value.length && seen < digitsBeforeCursor) {
+    if (/\d/.test(el.value[pos])) seen++;
+    pos++;
+  }
+  el.setSelectionRange(pos, pos);
+});
+
 /**
  * Tenta di acquisire un lock per una specifica offerta
  * @returns {boolean} true se il lock è acquisito, false se è occupato
@@ -574,7 +698,6 @@ window.saveStoreProfile = async (e) => {
     // Recupero dati dal form (Impostazioni). L'email resta sola lettura: cambiarla
     // davvero richiederebbe il flusso di verifica di Supabase Auth, non lo facciamo qui.
     const nameInput = document.getElementById("profName");
-    const telInput = document.getElementById("profTel");
     const logoInput = document.getElementById("profLogo");
     const hoursInput = document.getElementById("profHours");
     const notesInput = document.getElementById("profNotes");
@@ -588,7 +711,7 @@ window.saveStoreProfile = async (e) => {
       .from('stores')
       .update({
         name: newName,
-        phone: clean(telInput?.value || ""),
+        phone: getPhoneInputValue('profTelPrefix', 'profTel'),
         hours: clean(hoursInput?.value || ""),
         logo_url: newLogo,
         internal_notes: clean(notesInput?.value || ""),
@@ -1330,11 +1453,25 @@ function initOfferRevealObserver() {
       // Scroll veloce (scatto/flick): accorciamo l'animazione per non lasciare
       // spazi vuoti in griglia mentre l'utente ha già superato la card.
       const fastScroll = currentScrollVelocity > 18; // soglia in px/frame, regolabile
-      el.style.setProperty('--reveal-duration', fastScroll ? '0.2s' : '1.6s');
-      // Nessun unobserve/cleanup: la card entra ed esce ogni volta che
-      // attraversa il punto di trigger, in entrambe le direzioni di scroll,
-      // così l'effetto resta attivo per sempre e non solo la prima volta.
-      el.classList.toggle('in-view', entry.isIntersecting);
+      el.style.setProperty('--reveal-duration', fastScroll ? '0.2s' : '1.9s');
+
+      if (entry.isIntersecting) {
+        // Il prodotto è visibile (o torna visibile): lo mostriamo.
+        el.classList.add('in-view');
+        return;
+      }
+
+      // Non è più visibile: da che lato è uscito?
+      // Se il bordo inferiore della card è sopra lo zero, significa che è
+      // uscita da SOPRA lo schermo — è già stata vista e semplicemente
+      // superata scorrendo. Resta comparsa per sempre, ferma, senza animarsi.
+      const exitedFromTop = entry.boundingClientRect.bottom <= 0;
+      if (exitedFromTop) return;
+
+      // Altrimenti è ancora sotto la viewport: risalendo la stiamo
+      // "riportando" fuori dallo schermo, quindi la facciamo rientrare
+      // verso l'esterno, dallo stesso lato da cui era comparsa.
+      el.classList.remove('in-view');
     });
   }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
 }
@@ -1888,7 +2025,7 @@ function renderProfileTab() {
           </div>
           <div class="input-group">
             <label>Telefono Contatto</label>
-            <input type="tel" id="profTel" value="${partner.phone || ''}">
+            ${renderPhoneInputGroup('profTelPrefix', 'profTel', partner.phone || '', 'Numero di Telefono')}
           </div>
         </div>
 
@@ -5729,7 +5866,7 @@ function renderOnboarding(container) {
         <p class="step-sub">Completa il profilo (Facoltativo).</p>
         <form id="onboardingForm" class="auth-form">
           <input type="url" id="obLogo" placeholder="URL Logo (es: https://...)">
-          <input type="tel" id="obTel" placeholder="Numero di Telefono">
+          ${renderPhoneInputGroup('obTelPrefix', 'obTel', storeData.tempReg?.phone || '', 'Numero di Telefono')}
           <input type="text" id="obHours" placeholder="Orari (es: Lun-Sab 08-20)">
           <input type="url" id="obWeb" placeholder="Sito Web">
           
@@ -5887,7 +6024,7 @@ async function handleOnboardingSubmit(step) {
       }
 
       const logoUrl = clean($("#obLogo").value);
-      const phone = clean($("#obTel").value);
+      const phone = getPhoneInputValue('obTelPrefix', 'obTel');
       const fullAddress = `${storeData.tempReg.street}, ${storeData.tempReg.cap} ${storeData.tempReg.city}`;
       const emailClean = storeData.tempReg.email;
       const planChoice = storeData.subscription?.plan || 'Starter';
@@ -5920,7 +6057,7 @@ async function handleOnboardingSubmit(step) {
           billing_cycle: isDirectAnnual ? 'annual' : 'monthly',
           subscription_status: isDirectAnnual ? 'active' : 'trial',
           renewal_date: annualRenewalISO,
-          business_type: typeVal,
+          business_type: storeData.tempReg.type,
           // FIX: prima chi si registrava direttamente su Professional/Enterprise
           // restava senza api_key finché non cliccava "Rigenera" a mano.
           api_key: (planChoice === 'Professional' || planChoice === 'Enterprise') ? generateRandomApiKey() : null

@@ -597,10 +597,10 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
                 box-shadow var(--reveal-duration) ease-out;
   }
   #offersGrid > .offer-row.scroll-reveal.from-left {
-    transform: translateX(-60px) rotate(-2deg);
+    transform: translateX(-110px) rotate(-4deg);
   }
   #offersGrid > .offer-row.scroll-reveal.from-right {
-    transform: translateX(60px) rotate(2deg);
+    transform: translateX(110px) rotate(4deg);
   }
   #offersGrid > .offer-row.scroll-reveal.in-view {
     opacity: 1;
@@ -1030,6 +1030,53 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
   font-weight: 700;
   margin-left: 5px;
   text-transform: uppercase;
+}
+
+/* --- Selettore prefisso telefonico con bandiera + numero raggruppato --- */
+.phone-input-group {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.phone-prefix-select {
+  flex: 0 0 108px;
+  padding: 14px 6px;
+  border-radius: var(--radius-md);
+  border: 1px solid #ddd;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.phone-number-input {
+  flex: 1;
+  min-width: 0;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid #ddd;
+  font-size: 1rem;
+  font-family: inherit;
+  letter-spacing: 0.3px;
+}
+
+.phone-prefix-select:focus,
+.phone-number-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(15, 98, 254, 0.12);
+}
+
+@media (max-width: 480px) {
+  .phone-input-group {
+    flex-wrap: wrap;
+  }
+  .phone-prefix-select,
+  .phone-number-input {
+    flex: 1 1 100%;
+  }
 }
 
 /* --- Box sedi (Gestione Punti Vendita): indirizzo, città, CAP, coordinate --- */
