@@ -9247,42 +9247,53 @@ window.hideLoading = () => {
 // Pannello Partner né su Chi Siamo), dopo che il banner cookie è stato chiuso.
 const maybeStartTour = (function () {
   const STORAGE_KEY = "decerne_tour_seen";
+  const DEMO_OFFER_CLASS = "tour-demo-offer";
 
   const steps = [
     {
       title: "Benvenuto su DECERNE",
       text: "Qui trovi le offerte reali dei supermercati vicino a te, caricate direttamente dai negozi. Ci vogliono pochi secondi per mostrarti come funziona.",
-      highlight: null
+      highlight: null,
+      position: "bottom"
     },
     {
       title: "Imposta dove sei",
       text: "Scrivi qui la tua città o il CAP (oppure consenti la posizione quando te lo chiediamo): le offerte si ordinano in base a quanto sono vicine.",
-      highlight: "#locationInput"
+      highlight: "#locationInput",
+      position: "bottom"
     },
     {
       title: "Cerca un prodotto",
       text: "Se ti serve qualcosa di preciso — pasta, detersivo, quello che vuoi — scrivilo qui e la lista si filtra da sola.",
-      highlight: "#searchInput"
+      highlight: "#searchInput",
+      position: "bottom"
     },
     {
       title: "Apri un'offerta",
       text: "Ogni scheda è un'offerta vera. Toccala per vedere prezzo, sconto e scadenza. Da lì puoi anche toccare il nome del negozio per avere indirizzo, telefono e orari.",
-      highlight: "#offersGrid"
+      highlight: null,          // gestito dinamicamente su .offer-row
+      position: "top",          // sposta il popup in alto
+      injectDemoOffers: true
     },
     {
       title: "La Lista Intelligente",
       text: "Salva i prodotti che ti servono, poi apri la Lista Intelligente da qui: scrivi cosa ti manca e ti diciamo in quali negozi conviene andare, tenendo conto anche del carburante se vuoi. Il percorso lo tracci sulla mappa in un tocco.",
-      highlight: "#cartBtn"
+      highlight: "#cartBtn",
+      position: "bottom",
+      waitForClick: "#cartBtn", // l'utente deve cliccare il carrello
+      injectDemoCart: true
     },
     {
       title: "Il resto è qui",
       text: "Dal menu trovi il tuo profilo, l'accesso e tutto quello che manca. Buona spesa.",
-      highlight: "#menuBtn"
+      highlight: "#menuBtn",
+      position: "bottom"
     }
   ];
 
   let current = 0;
   let highlightedEl = null;
+  let savedCartOnclick = null;
 
   function clearHighlight() {
     if (highlightedEl) {
@@ -9291,9 +9302,113 @@ const maybeStartTour = (function () {
     }
   }
 
+  function positionTourCard() {
+    const card = $("#tourCard");
+    const step = steps[current];
+    if (!card || !step) return;
+    card.classList.remove("tour-card-top");
+    if (step.position === "top") {
+      card.classList.add("tour-card-top");
+    }
+  }
+
+  function removeDemoOffers() {
+    document.querySelectorAll("." + DEMO_OFFER_CLASS).forEach(el => el.remove());
+  }
+
+  function injectDemoOffers() {
+    const grid = $("#offersGrid");
+    if (!grid) return;
+    // Se ci sono già offerte reali, non sporcare nulla
+    const realOffers = grid.querySelectorAll(".offer-row:not(." + DEMO_OFFER_CLASS + ")");
+    if (realOffers.length > 0) return;
+
+    const demos = [
+      {
+        product: "Pasta Barilla 500g",
+        store_name: "Supermercato Demo",
+        price: 1.29,
+        original_price: 1.89,
+        img_url: "https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=300&h=300&fit=crop",
+        end_date: "2026-12-31"
+      },
+      {
+        product: "Detersivo Piatti 1L",
+        store_name: "Supermercato Demo",
+        price: 2.49,
+        original_price: 3.99,
+        img_url: "https://images.unsplash.com/photo-1583947581924-860bda6a26df?w=300&h=300&fit=crop",
+        end_date: "2026-12-31"
+      }
+    ];
+
+    demos.forEach(o => {
+      const row = document.createElement("div");
+      row.className = "offer-row " + DEMO_OFFER_CLASS;
+      row.innerHTML = `
+        <div class="product-image-container">
+          <img src="${o.img_url}" class="product-img" alt="">
+        </div>
+        <div class="product-info">
+          <div class="product-details">
+            <h3>${o.product}</h3>
+            <div class="store-name">${o.store_name}</div>
+          </div>
+          <div class="product-actions">
+            <div style="text-align:right;">
+              <div class="price-tag">€ ${o.price.toFixed(2).replace('.', ',')}</div>
+              <div style="font-size:0.75rem;color:#94a3b8;text-decoration:line-through;">€ ${o.original_price.toFixed(2).replace('.', ',')}</div>
+            </div>
+          </div>
+        </div>
+      `;
+      grid.appendChild(row);
+    });
+  }
+
+  function injectDemoCart() {
+    const content = $("#modalContent");
+    if (!content) return;
+    content.innerHTML = `
+      <div class="cart-toolbar">
+        <button class="btn cart-smart-btn" onclick="if(window.openSmartShoppingListModal) openSmartShoppingListModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align:-3px;margin-right:5px;"><path d="M6 2h12l2 7H4z"/><path d="M4 9v10a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1V9"/><circle cx="9" cy="21" r="1"/><circle cx="18" cy="21" r="1"/></svg> Lista della spesa
+        </button>
+      </div>
+      <div class="cart-list">
+        <div class="cart-row" onclick="closeFullPageModal()">
+          <div class="cart-row-img"><img src="https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=150&h=150&fit=crop" alt=""></div>
+          <div class="cart-row-body">
+            <div class="cart-row-info">
+              <div class="cart-row-store">Supermercato Demo - Via Roma 1</div>
+              <div class="cart-row-product">Pasta Barilla 500g</div>
+              <div class="cart-row-price">€ 1,29</div>
+            </div>
+            <button class="btn danger cart-remove-btn" onclick="event.stopPropagation();">Rimuovi</button>
+          </div>
+        </div>
+        <div class="cart-row" onclick="closeFullPageModal()">
+          <div class="cart-row-img"><img src="https://images.unsplash.com/photo-1583947581924-860bda6a26df?w=150&h=150&fit=crop" alt=""></div>
+          <div class="cart-row-body">
+            <div class="cart-row-info">
+              <div class="cart-row-store">Supermercato Demo - Via Roma 1</div>
+              <div class="cart-row-product">Detersivo Piatti 1L</div>
+              <div class="cart-row-price">€ 2,49</div>
+            </div>
+            <button class="btn danger cart-remove-btn" onclick="event.stopPropagation();">Rimuovi</button>
+          </div>
+        </div>
+        <button class="btn cart-map-btn" onclick="closeFullPageModal(); toast.info('Nella demo la mappa non è attiva.')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align:-3px;margin-right:5px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> Segui nella mappa fino ai negozi
+        </button>
+      </div>
+    `;
+  }
+
   function renderStep() {
     const step = steps[current];
     clearHighlight();
+    positionTourCard();
 
     $("#tourTitle").textContent = step.title;
     $("#tourText").textContent = step.text;
@@ -9306,9 +9421,58 @@ const maybeStartTour = (function () {
     }
 
     const nextBtn = $("#tourNextBtn");
-    if (nextBtn) nextBtn.textContent = current === steps.length - 1 ? "Inizia a cercare" : "Avanti";
+    if (nextBtn) {
+      if (step.waitForClick) {
+        nextBtn.style.display = "none";          // NON permette di andare avanti
+      } else {
+        nextBtn.style.display = "";
+        nextBtn.textContent = current === steps.length - 1 ? "Inizia a cercare" : "Avanti";
+      }
+    }
 
-    if (step.highlight) {
+    // Step 4: offerte — inietta demo se vuota ed evidenzia la prima card
+    if (step.injectDemoOffers) {
+      injectDemoOffers();
+      const grid = $("#offersGrid");
+      if (grid) {
+        const anyRow = grid.querySelector(".offer-row");
+        if (anyRow) {
+          anyRow.classList.add("tour-highlight");
+          highlightedEl = anyRow;
+          anyRow.scrollIntoView({ behavior: "smooth", block: "center" });
+        } else {
+          grid.classList.add("tour-highlight");
+          highlightedEl = grid;
+          grid.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    }
+    // Step 5: carrello — evidenzia il bottone e prepara l'intercettazione click
+    else if (step.waitForClick) {
+      const btn = document.querySelector(step.waitForClick);
+      if (btn) {
+        // Salva handler originale
+        if (savedCartOnclick === null) savedCartOnclick = btn.onclick;
+        btn.onclick = function () {
+          openFullPageModal('cart');
+          setTimeout(() => {
+            if (step.injectDemoCart) injectDemoCart();
+            nextStep();   // il tour continua automaticamente appena apre
+          }, 60);
+        };
+      }
+      // Evidenzia comunque il bottone
+      if (step.highlight) {
+        const el = document.querySelector(step.highlight);
+        if (el) {
+          el.classList.add("tour-highlight");
+          highlightedEl = el;
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    }
+    // Altri step: evidenziazione classica
+    else if (step.highlight) {
       const el = document.querySelector(step.highlight);
       if (el) {
         el.classList.add("tour-highlight");
@@ -9320,12 +9484,29 @@ const maybeStartTour = (function () {
 
   function closeTour() {
     clearHighlight();
+    removeDemoOffers();
+    // Ripristina handler originale del cartBtn se ancora salvato
+    if (savedCartOnclick !== null) {
+      const btn = document.querySelector("#cartBtn");
+      if (btn) btn.onclick = savedCartOnclick;
+      savedCartOnclick = null;
+    }
     $("#tourOverlay")?.classList.add("hidden");
     $("#tourCard")?.classList.add("hidden");
     try { localStorage.setItem(STORAGE_KEY, "1"); } catch (e) {}
   }
 
   function nextStep() {
+    // Pulizia dello step precedente (rimuovi handler temporanei)
+    const prev = steps[current];
+    if (prev && prev.waitForClick) {
+      const btn = document.querySelector(prev.waitForClick);
+      if (btn && savedCartOnclick !== null) {
+        btn.onclick = savedCartOnclick;
+        savedCartOnclick = null;
+      }
+    }
+
     if (current === steps.length - 1) {
       closeTour();
       return;
@@ -9336,6 +9517,7 @@ const maybeStartTour = (function () {
 
   function startTour() {
     current = 0;
+    savedCartOnclick = null;
     $("#tourOverlay")?.classList.remove("hidden");
     $("#tourCard")?.classList.remove("hidden");
     renderStep();
@@ -9349,8 +9531,6 @@ const maybeStartTour = (function () {
     if (alreadySeen) return;
     if (!$("#tourOverlay") || !$("#tourCard")) return;
 
-    // Il tour riguarda solo chi sta guardando le offerte come utente,
-    // non il Pannello Partner né la pagina Chi Siamo
     const storeView = document.getElementById("store-view");
     const chisiamoView = document.getElementById("chisiamo-view");
     const inUserMode = (!storeView || storeView.classList.contains("hidden")) &&

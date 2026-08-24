@@ -556,6 +556,56 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
   border-radius: var(--radius-sm);
 }
 
+.tour-overlay {
+  position: fixed; inset: 0; background: rgba(2,6,23,0.6);
+  z-index: 2100;
+}
+.tour-card {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  width: min(420px, 92vw); box-sizing: border-box;
+  background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow-xl);
+  z-index: 2101; padding: 24px;
+}
+/* NUOVO: sposta la card in alto quando serve (evita che finisca sotto l'highlight) */
+.tour-card.tour-card-top {
+  top: 24px;
+  bottom: auto;
+  transform: translateX(-50%);
+}
+@media (min-width: 640px) {
+  .tour-card { left: auto; right: 32px; bottom: 32px; transform: none; }
+  .tour-card.tour-card-top {
+    left: auto;
+    right: 32px;
+    top: 24px;
+    bottom: auto;
+    transform: none;
+  }
+}
+.tour-dots { display: flex; gap: 6px; margin-bottom: 14px; }
+.tour-dots span {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #e2e8f0; transition: background 0.2s ease;
+}
+.tour-dots span.active { background: var(--primary); }
+.tour-card h3 { margin: 0 0 8px; font-size: 1.1rem; color: var(--text); }
+.tour-card p { margin: 0 0 18px; font-size: 0.9rem; line-height: 1.55; color: #475569; }
+.tour-actions { display: flex; justify-content: space-between; align-items: center; }
+.tour-skip-btn {
+  background: none; border: none; color: #64748b; font-weight: 600;
+  cursor: pointer; padding: 8px 4px; font-size: 0.85rem;
+}
+.tour-skip-btn:hover, .tour-skip-btn:focus-visible { color: var(--primary-dark); }
+
+/* L'elemento indicato dal passaggio corrente resta acceso sopra lo sfondo scurito */
+.tour-highlight {
+  position: relative;
+  z-index: 2110;
+  outline: 3px solid var(--primary);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+
 @media (min-width: 640px) {
   .tour-card { left: auto; right: 32px; bottom: 32px; transform: none; }
 }
