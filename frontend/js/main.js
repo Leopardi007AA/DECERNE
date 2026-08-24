@@ -2917,11 +2917,12 @@ async function completeEmailVerification(email, token) {
 
   if (pendingVerification.type === 'customer') {
     pendingVerification = null;
-    await restoreUserSession();
+    await supabaseClient.auth.signOut();
+    state.currentUser = null;
     updateDrawerUI();
     renderOffers();
-    toast.success("Email verificata! Benvenuto su Decerne.");
-    closeFullPageModal();
+    toast.success("Registrazione completata! Ora accedi con le tue credenziali.");
+    renderLoginForm();
   } else if (pendingVerification.type === 'store') {
     await finalizeStoreRegistration(data.user.id, data.session);
   }
