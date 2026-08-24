@@ -9557,42 +9557,38 @@ const maybeStartTour = (function () {
     {
       title: "Benvenuto su DECERNE",
       text: "Qui trovi le offerte reali dei supermercati vicino a te, caricate direttamente dai negozi. Ci vogliono pochi secondi per mostrarti come funziona.",
-      highlight: null,
-      position: "bottom"
+      highlight: null
     },
     {
       title: "Imposta dove sei",
       text: "Scrivi qui la tua città o il CAP (oppure consenti la posizione quando te lo chiediamo): le offerte si ordinano in base a quanto sono vicine.",
-      highlight: "#locationInput",
-      position: "bottom"
+      highlight: "#locationInput"
     },
     {
       title: "Cerca un prodotto",
       text: "Se ti serve qualcosa di preciso — pasta, detersivo, quello che vuoi — scrivilo qui e la lista si filtra da sola.",
-      highlight: "#searchInput",
-      position: "bottom"
+      highlight: "#searchInput"
     },
     {
       title: "Le offerte vicino a te",
       text: "Qui trovi le offerte dei negozi della tua zona. Clicca su una per vederne prezzo, sconto e scadenza.",
       highlight: null,
-      position: "top",
       injectDemoOffers: true,
-      waitForModalClose: true
+      waitForModalClose: true,
+      allowNext: true
     },
     {
       title: "La Lista Intelligente",
       text: "Salva i prodotti che ti servono, poi apri la Lista Intelligente da qui: scrivi cosa ti manca e ti diciamo in quali negozi conviene andare, tenendo conto anche del carburante se vuoi. Il percorso lo tracci sulla mappa in un tocco.",
       highlight: "#cartBtn",
-      position: "bottom",
       waitForClick: "#cartBtn",
-      injectDemoCart: true
+      injectDemoCart: true,
+      allowNext: false
     },
     {
       title: "Il resto è qui",
       text: "Dal menu trovi il tuo profilo, l'accesso e tutto quello che manca. Buona spesa.",
-      highlight: "#menuBtn",
-      position: "bottom"
+      highlight: "#menuBtn"
     }
   ];
 
@@ -9606,16 +9602,6 @@ const maybeStartTour = (function () {
     if (highlightedEl) {
       highlightedEl.classList.remove("tour-highlight");
       highlightedEl = null;
-    }
-  }
-
-  function positionTourCard() {
-    const card = $("#tourCard");
-    const step = steps[current];
-    if (!card || !step) return;
-    card.classList.remove("tour-card-top");
-    if (step.position === "top") {
-      card.classList.add("tour-card-top");
     }
   }
 
@@ -9652,7 +9638,6 @@ const maybeStartTour = (function () {
     };
     if (typeof displayProductInModal === "function") {
       displayProductInModal(product);
-      // Mostra il modal (displayProductInModal non lo fa da sola)
       const modal = $("#fullPagePopup");
       if (modal) {
         modal.style.display = "flex";
@@ -9667,6 +9652,19 @@ const maybeStartTour = (function () {
   function injectDemoOffers() {
     const grid = $("#offersGrid");
     if (!grid) return;
+
+    // Se ci sono già offerte reali, evidenzia la prima e non sporcare nulla
+    const realOffers = grid.querySelectorAll(".offer-row:not(." + DEMO_OFFER_CLASS + ")");
+    if (realOffers.length > 0) {
+      const firstRow = realOffers[0];
+      firstRow.classList.add("tour-highlight");
+      highlightedEl = firstRow;
+      firstRow.scrollIntoView({ behavior: "smooth", block: "center" });
+      waitingForModalClose = true;
+      hookModalClose();
+      return;
+    }
+
     removeDemoOffers();
 
     const demos = [
@@ -9777,7 +9775,6 @@ const maybeStartTour = (function () {
   function renderStep() {
     const step = steps[current];
     clearHighlight();
-    positionTourCard();
 
     $("#tourTitle").textContent = step.title;
     $("#tourText").textContent = step.text;
@@ -9791,7 +9788,8 @@ const maybeStartTour = (function () {
 
     const nextBtn = $("#tourNextBtn");
     if (nextBtn) {
-      if (step.waitForClick || step.waitForModalClose) {
+      // Nascondi Avanti SOLO se lo step lo richiede esplicitamente
+      if ((step.waitForClick || step.waitForModalClose) && step.allowNext === false) {
         nextBtn.style.display = "none";
       } else {
         nextBtn.style.display = "";
@@ -9801,21 +9799,6 @@ const maybeStartTour = (function () {
 
     if (step.injectDemoOffers) {
       injectDemoOffers();
-      const grid = $("#offersGrid");
-      if (grid) {
-        const firstRow = grid.querySelector(".offer-row");
-        if (firstRow) {
-          firstRow.classList.add("tour-highlight");
-          highlightedEl = firstRow;
-          firstRow.scrollIntoView({ behavior: "smooth", block: "center" });
-        } else {
-          grid.classList.add("tour-highlight");
-          highlightedEl = grid;
-          grid.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }
-      waitingForModalClose = true;
-      hookModalClose();
     }
     else if (step.waitForClick) {
       const btn = document.querySelector(step.waitForClick);
@@ -9865,6 +9848,20 @@ const maybeStartTour = (function () {
   }
 
   function nextStep() {
+    // Pulizia dello step precedente prima di avanzare
+    const prev = steps[current];
+    if (prev) {
+      if (prev.waitForModalClose) {
+        waitingForModalClose = false;
+        unhookModalClose();
+      }
+      if (prev.waitForClick && savedCartOnclick !== null) {
+        const btn = document.querySelector(prev.waitForClick);
+        if (btn) btn.onclick = savedCartOnclick;
+        savedCartOnclick = null;
+      }
+    }
+
     if (current === steps.length - 1) {
       closeTour();
       return;

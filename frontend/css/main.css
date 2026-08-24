@@ -525,26 +525,17 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
 .tour-overlay {
   position: fixed; inset: 0; background: rgba(2,6,23,0.6);
   z-index: 2100;
-  pointer-events: none; /* permette di cliccare attraverso l'overlay */
+  pointer-events: none;
 }
 .tour-card {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
   width: min(420px, 92vw); box-sizing: border-box;
   background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow-xl);
   z-index: 2101; padding: 24px;
-  pointer-events: auto; /* la card resta interagibile */
-}
-/* Sposta la card in alto quando serve (evita che finisca sotto l'highlight) */
-.tour-card.tour-card-top {
-  top: 24px;
-  bottom: auto;
-  transform: translateX(-50%);
+  pointer-events: auto;
 }
 @media (min-width: 640px) {
   .tour-card { left: auto; right: 32px; bottom: 32px; transform: none; }
-  .tour-card.tour-card-top {
-    left: auto; right: 32px; top: 24px; bottom: auto; transform: none;
-  }
 }
 .tour-dots { display: flex; gap: 6px; margin-bottom: 14px; }
 .tour-dots span {
@@ -561,7 +552,6 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
 }
 .tour-skip-btn:hover, .tour-skip-btn:focus-visible { color: var(--primary-dark); }
 
-/* L'elemento indicato resta cliccabile sopra l'overlay scurito */
 .tour-highlight {
   position: relative;
   z-index: 2110;
@@ -571,7 +561,6 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
   pointer-events: auto;
 }
 
-/* Quando il tour è attivo, i modali full-page devono stare SOPRA il tour */
 body.tour-active .full-page-modal,
 body.tour-active .full-page-modal.is-visible {
   z-index: 2200 !important;
