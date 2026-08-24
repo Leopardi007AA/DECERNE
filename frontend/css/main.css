@@ -561,6 +561,23 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
   pointer-events: auto;
 }
 
+/* Fix: quando un elemento dentro la navbar è evidenziato,
+   la navbar stessa deve uscire sopra l'overlay del tour */
+   .navbar.tour-highlight-parent {
+    z-index: 2115 !important;
+  }
+  
+  /* Fix: elementi evidenziati dentro il popup carrello
+     devono stare sopra il popup (z-index 2200) */
+  .full-page-modal .tour-highlight {
+    z-index: 2210 !important;
+  }
+  
+  /* Fix: la card del tour resta visibile sopra il popup */
+  body.tour-active .tour-card {
+    z-index: 2202 !important;
+  }
+
 body.tour-active .full-page-modal,
 body.tour-active .full-page-modal.is-visible {
   z-index: 2200 !important;

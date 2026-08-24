@@ -9582,8 +9582,17 @@ const maybeStartTour = (function () {
       text: "Salva i prodotti che ti servono, poi apri la Lista Intelligente da qui: scrivi cosa ti manca e ti diciamo in quali negozi conviene andare, tenendo conto anche del carburante se vuoi. Il percorso lo tracci sulla mappa in un tocco.",
       highlight: "#cartBtn",
       waitForClick: "#cartBtn",
-      injectDemoCart: true,
-      allowNext: false
+      injectDemoCart: true
+    },
+    {
+      title: "Crea la lista della spesa",
+      text: "Clicca qui per creare una lista intelligente con ciò che ti manca. Ti suggeriremo i negozi migliori.",
+      highlight: ".cart-smart-btn"
+    },
+    {
+      title: "Percorso in mappa",
+      text: "Tocca qui per vedere il percorso ottimale fino ai negozi sulla mappa.",
+      highlight: ".cart-map-btn"
     },
     {
       title: "Il resto è qui",
@@ -9601,6 +9610,8 @@ const maybeStartTour = (function () {
   function clearHighlight() {
     if (highlightedEl) {
       highlightedEl.classList.remove("tour-highlight");
+      const navbar = highlightedEl.closest(".navbar");
+      if (navbar) navbar.classList.remove("tour-highlight-parent");
       highlightedEl = null;
     }
   }
@@ -9788,13 +9799,8 @@ const maybeStartTour = (function () {
 
     const nextBtn = $("#tourNextBtn");
     if (nextBtn) {
-      // Nascondi Avanti SOLO se lo step lo richiede esplicitamente
-      if ((step.waitForClick || step.waitForModalClose) && step.allowNext === false) {
-        nextBtn.style.display = "none";
-      } else {
-        nextBtn.style.display = "";
-        nextBtn.textContent = current === steps.length - 1 ? "Inizia a cercare" : "Avanti";
-      }
+      nextBtn.style.display = "";
+      nextBtn.textContent = current === steps.length - 1 ? "Inizia a cercare" : "Avanti";
     }
 
     if (step.injectDemoOffers) {
@@ -9808,9 +9814,8 @@ const maybeStartTour = (function () {
           openFullPageModal("cart");
           setTimeout(() => {
             if (step.injectDemoCart) injectDemoCart();
+            setTimeout(nextStep, 250);
           }, 60);
-          waitingForModalClose = true;
-          hookModalClose();
         };
       }
       if (step.highlight) {
@@ -9818,16 +9823,27 @@ const maybeStartTour = (function () {
         if (el) {
           el.classList.add("tour-highlight");
           highlightedEl = el;
+          const navbar = el.closest(".navbar");
+          if (navbar) navbar.classList.add("tour-highlight-parent");
           el.scrollIntoView({ behavior: "smooth", block: "center" });
         }
       }
     }
     else if (step.highlight) {
-      const el = document.querySelector(step.highlight);
-      if (el) {
-        el.classList.add("tour-highlight");
-        highlightedEl = el;
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      const tryHighlight = () => {
+        const el = document.querySelector(step.highlight);
+        if (el) {
+          el.classList.add("tour-highlight");
+          highlightedEl = el;
+          const navbar = el.closest(".navbar");
+          if (navbar) navbar.classList.add("tour-highlight-parent");
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      };
+      if (step.highlight.startsWith(".cart-")) {
+        setTimeout(tryHighlight, 200);
+      } else {
+        tryHighlight();
       }
     }
   }
