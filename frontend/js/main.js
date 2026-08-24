@@ -1477,11 +1477,18 @@ function initOfferRevealObserver() {
 }
 
 function applyOfferRevealAnimation(grid) {
-  if (window.innerWidth < 769) return; // per ora solo schermi grandi
   initOfferRevealObserver();
+  const isLargeScreen = window.innerWidth >= 769;
   const cards = grid.querySelectorAll(':scope > .offer-row');
   cards.forEach((card, idx) => {
-    card.classList.add('scroll-reveal', idx % 2 === 0 ? 'from-left' : 'from-right');
+    card.classList.add('scroll-reveal');
+    if (isLargeScreen) {
+      // Schermi grandi: alternata da sinistra/destra.
+      card.classList.add(idx % 2 === 0 ? 'from-left' : 'from-right');
+    } else {
+      // Schermi piccoli (griglia a 2 colonne): sempre dal basso.
+      card.classList.add('from-bottom');
+    }
     offerRevealObserver.observe(card);
   });
 }

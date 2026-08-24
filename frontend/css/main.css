@@ -609,6 +609,29 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
   }
 }
 
+/* --- Comparsa/uscita offerte allo scroll su schermi piccoli (dal basso, "sagoma nell'ombra") --- */
+@media (max-width: 768px) {
+  #offersGrid > .offer-row.scroll-reveal {
+    --reveal-duration: 1.9s;
+    opacity: 0.12;
+    filter: brightness(0.35) saturate(0.7);
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.25);
+    transition: opacity var(--reveal-duration) cubic-bezier(.22,.9,.34,1),
+                transform var(--reveal-duration) cubic-bezier(.22,.9,.34,1),
+                filter var(--reveal-duration) ease-out,
+                box-shadow var(--reveal-duration) ease-out;
+  }
+  #offersGrid > .offer-row.scroll-reveal.from-bottom {
+    transform: translateY(70px);
+  }
+  #offersGrid > .offer-row.scroll-reveal.in-view {
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+    transform: translateY(0);
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.16), 0 4px 10px rgba(15, 23, 42, 0.08);
+  }
+}
+
 /* --- OFFERTE CONSIGLIATE: pannello "sovrapposto" sopra Offerte Vicine --- */
 .recommended-offers-panel {
   position: relative;
