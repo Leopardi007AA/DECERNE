@@ -5897,9 +5897,11 @@ const isAnnualView = cycle === 'annual';
 const getPlanButton = (planName, priceText) => {
   const currentSub = partner?.subscription;
 
-  // 1. Caso: piano corrente ma scaduto -> deve potersi rinnovare anche da qui
+  // 1. Caso: piano corrente ma scaduto -> deve potersi rinnovare anche da qui,
+  // rispettando il ciclo (Mensile/Annuale) che il partner ha selezionato QUI
+  // sulla pagina, non quello che aveva sul vecchio abbonamento.
   if (currentPlan === planName && currentSub?.status === 'expired') {
-    return `<button class="btn full-width" style="background:#ef4444;" onclick="activatePlan('${planName}', '${currentSub.billingCycle || 'monthly'}')">Rinnova ${planName}</button>`;
+    return `<button class="btn full-width" onclick="activatePlan('${planName}', '${cycle}')">Rinnova ${planName}</button>`;
   }
 
   // 2. Caso: Il partner è già su questo piano ed è ancora attivo -> non rinnovabile in anticipo
@@ -9677,11 +9679,13 @@ const maybeStartTour = (function () {
   let savedCartOnclick = null;
   let originalCloseFullPageModal = null;
   let waitingForModalClose = false;
+  let waitingForProductClick = false;
 
   let highlightedEls = [];
 
   function clearHighlight() {
-    highlightedEls.forEach(el => {
+    // Pulisci TUTTI gli elementi con tour-highlight nel DOM (fix sovrapposizione)
+    document.querySelectorAll(".tour-highlight, .tour-highlight-fixed").forEach(el => {
       el.classList.remove("tour-highlight", "tour-highlight-fixed");
       const navbar = el.closest(".navbar");
       if (navbar) navbar.classList.remove("tour-highlight-parent");
@@ -9907,13 +9911,15 @@ const maybeStartTour = (function () {
     clearHighlight();
     removeInputListeners();
 
-    // Gestione overlay bloccante
+    // Gestione overlay bloccante + blocco scroll
     const overlay = $("#tourOverlay");
     if (overlay) {
       if (step.blockRest) {
         overlay.classList.add("blocking");
+        document.body.classList.add("tour-blocking");
       } else {
         overlay.classList.remove("blocking");
+        document.body.classList.remove("tour-blocking");
       }
     }
 
@@ -9931,8 +9937,12 @@ const maybeStartTour = (function () {
     if (nextBtn) {
       nextBtn.style.display = "";
       nextBtn.textContent = current === steps.length - 1 ? "Inizia a cercare" : "Avanti";
+      // Nascondi Avanti quando l'utente deve interagire (cliccare prodotto o chiudere modal)
+      if (step.waitForProductClick || step.waitForModalClose) {
+        nextBtn.style.display = "none";
+      }
       // Gestione tasto Avanti disabilitato finché non c'è input
-      if (step.requireInput) {
+      else if (step.requireInput) {
         nextBtn.classList.remove("enabled");
         nextBtn.classList.add("tour-next-btn");
         const inputEl = document.querySelector(step.requireInput);
@@ -9996,6 +10006,10 @@ const maybeStartTour = (function () {
       injectDemoOffers();
     }
 
+    if (step.waitForProductClick) {
+      waitingForProductClick = true;
+    }
+
     if (step.waitForModalClose) {
       waitingForModalClose = true;
       hookModalClose();
@@ -10040,7 +10054,7 @@ const maybeStartTour = (function () {
     if (modal && (modal.style.display === "flex" || getComputedStyle(modal).display === "flex")) {
       closeFullPageModal();
     }
-    document.body.classList.remove("tour-active");
+    document.body.classList.remove("tour-active", "tour-blocking");
     $("#tourOverlay")?.classList.add("hidden");
     $("#tourCard")?.classList.add("hidden");
     try { localStorage.setItem(STORAGE_KEY, "1"); } catch (e) {}
@@ -10053,6 +10067,9 @@ const maybeStartTour = (function () {
       if (prev.waitForModalClose) {
         waitingForModalClose = false;
         unhookModalClose();
+      }
+      if (prev.waitForProductClick) {
+        waitingForProductClick = false;
       }
       if (prev.waitForCartClick && savedCartOnclick !== null) {
         const btn = document.querySelector("#cartBtn");

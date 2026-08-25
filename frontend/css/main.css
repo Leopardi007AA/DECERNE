@@ -578,6 +578,11 @@ body.tour-active .tour-card {
 }
 
 
+/* Blocca lo scroll quando il tour è in modalità blocking */
+body.tour-blocking {
+  overflow: hidden !important;
+}
+
 /* Tasto Avanti del tour: disabilitato (grigio) */
 .tour-next-btn {
   opacity: 0.4 !important;
