@@ -9627,24 +9627,29 @@ const maybeStartTour = (function () {
       text: "Qui trovi le offerte dei negozi della tua zona. Clicca su una per vederne prezzo, sconto e scadenza.",
       highlight: null,
       injectDemoOffers: true,
-      waitForModalClose: true,
-      allowNext: true
+      waitForProductClick: true
     },
     {
-      title: "La Lista Intelligente",
-      text: "Apri il carrello per vedere la tua lista della spesa.",
+      title: "Dettaglio offerta",
+      text: "Ecco come appare il dettaglio di un'offerta: prezzo, sconto, scadenza e info del negozio. Chiudi quando vuoi per continuare.",
+      highlight: null,
+      waitForModalClose: true
+    },
+    {
+      title: "Il tuo carrello",
+      text: "Ora clicca sul carrello in alto a destra per vedere la tua lista della spesa.",
       highlight: "#cartBtn",
-      autoOpenModal: 'cart'
+      waitForCartClick: true
     },
     {
       title: "Crea la lista",
-      text: "Da qui puoi creare una lista intelligente con ciò che ti manca. Ti suggeriremo i negozi migliori.",
+      text: "Da qui puoi creare una lista intelligente. Ti suggeriremo i negozi migliori per quello che ti manca.",
       highlight: ".cart-smart-btn",
       inModal: true
     },
     {
       title: "Percorso in mappa",
-      text: "Quando hai prodotti nella lista, tocca qui per vedere il percorso ottimale fino ai negozi.",
+      text: "Quando hai prodotti nella lista, tocca qui per vedere il percorso ottimale fino ai negozi sulla mappa.",
       highlight: ".cart-map-btn",
       inModal: true,
       skipIfMissing: true
@@ -9720,15 +9725,26 @@ const maybeStartTour = (function () {
     const grid = $("#offersGrid");
     if (!grid) return;
 
-    // Se ci sono già offerte reali, evidenzia la prima e non sporcare nulla
+    // Se ci sono già offerte reali, evidenzia la prima e aggiungi listener
     const realOffers = grid.querySelectorAll(".offer-row:not(." + DEMO_OFFER_CLASS + ")");
     if (realOffers.length > 0) {
       const firstRow = realOffers[0];
       firstRow.classList.add("tour-highlight");
       highlightedEl = firstRow;
       firstRow.scrollIntoView({ behavior: "smooth", block: "center" });
-      waitingForModalClose = true;
-      hookModalClose();
+      // Aggiungi listener temporaneo sulle card reali per avanzare il tour
+      realOffers.forEach(row => {
+        const origClick = row.onclick;
+        row.onclick = function(e) {
+          if (origClick) origClick.call(this, e);
+          setTimeout(() => {
+            if (waitingForProductClick) {
+              waitingForProductClick = false;
+              nextStep();
+            }
+          }, 150);
+        };
+      });
       return;
     }
 
@@ -9775,6 +9791,12 @@ const maybeStartTour = (function () {
         e.preventDefault();
         e.stopPropagation();
         openDemoProductDetail();
+        setTimeout(() => {
+          if (waitingForProductClick) {
+            waitingForProductClick = false;
+            nextStep();
+          }
+        }, 150);
       });
       grid.prepend(row);
     });
@@ -9821,11 +9843,6 @@ const maybeStartTour = (function () {
       nextBtn.textContent = current === steps.length - 1 ? "Inizia a cercare" : "Avanti";
     }
 
-    // Apri popup automaticamente se richiesto
-    if (step.autoOpenModal) {
-      openFullPageModal(step.autoOpenModal);
-    }
-
     // Chiudi popup automaticamente se richiesto
     if (step.autoCloseModal) {
       closeFullPageModal();
@@ -9859,6 +9876,25 @@ const maybeStartTour = (function () {
     if (step.injectDemoOffers) {
       injectDemoOffers();
     }
+
+    if (step.waitForModalClose) {
+      waitingForModalClose = true;
+      hookModalClose();
+    }
+
+    if (step.waitForCartClick) {
+      const btn = document.querySelector("#cartBtn");
+      if (btn) {
+        if (savedCartOnclick === null) savedCartOnclick = btn.onclick;
+        btn.onclick = function () {
+          openFullPageModal("cart");
+          setTimeout(() => {
+            injectDemoCart();
+            nextStep();
+          }, 100);
+        };
+      }
+    }
   }
 
   function closeTour() {
@@ -9875,10 +9911,6 @@ const maybeStartTour = (function () {
     if (modal && (modal.style.display === "flex" || getComputedStyle(modal).display === "flex")) {
       closeFullPageModal();
     }
-    // Torna alla home utenti
-    if (typeof setMode === "function") {
-      setMode("user");
-    }
     document.body.classList.remove("tour-active");
     $("#tourOverlay")?.classList.add("hidden");
     $("#tourCard")?.classList.add("hidden");
@@ -9893,8 +9925,8 @@ const maybeStartTour = (function () {
         waitingForModalClose = false;
         unhookModalClose();
       }
-      if (prev.waitForClick && savedCartOnclick !== null) {
-        const btn = document.querySelector(prev.waitForClick);
+      if (prev.waitForCartClick && savedCartOnclick !== null) {
+        const btn = document.querySelector("#cartBtn");
         if (btn) btn.onclick = savedCartOnclick;
         savedCartOnclick = null;
       }
