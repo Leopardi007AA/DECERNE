@@ -926,12 +926,6 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
       ownerStoreRow = tRow.stores;
     }
 
-    if (ownerStoreRow.subscription_status === 'expired') {
-      await logAuditAction(ownerStoreRow.id, "LOGIN_BLOCKED", "Tentativo di accesso con account scaduto.");
-      await storeAuthClient.auth.signOut();
-      return { success: false, reason: 'expired' };
-    }
-
     // Collaboratore al primo accesso: deve verificare l'email col codice a 6 cifre
     // e scegliere una password personale prima di entrare nel pannello.
     if (teamRow && teamRow.must_reset_password) {
@@ -984,6 +978,16 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
     }
 
     state.currentStore = newStore;
+
+    // Abbonamento scaduto: la sessione resta valida (serve per poter rinnovare
+    // con le stesse credenziali, dato che il rinnovo scrive su Supabase con RLS
+    // basata sull'utente autenticato), ma il chiamante deve mandare il partner
+    // al rinnovo invece che dentro la dashboard.
+    if (ownerStoreRow.subscription_status === 'expired') {
+      await logAuditAction(ownerStoreRow.id, "LOGIN_BLOCKED", "Accesso con abbonamento scaduto: reindirizzato al rinnovo.");
+      return { success: false, reason: 'expired', store: newStore };
+    }
+
     return { success: true, store: newStore };
   } catch (e) {
     console.error("Errore critico in loginPartnerAction:", e);
@@ -5905,7 +5909,7 @@ const getPlanButton = (planName, priceText) => {
 
   // 3. Caso: Il partner è loggato e sta guardando un piano superiore al suo (upgrade diretto, no trial)
   if (partner && PLAN_LEVELS[currentPlan] < PLAN_LEVELS[planName]) {
-    return `<button class="btn full-width" onclick="activatePlan('${planName}')">Attiva ${planName}</button>`;
+    return `<button class="btn full-width" onclick="activatePlan('${planName}')">Passa a ${planName}</button>`;
   }
 
   // 2bis. Modalità Annuale (non loggato): niente prova gratuita per nessun piano, si registra
@@ -7010,9 +7014,10 @@ function renderStoreLoginForm(container) {
 
     if (result.reason === 'expired') {
       toast.error("Il tuo abbonamento è scaduto.");
+      const expiredCycle = (result.store && result.store.subscription.billingCycle) || 'monthly';
       errBox.innerHTML = `<strong>Accesso negato:</strong> il periodo di prova o l'abbonamento sono terminati.<br><br>
                           <button class="btn outline" style="padding:5px 10px; font-size:0.7rem;" 
-                          onclick="storeData.step='pricing'; renderStoreView();">Rinnova ora</button>`;
+                          onclick="storeData.billingCycle = '${expiredCycle}'; storeData.step='pricing'; renderStoreView();">Rinnova ora</button>`;
     } else if (result.reason === 'credentials') {
       toast.error("Email o password errati.");
       errBox.innerText = "Email o password non corretti.";
