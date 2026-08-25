@@ -9617,12 +9617,15 @@ const maybeStartTour = (function () {
       text: "Scrivi qui la tua città o il CAP (oppure consenti la posizione quando te lo chiediamo): le offerte si ordinano in base a quanto sono vicine.",
       highlight: "#locationInput",
       alsoHighlight: "#locationBanner",
-      blockRest: true
+      blockRest: true,
+      requireInput: "#locationInput"
     },
     {
       title: "Cerca un prodotto",
       text: "Se ti serve qualcosa di preciso — pasta, detersivo, quello che vuoi — scrivilo qui e la lista si filtra da sola.",
-      highlight: "#searchInput"
+      highlight: "#searchInput",
+      blockRest: true,
+      requireInput: "#searchInput"
     },
     {
       title: "Le offerte vicino a te",
@@ -9694,6 +9697,17 @@ const maybeStartTour = (function () {
     const navbar = el.closest(".navbar");
     if (navbar) navbar.classList.add("tour-highlight-parent");
     el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function removeInputListeners() {
+    if (window.__tourInputListeners) {
+      window.__tourInputListeners.forEach(item => {
+        item.el.removeEventListener("input", item.fn);
+        item.el.removeEventListener("change", item.fn);
+        item.el.removeEventListener("click", item.fn);
+      });
+      window.__tourInputListeners = [];
+    }
   }
 
   function removeDemoOffers() {
@@ -9886,6 +9900,7 @@ const maybeStartTour = (function () {
   function renderStep() {
     const step = steps[current];
     clearHighlight();
+    removeInputListeners();
 
     // Gestione overlay bloccante
     const overlay = $("#tourOverlay");
@@ -9911,6 +9926,47 @@ const maybeStartTour = (function () {
     if (nextBtn) {
       nextBtn.style.display = "";
       nextBtn.textContent = current === steps.length - 1 ? "Inizia a cercare" : "Avanti";
+      // Gestione tasto Avanti disabilitato finché non c'è input
+      if (step.requireInput) {
+        nextBtn.classList.remove("enabled");
+        nextBtn.classList.add("tour-next-btn");
+        const inputEl = document.querySelector(step.requireInput);
+        if (inputEl) {
+          const checkInput = () => {
+            if (inputEl.value.trim().length > 0) {
+              nextBtn.classList.add("enabled");
+            } else {
+              nextBtn.classList.remove("enabled");
+            }
+          };
+          inputEl.addEventListener("input", checkInput);
+          inputEl.addEventListener("change", checkInput);
+          checkInput();
+          if (!window.__tourInputListeners) window.__tourInputListeners = [];
+          window.__tourInputListeners.push({ el: inputEl, fn: checkInput });
+        }
+        // Per lo step location, ascolta anche i bottoni del banner
+        if (step.alsoHighlight === "#locationBanner") {
+          const allowBtn = document.querySelector("#allowLoc");
+          const denyBtn = document.querySelector("#denyLoc");
+          const onLocDecision = () => {
+            nextBtn.classList.add("enabled");
+          };
+          if (allowBtn) {
+            allowBtn.addEventListener("click", onLocDecision, { once: true });
+            if (!window.__tourInputListeners) window.__tourInputListeners = [];
+            window.__tourInputListeners.push({ el: allowBtn, fn: onLocDecision });
+          }
+          if (denyBtn) {
+            denyBtn.addEventListener("click", onLocDecision, { once: true });
+            if (!window.__tourInputListeners) window.__tourInputListeners = [];
+            window.__tourInputListeners.push({ el: denyBtn, fn: onLocDecision });
+          }
+        }
+      } else {
+        nextBtn.classList.remove("tour-next-btn");
+        nextBtn.classList.add("enabled");
+      }
     }
 
     // Chiudi popup automaticamente se richiesto
@@ -9999,6 +10055,7 @@ const maybeStartTour = (function () {
         savedCartOnclick = null;
       }
     }
+    removeInputListeners();
 
     if (current === steps.length - 1) {
       closeTour();

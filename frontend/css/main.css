@@ -573,9 +573,24 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
   pointer-events: auto;
 }
 
-
 body.tour-active .tour-card {
   z-index: 2202 !important;
+}
+
+
+/* Tasto Avanti del tour: disabilitato (grigio) */
+.tour-next-btn {
+  opacity: 0.4 !important;
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+  filter: grayscale(100%);
+}
+/* Tasto Avanti del tour: abilitato (blu) */
+.tour-next-btn.enabled {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  filter: grayscale(0%);
 }
 
 /* Fix: quando un elemento dentro la navbar è evidenziato,
