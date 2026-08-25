@@ -9680,6 +9680,7 @@ const maybeStartTour = (function () {
   let originalCloseFullPageModal = null;
   let waitingForModalClose = false;
   let waitingForProductClick = false;
+  let modalCheckInterval = null;
 
   let highlightedEls = [];
 
@@ -9937,9 +9938,29 @@ const maybeStartTour = (function () {
     if (nextBtn) {
       nextBtn.style.display = "";
       nextBtn.textContent = current === steps.length - 1 ? "Inizia a cercare" : "Avanti";
-      // Nascondi Avanti quando l'utente deve interagire (cliccare prodotto o chiudere modal)
-      if (step.waitForProductClick || step.waitForModalClose) {
+      // Nascondi Avanti quando l'utente deve cliccare un prodotto
+      if (step.waitForProductClick) {
         nextBtn.style.display = "none";
+      }
+      // Grigio quando deve chiudere il modal; avanza automaticamente quando chiuso
+      else if (step.waitForModalClose) {
+        nextBtn.classList.add("tour-next-btn");
+        nextBtn.classList.remove("enabled");
+        waitingForModalClose = true;
+        // Polling: controlla ogni 300ms se il modal è stato chiuso
+        setTimeout(() => {
+          modalCheckInterval = setInterval(() => {
+            const modal = $("#fullPagePopup");
+            if (!modal || modal.style.display === "none" || getComputedStyle(modal).display === "none") {
+              clearInterval(modalCheckInterval);
+              modalCheckInterval = null;
+              if (waitingForModalClose) {
+                waitingForModalClose = false;
+                nextStep();
+              }
+            }
+          }, 300);
+        }, 500);
       }
       // Gestione tasto Avanti disabilitato finché non c'è input
       else if (step.requireInput) {
@@ -10010,11 +10031,6 @@ const maybeStartTour = (function () {
       waitingForProductClick = true;
     }
 
-    if (step.waitForModalClose) {
-      waitingForModalClose = true;
-      hookModalClose();
-    }
-
     if (step.waitForCartClick) {
       const btn = document.querySelector("#cartBtn");
       if (btn) {
@@ -10048,7 +10064,10 @@ const maybeStartTour = (function () {
       if (btn) btn.onclick = savedCartOnclick;
       savedCartOnclick = null;
     }
-    unhookModalClose();
+    if (modalCheckInterval) {
+      clearInterval(modalCheckInterval);
+      modalCheckInterval = null;
+    }
     // Chiudi popup se aperto
     const modal = $("#fullPagePopup");
     if (modal && (modal.style.display === "flex" || getComputedStyle(modal).display === "flex")) {
@@ -10066,6 +10085,10 @@ const maybeStartTour = (function () {
     if (prev) {
       if (prev.waitForModalClose) {
         waitingForModalClose = false;
+        if (modalCheckInterval) {
+          clearInterval(modalCheckInterval);
+          modalCheckInterval = null;
+        }
         unhookModalClose();
       }
       if (prev.waitForProductClick) {
