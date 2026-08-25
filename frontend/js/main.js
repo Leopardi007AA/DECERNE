@@ -9615,7 +9615,9 @@ const maybeStartTour = (function () {
     {
       title: "Imposta dove sei",
       text: "Scrivi qui la tua città o il CAP (oppure consenti la posizione quando te lo chiediamo): le offerte si ordinano in base a quanto sono vicine.",
-      highlight: "#locationInput"
+      highlight: "#locationInput",
+      alsoHighlight: "#locationBanner",
+      blockRest: true
     },
     {
       title: "Cerca un prodotto",
@@ -9668,13 +9670,30 @@ const maybeStartTour = (function () {
   let originalCloseFullPageModal = null;
   let waitingForModalClose = false;
 
+  let highlightedEls = [];
+
   function clearHighlight() {
-    if (highlightedEl) {
-      highlightedEl.classList.remove("tour-highlight");
-      const navbar = highlightedEl.closest(".navbar");
+    highlightedEls.forEach(el => {
+      el.classList.remove("tour-highlight", "tour-highlight-fixed");
+      const navbar = el.closest(".navbar");
       if (navbar) navbar.classList.remove("tour-highlight-parent");
-      highlightedEl = null;
+    });
+    highlightedEls = [];
+    highlightedEl = null;
+  }
+
+  function highlightElement(el, isFixed) {
+    if (!el) return;
+    if (isFixed) {
+      el.classList.add("tour-highlight-fixed");
+    } else {
+      el.classList.add("tour-highlight");
     }
+    highlightedEls.push(el);
+    highlightedEl = el;
+    const navbar = el.closest(".navbar");
+    if (navbar) navbar.classList.add("tour-highlight-parent");
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   function removeDemoOffers() {
@@ -9868,6 +9887,16 @@ const maybeStartTour = (function () {
     const step = steps[current];
     clearHighlight();
 
+    // Gestione overlay bloccante
+    const overlay = $("#tourOverlay");
+    if (overlay) {
+      if (step.blockRest) {
+        overlay.classList.add("blocking");
+      } else {
+        overlay.classList.remove("blocking");
+      }
+    }
+
     $("#tourTitle").textContent = step.title;
     $("#tourText").textContent = step.text;
 
@@ -9889,29 +9918,17 @@ const maybeStartTour = (function () {
       closeFullPageModal();
     }
 
-    // Evidenziazione con retry per elementi che appaiono dopo nel DOM
+    // Evidenzia elemento principale
     if (step.highlight) {
-      let attempts = 0;
-      const maxAttempts = step.inModal ? 30 : 5;
-      const tryHighlight = () => {
-        const el = document.querySelector(step.highlight);
-        if (el) {
-          el.classList.add("tour-highlight");
-          highlightedEl = el;
-          const navbar = el.closest(".navbar");
-          if (navbar) navbar.classList.add("tour-highlight-parent");
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-          return true;
-        }
-        attempts++;
-        if (attempts < maxAttempts) {
-          setTimeout(tryHighlight, 100);
-        } else if (step.skipIfMissing) {
-          setTimeout(nextStep, 200);
-        }
-        return false;
-      };
-      tryHighlight();
+      highlightElement(document.querySelector(step.highlight));
+    }
+
+    // Evidenzia elemento secondario (es. banner posizione)
+    if (step.alsoHighlight) {
+      const alsoEl = document.querySelector(step.alsoHighlight);
+      if (alsoEl && !alsoEl.classList.contains("hidden")) {
+        highlightElement(alsoEl, true);
+      }
     }
 
     if (step.injectDemoOffers) {
@@ -9928,7 +9945,6 @@ const maybeStartTour = (function () {
       if (btn) {
         if (savedCartOnclick === null) savedCartOnclick = btn.onclick;
         btn.onclick = function () {
-          // Apri il modal manualmente, bypassando renderCartContent() che chiede il login
           const modal = $("#fullPagePopup");
           if (modal) {
             modal.style.display = "flex";
@@ -9937,7 +9953,6 @@ const maybeStartTour = (function () {
             });
             document.body.style.overflow = "hidden";
           }
-          // Inietta contenuto demo direttamente
           setTimeout(() => {
             injectDemoCart();
             nextStep();
@@ -9945,14 +9960,7 @@ const maybeStartTour = (function () {
         };
       }
       if (step.highlight) {
-        const el = document.querySelector(step.highlight);
-        if (el) {
-          el.classList.add("tour-highlight");
-          highlightedEl = el;
-          const navbar = el.closest(".navbar");
-          if (navbar) navbar.classList.add("tour-highlight-parent");
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
+        highlightElement(document.querySelector(step.highlight));
       }
     }
   }
