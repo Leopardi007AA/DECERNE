@@ -554,11 +554,16 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
 
 .tour-highlight {
   position: relative;
-  z-index: 2110;
+  z-index: 2210;
   outline: 3px solid var(--primary);
   outline-offset: 4px;
   border-radius: var(--radius-sm);
   pointer-events: auto;
+}
+
+
+body.tour-active .tour-card {
+  z-index: 2202 !important;
 }
 
 /* Fix: quando un elemento dentro la navbar è evidenziato,

@@ -2207,9 +2207,10 @@ function renderSubTab() {
         </ul>
       </div>`;
 
-    actionButtons = `
-      <button class="btn" style="background: #6929c4;" onclick="activatePlan('Professional')">Rinnova Professional</button>
-      <button class="btn outline" onclick="storeData.step='pricing'; renderStoreView();">Gestisci Piani</button>`;
+      const canRenewNow = daysToRenewal <= 0;
+      actionButtons = `
+        <button class="btn" style="background: #6929c4;" ${canRenewNow ? `onclick="activatePlan('Professional', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Professional</button>
+        <button class="btn outline" onclick="storeData.billingCycle = '${sub.billingCycle || 'monthly'}'; storeData.step='pricing'; renderStoreView();">Gestisci Piani</button>`;
   }
 
   else if (plan === 'Standard' && status === 'active') {
@@ -2229,7 +2230,8 @@ function renderSubTab() {
         <p>Prossimo rinnovo: <strong>${renewalDate.toLocaleDateString()}</strong></p>
         <p>Giorni al rinnovo: <strong style="${daysToRenewal <= 5 ? 'color: #f97316;' : ''}">${daysToRenewal}</strong></p>
       </div>`;
-    actionButtons = `<button class="btn" onclick="activatePlan('Standard')">Rinnova Ora</button>`;
+      const canRenewNow = daysToRenewal <= 0;
+      actionButtons = `<button class="btn" ${canRenewNow ? `onclick="activatePlan('Standard', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Ora</button>`;
   }
 
   else if (plan === 'Enterprise' && status === 'active') {
@@ -2255,7 +2257,38 @@ function renderSubTab() {
         </ul>
       </div>`;
 
-    actionButtons = `<button class="btn" style="background: #1e40af;" onclick="activatePlan('Enterprise')">Rinnova Enterprise</button>`;
+      const canRenewNow = daysToRenewal <= 0;
+      actionButtons = `<button class="btn" style="background: #1e40af;" ${canRenewNow ? `onclick="activatePlan('Enterprise', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Enterprise</button>`;
+  }
+
+  else if (plan === 'Professional' && status === 'expired') {
+    statusContent = `
+      <div class="card" style="border-color: #ef4444; background: #fff5f5;">
+        <span class="status-badge status-expired">PIANO SCADUTO</span>
+        <h3 style="margin-top: 10px;">Piano Professional</h3>
+        <p>Il rinnovo non è stato ancora effettuato: le tue offerte sono in pausa.</p>
+      </div>`;
+    actionButtons = `<button class="btn" style="background: #6929c4;" onclick="activatePlan('Professional', '${sub.billingCycle || 'monthly'}')">Rinnova Professional</button>`;
+  }
+
+  else if (plan === 'Standard' && status === 'expired') {
+    statusContent = `
+      <div class="card" style="border-color: #ef4444; background: #fff5f5;">
+        <span class="status-badge status-expired">PIANO SCADUTO</span>
+        <h3>Piano Standard</h3>
+        <p>Il rinnovo non è stato ancora effettuato: le tue offerte sono in pausa.</p>
+      </div>`;
+    actionButtons = `<button class="btn" onclick="activatePlan('Standard', '${sub.billingCycle || 'monthly'}')">Rinnova Ora</button>`;
+  }
+
+  else if (plan === 'Enterprise' && status === 'expired') {
+    statusContent = `
+      <div class="card" style="border-color: #ef4444; background: #fff5f5;">
+        <span class="status-badge status-expired">PIANO SCADUTO</span>
+        <h3 style="margin-top: 10px;">Piano Enterprise</h3>
+        <p>Il rinnovo non è stato ancora effettuato: le tue offerte sono in pausa.</p>
+      </div>`;
+    actionButtons = `<button class="btn" style="background: #1e40af;" onclick="activatePlan('Enterprise', '${sub.billingCycle || 'monthly'}')">Rinnova Enterprise</button>`;
   }
 
   else if (status === 'trial' || status === 'expired') {
@@ -5858,12 +5891,19 @@ const isAnnualView = cycle === 'annual';
 
 // Helper per generare i pulsanti in modo dinamico
 const getPlanButton = (planName, priceText) => {
-  // 1. Caso: Il partner è già su questo piano
-  if (currentPlan === planName) {
-    return `<button class="btn full-width disabled" disabled>Piano Attuale</button>`;
+  const currentSub = partner?.subscription;
+
+  // 1. Caso: piano corrente ma scaduto -> deve potersi rinnovare anche da qui
+  if (currentPlan === planName && currentSub?.status === 'expired') {
+    return `<button class="btn full-width" style="background:#ef4444;" onclick="activatePlan('${planName}', '${currentSub.billingCycle || 'monthly'}')">Rinnova ${planName}</button>`;
   }
 
-  // 2. Caso: Il partner è loggato e sta guardando un piano superiore al suo (upgrade diretto, no trial)
+  // 2. Caso: Il partner è già su questo piano ed è ancora attivo -> non rinnovabile in anticipo
+  if (currentPlan === planName) {
+    return `<button class="btn full-width disabled" disabled title="Disponibile dal giorno di scadenza">Piano Attuale</button>`;
+  }
+
+  // 3. Caso: Il partner è loggato e sta guardando un piano superiore al suo (upgrade diretto, no trial)
   if (partner && PLAN_LEVELS[currentPlan] < PLAN_LEVELS[planName]) {
     return `<button class="btn full-width" onclick="activatePlan('${planName}')">Attiva ${planName}</button>`;
   }
@@ -7626,12 +7666,22 @@ function getSubscriptionBanner() {
               </p>
             </div>
           </div>
-          <button class="btn" style="background: #ef4444; color: white; white-space: nowrap;" onclick="activatePlan('Enterprise')">Rinnova Ora</button>
+          <button class="btn" style="background: #ef4444; color: white; white-space: nowrap;" onclick="activatePlan('Enterprise', '${sub.billingCycle || 'monthly'}')">Rinnova Ora</button>
         </div>`;
     }
   }
 
   if (sub.status === 'expired') {
+    if (plan !== 'Starter') {
+      return `
+        <div class="upgrade-banner banner-danger" style="flex-direction: column; align-items: flex-start; gap: 15px;">
+          <p style="margin: 0; font-size: 1rem; line-height: 1.6; display:flex; align-items:flex-start; gap:10px;">
+            <span class="banner-ico">${PANEL_ICONS.alert}</span>
+            <span><strong>Il tuo piano ${plan} è scaduto.</strong><br>Le tue offerte sono state messe in pausa. Rinnova per riprendere la pubblicazione.</span>
+          </p>
+          <button class="btn" style="background: #ef4444; color: white; width: fit-content;" onclick="activatePlan('${plan}', '${sub.billingCycle || 'monthly'}')">Rinnova ${plan}</button>
+        </div>`;
+    }
     return `
       <div class="upgrade-banner banner-danger" style="flex-direction: column; align-items: flex-start; gap: 15px;">
         <p style="margin: 0; font-size: 1rem; line-height: 1.6; display:flex; align-items:flex-start; gap:10px;">
@@ -7709,11 +7759,13 @@ window.promptUpgradeToStandard = function(partnerId) {
  * Attiva un piano di abbonamento reale (non trial) per il partner loggato.
  * Gestisce logicamente i piani Standard, Professional ed Enterprise.
  */
-window.activatePlan = async function(planName) {
+window.activatePlan = async function(planName, forceCycle) {
   const partner = getCurrentPartner();
   if (!partner) return toast.error("Esegui il login come partner per attivare un piano.");
 
-  const cycle = storeData.billingCycle || 'monthly'; // FIX: da qui deriva il conteggio giorni (mensile = +1 mese, annuale = +1 anno)
+  // forceCycle arriva dai bottoni "Rinnova": deve restare sul ciclo già attivo
+  // sul piano, non seguire il toggle Mensile/Annuale della pagina prezzi.
+  const cycle = forceCycle || storeData.billingCycle || 'monthly';
   const cycleLabel = cycle === 'annual' ? '1 anno' : '1 mese';
 
   showConfirm(`Confermi l'attivazione del piano ${planName} (durata ${cycleLabel})?`, async () => {
@@ -7754,7 +7806,8 @@ window.activatePlan = async function(planName) {
       subscription: {
         plan: storeRow.plan,
         status: storeRow.subscription_status,
-        renewalDate: storeRow.renewal_date
+        renewalDate: storeRow.renewal_date,
+        billingCycle: storeRow.billing_cycle || cycle
       }
     };
     const dataString = JSON.stringify(updatedStore);
@@ -9579,25 +9632,28 @@ const maybeStartTour = (function () {
     },
     {
       title: "La Lista Intelligente",
-      text: "Salva i prodotti che ti servono, poi apri la Lista Intelligente da qui: scrivi cosa ti manca e ti diciamo in quali negozi conviene andare, tenendo conto anche del carburante se vuoi. Il percorso lo tracci sulla mappa in un tocco.",
+      text: "Apri il carrello per vedere la tua lista della spesa.",
       highlight: "#cartBtn",
-      waitForClick: "#cartBtn",
-      injectDemoCart: true
+      autoOpenModal: 'cart'
     },
     {
-      title: "Crea la lista della spesa",
-      text: "Clicca qui per creare una lista intelligente con ciò che ti manca. Ti suggeriremo i negozi migliori.",
-      highlight: ".cart-smart-btn"
+      title: "Crea la lista",
+      text: "Da qui puoi creare una lista intelligente con ciò che ti manca. Ti suggeriremo i negozi migliori.",
+      highlight: ".cart-smart-btn",
+      inModal: true
     },
     {
       title: "Percorso in mappa",
-      text: "Tocca qui per vedere il percorso ottimale fino ai negozi sulla mappa.",
-      highlight: ".cart-map-btn"
+      text: "Quando hai prodotti nella lista, tocca qui per vedere il percorso ottimale fino ai negozi.",
+      highlight: ".cart-map-btn",
+      inModal: true,
+      skipIfMissing: true
     },
     {
       title: "Il resto è qui",
       text: "Dal menu trovi il tuo profilo, l'accesso e tutto quello che manca. Buona spesa.",
-      highlight: "#menuBtn"
+      highlight: "#menuBtn",
+      autoCloseModal: true
     }
   ];
 
@@ -9724,45 +9780,7 @@ const maybeStartTour = (function () {
     });
   }
 
-  function injectDemoCart() {
-    const content = $("#modalContent");
-    if (!content) return;
-    content.innerHTML = `
-      <div class="cart-toolbar">
-        <button class="btn cart-smart-btn" onclick="if(window.openSmartShoppingListModal) openSmartShoppingListModal()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align:-3px;margin-right:5px;"><path d="M6 2h12l2 7H4z"/><path d="M4 9v10a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1V9"/><circle cx="9" cy="21" r="1"/><circle cx="18" cy="21" r="1"/></svg> Lista della spesa
-        </button>
-      </div>
-      <div class="cart-list">
-        <div class="cart-row" onclick="closeFullPageModal()">
-          <div class="cart-row-img"><img src="https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=150&h=150&fit=crop" alt=""></div>
-          <div class="cart-row-body">
-            <div class="cart-row-info">
-              <div class="cart-row-store">Supermercato Demo - Via Roma 1</div>
-              <div class="cart-row-product">Pasta Barilla 500g</div>
-              <div class="cart-row-price">€ 1,29</div>
-            </div>
-            <button class="btn danger cart-remove-btn" onclick="event.stopPropagation();">Rimuovi</button>
-          </div>
-        </div>
-        <div class="cart-row" onclick="closeFullPageModal()">
-          <div class="cart-row-img"><img src="https://images.unsplash.com/photo-1583947581924-860bda6a26df?w=150&h=150&fit=crop" alt=""></div>
-          <div class="cart-row-body">
-            <div class="cart-row-info">
-              <div class="cart-row-store">Supermercato Demo - Via Roma 1</div>
-              <div class="cart-row-product">Detersivo Piatti 1L</div>
-              <div class="cart-row-price">€ 2,49</div>
-            </div>
-            <button class="btn danger cart-remove-btn" onclick="event.stopPropagation();">Rimuovi</button>
-          </div>
-        </div>
-        <button class="btn cart-map-btn" onclick="closeFullPageModal(); toast.info('Nella demo la mappa non è attiva.')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align:-3px;margin-right:5px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> Segui nella mappa fino ai negozi
-        </button>
-      </div>
-    `;
-  }
-
+  
   function hookModalClose() {
     if (!originalCloseFullPageModal && typeof window.closeFullPageModal === "function") {
       originalCloseFullPageModal = window.closeFullPageModal;
@@ -9803,33 +9821,20 @@ const maybeStartTour = (function () {
       nextBtn.textContent = current === steps.length - 1 ? "Inizia a cercare" : "Avanti";
     }
 
-    if (step.injectDemoOffers) {
-      injectDemoOffers();
+    // Apri popup automaticamente se richiesto
+    if (step.autoOpenModal) {
+      openFullPageModal(step.autoOpenModal);
     }
-    else if (step.waitForClick) {
-      const btn = document.querySelector(step.waitForClick);
-      if (btn) {
-        if (savedCartOnclick === null) savedCartOnclick = btn.onclick;
-        btn.onclick = function () {
-          openFullPageModal("cart");
-          setTimeout(() => {
-            if (step.injectDemoCart) injectDemoCart();
-            setTimeout(nextStep, 250);
-          }, 60);
-        };
-      }
-      if (step.highlight) {
-        const el = document.querySelector(step.highlight);
-        if (el) {
-          el.classList.add("tour-highlight");
-          highlightedEl = el;
-          const navbar = el.closest(".navbar");
-          if (navbar) navbar.classList.add("tour-highlight-parent");
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }
+
+    // Chiudi popup automaticamente se richiesto
+    if (step.autoCloseModal) {
+      closeFullPageModal();
     }
-    else if (step.highlight) {
+
+    // Evidenziazione con retry per elementi che appaiono dopo nel DOM
+    if (step.highlight) {
+      let attempts = 0;
+      const maxAttempts = step.inModal ? 30 : 5;
       const tryHighlight = () => {
         const el = document.querySelector(step.highlight);
         if (el) {
@@ -9838,13 +9843,21 @@ const maybeStartTour = (function () {
           const navbar = el.closest(".navbar");
           if (navbar) navbar.classList.add("tour-highlight-parent");
           el.scrollIntoView({ behavior: "smooth", block: "center" });
+          return true;
         }
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(tryHighlight, 100);
+        } else if (step.skipIfMissing) {
+          setTimeout(nextStep, 200);
+        }
+        return false;
       };
-      if (step.highlight.startsWith(".cart-")) {
-        setTimeout(tryHighlight, 200);
-      } else {
-        tryHighlight();
-      }
+      tryHighlight();
+    }
+
+    if (step.injectDemoOffers) {
+      injectDemoOffers();
     }
   }
 
@@ -9857,6 +9870,15 @@ const maybeStartTour = (function () {
       savedCartOnclick = null;
     }
     unhookModalClose();
+    // Chiudi popup se aperto
+    const modal = $("#fullPagePopup");
+    if (modal && (modal.style.display === "flex" || getComputedStyle(modal).display === "flex")) {
+      closeFullPageModal();
+    }
+    // Torna alla home utenti
+    if (typeof setMode === "function") {
+      setMode("user");
+    }
     document.body.classList.remove("tour-active");
     $("#tourOverlay")?.classList.add("hidden");
     $("#tourCard")?.classList.add("hidden");
