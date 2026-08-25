@@ -9802,6 +9802,47 @@ const maybeStartTour = (function () {
     });
   }
 
+  function injectDemoCart() {
+    const title = $("#modalTitle");
+    const content = $("#modalContent");
+    if (title) title.innerText = "Lista della Spesa";
+    if (!content) return;
+
+    content.innerHTML = `
+      <div class="cart-toolbar">
+        <button class="btn cart-smart-btn" onclick="if(window.openSmartShoppingListModal) openSmartShoppingListModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align:-3px;margin-right:5px;"><path d="M6 2h12l2 7H4z"/><path d="M4 9v10a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1V9"/><circle cx="9" cy="21" r="1"/><circle cx="18" cy="21" r="1"/></svg> Lista della spesa
+        </button>
+      </div>
+      <div class="cart-list">
+        <div class="cart-row" onclick="closeFullPageModal()">
+          <div class="cart-row-img"><img src="https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=150&h=150&fit=crop" alt=""></div>
+          <div class="cart-row-body">
+            <div class="cart-row-info">
+              <div class="cart-row-store">Supermercato Demo - Via Roma 1</div>
+              <div class="cart-row-product">Pasta Barilla 500g</div>
+              <div class="cart-row-price">€ 1,29</div>
+            </div>
+            <button class="btn danger cart-remove-btn" onclick="event.stopPropagation();">Rimuovi</button>
+          </div>
+        </div>
+        <div class="cart-row" onclick="closeFullPageModal()">
+          <div class="cart-row-img"><img src="https://images.unsplash.com/photo-1583947581924-860bda6a26df?w=150&h=150&fit=crop" alt=""></div>
+          <div class="cart-row-body">
+            <div class="cart-row-info">
+              <div class="cart-row-store">Supermercato Demo - Via Roma 1</div>
+              <div class="cart-row-product">Detersivo Piatti 1L</div>
+              <div class="cart-row-price">€ 2,49</div>
+            </div>
+            <button class="btn danger cart-remove-btn" onclick="event.stopPropagation();">Rimuovi</button>
+          </div>
+        </div>
+        <button class="btn cart-map-btn" onclick="closeFullPageModal(); toast.info('Nella demo la mappa non è attiva.')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align:-3px;margin-right:5px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> Segui nella mappa fino ai negozi
+        </button>
+      </div>
+    `;
+  }
   
   function hookModalClose() {
     if (!originalCloseFullPageModal && typeof window.closeFullPageModal === "function") {
@@ -9887,12 +9928,31 @@ const maybeStartTour = (function () {
       if (btn) {
         if (savedCartOnclick === null) savedCartOnclick = btn.onclick;
         btn.onclick = function () {
-          openFullPageModal("cart");
+          // Apri il modal manualmente, bypassando renderCartContent() che chiede il login
+          const modal = $("#fullPagePopup");
+          if (modal) {
+            modal.style.display = "flex";
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => modal.classList.add("is-visible"));
+            });
+            document.body.style.overflow = "hidden";
+          }
+          // Inietta contenuto demo direttamente
           setTimeout(() => {
             injectDemoCart();
             nextStep();
           }, 100);
         };
+      }
+      if (step.highlight) {
+        const el = document.querySelector(step.highlight);
+        if (el) {
+          el.classList.add("tour-highlight");
+          highlightedEl = el;
+          const navbar = el.closest(".navbar");
+          if (navbar) navbar.classList.add("tour-highlight-parent");
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
       }
     }
   }
