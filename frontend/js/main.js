@@ -9664,7 +9664,8 @@ const maybeStartTour = (function () {
       text: "Quando hai prodotti nella lista, tocca qui per vedere il percorso ottimale fino ai negozi sulla mappa.",
       highlight: ".cart-map-btn",
       inModal: true,
-      skipIfMissing: true
+      skipIfMissing: true,
+      reopenCart: true
     },
     {
       title: "Il resto è qui",
@@ -9717,6 +9718,27 @@ const maybeStartTour = (function () {
         item.el.removeEventListener("click", item.fn);
       });
       window.__tourInputListeners = [];
+    }
+  }
+
+
+  function addScrollBlock() {
+    const prevent = (e) => { e.preventDefault(); };
+    window.__tourScrollPrevent = prevent;
+    document.addEventListener("wheel", prevent, { passive: false });
+    document.addEventListener("touchmove", prevent, { passive: false });
+    document.addEventListener("keydown", (e) => {
+      if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Space"].includes(e.key)) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+  }
+
+  function removeScrollBlock() {
+    if (window.__tourScrollPrevent) {
+      document.removeEventListener("wheel", window.__tourScrollPrevent, { passive: false });
+      document.removeEventListener("touchmove", window.__tourScrollPrevent, { passive: false });
+      window.__tourScrollPrevent = null;
     }
   }
 
@@ -9918,10 +9940,27 @@ const maybeStartTour = (function () {
       if (step.blockRest) {
         overlay.classList.add("blocking");
         document.body.classList.add("tour-blocking");
+        addScrollBlock();
       } else {
         overlay.classList.remove("blocking");
         document.body.classList.remove("tour-blocking");
       }
+    }
+
+    // Se richiesto, riapri il carrello (per il punto 8 dopo lista intelligente)
+    if (step.reopenCart) {
+      closeFullPageModal();
+      setTimeout(() => {
+        const modal = $("#fullPagePopup");
+        if (modal) {
+          modal.style.display = "flex";
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => modal.classList.add("is-visible"));
+          });
+          document.body.style.overflow = "hidden";
+        }
+        injectDemoCart();
+      }, 200);
     }
 
     $("#tourTitle").textContent = step.title;
@@ -10068,6 +10107,8 @@ const maybeStartTour = (function () {
       clearInterval(modalCheckInterval);
       modalCheckInterval = null;
     }
+    removeScrollBlock();
+    
     // Chiudi popup se aperto
     const modal = $("#fullPagePopup");
     if (modal && (modal.style.display === "flex" || getComputedStyle(modal).display === "flex")) {
@@ -10101,6 +10142,7 @@ const maybeStartTour = (function () {
       }
     }
     removeInputListeners();
+    removeScrollBlock();
 
     if (current === steps.length - 1) {
       closeTour();
