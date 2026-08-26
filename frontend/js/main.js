@@ -10139,6 +10139,10 @@ const maybeStartTour = (function () {
     // Se richiesto, riapri il carrello (per il punto 9 dopo lista intelligente)
     if (step.reopenCart) {
       closeFullPageModal();
+      // closeFullPageModal() nasconde davvero il popup (display:none) solo
+      // dopo un suo timeout interno di 250ms: qui bisogna aspettare DI PIÙ
+      // di quel timeout, altrimenti scatta lui subito dopo aver riaperto noi
+      // il popup, nascondendolo di nuovo (sembrava "tornare alla home grigia").
       setTimeout(() => {
         const modal = $("#fullPagePopup");
         if (modal) {
@@ -10157,7 +10161,7 @@ const maybeStartTour = (function () {
         if (step.blockRest && step.inModal) {
           addModalBlocker();
         }
-      }, 200);
+      }, 300);
     }
 
     $("#tourTitle").textContent = step.title;
@@ -10299,65 +10303,29 @@ const maybeStartTour = (function () {
       }
     }
 
-        if (step.forceAddToCart) {
-      // Riapri lo STESSO prodotto/offerta che l'utente ha appena guardato
-      // (memorizzato da displayProductInModal): prima veniva creato un
-      // prodotto finto diverso, dando l'impressione di "un altro popup".
-      const fallbackDemoProduct = {
-        id: "tour-added-product",
-        product: tourSearchTerm || "Prodotto selezionato",
-        price: 1.29,
-        originalPrice: 1.89,
-        category: "Generico",
-        startDate: "2026-01-01",
-        endDate: "2026-12-31",
-        description: "Prodotto aggiunto durante il tour.",
-        img: "https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=600&h=600&fit=crop",
-        status: "active",
-        storeName: "Supermercato Demo",
-        storeCity: "Milano",
-        storeCap: "20100",
-        storeAddress: "Via Roma 1",
-        storeId: "demo-store",
-        storeLogo: "",
-        storePhone: "02 1234567",
-        storeHours: "Lun-Sab 8:30-20:30",
-        plan: "Professional",
-        unit: "pezzo",
-        cardRequirement: null,
-        limitedQuantity: false,
-        storeCardName: "",
-        storeCardImage: ""
-      };
-      const demoProduct = window.__tourLastProduct || fallbackDemoProduct;
-      if (typeof displayProductInModal === "function") {
-        displayProductInModal(demoProduct);
+    // Punto 6 "Aggiungi al carrello": niente popup nuovo. Si lavora sulla
+    // card ESTERNA già mostrata nei punti precedenti (quella nella griglia,
+    // reale o demo), evidenziando solo il suo pulsante "Aggiungi".
+    if (step.highlightRowAddBtn) {
+      let targetRow = window.__tourLastOfferRowEl;
+      if (!targetRow || !document.contains(targetRow)) {
+        targetRow = document.querySelector("#offersGrid .offer-row");
       }
-      const modal = $("#fullPagePopup");
-      if (modal) {
-        modal.style.display = "flex";
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => modal.classList.add("is-visible"));
-        });
-        document.body.style.overflow = "hidden";
+      const addBtn = targetRow ? targetRow.querySelector(".product-actions button") : null;
+      if (addBtn) {
+        highlightElement(addBtn);
+        tourRowAddBtn = addBtn;
+        tourRowAddInterceptor = function (e) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          tourSimulateAddToCart();
+          nextStep();
+        };
+        // Fase di cattura: intercetta il click PRIMA del vero onclick del
+        // pulsante (che richiederebbe login/scrittura reale su Supabase),
+        // così funziona anche per un visitatore anonimo al primo accesso.
+        addBtn.addEventListener("click", tourRowAddInterceptor, { capture: true, once: true });
       }
-      // Aggiungi blocker sopra il modal (solo il pulsante Aggiungi resterà cliccabile)
-      setTimeout(() => {
-        addModalBlocker();
-        const addBtn = document.querySelector("#fullPagePopup button[onclick*='saveToShoppingList']");
-        if (addBtn) {
-          addBtn.classList.add("tour-highlight");
-          highlightedEl = addBtn;
-          addBtn.scrollIntoView({ behavior: "smooth", block: "center" });
-          addBtn.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            removeModalBlocker();
-            closeFullPageModal();
-            nextStep();
-          };
-        }
-      }, 400);
     }
   }
   
