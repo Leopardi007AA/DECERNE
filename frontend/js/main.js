@@ -9760,11 +9760,25 @@ const maybeStartTour = (function () {
     window.__tourScrollPrevent = prevent;
     document.addEventListener("wheel", prevent, { passive: false });
     document.addEventListener("touchmove", prevent, { passive: false });
-    document.addEventListener("keydown", (e) => {
+    const preventKeys = (e) => {
       if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Space"].includes(e.key)) {
         e.preventDefault();
       }
-    }, { passive: false });
+    };
+    window.__tourScrollPreventKeys = preventKeys;
+    document.addEventListener("keydown", preventKeys, { passive: false });
+  }
+
+  function removeScrollBlock() {
+    if (window.__tourScrollPrevent) {
+      document.removeEventListener("wheel", window.__tourScrollPrevent, { passive: false });
+      document.removeEventListener("touchmove", window.__tourScrollPrevent, { passive: false });
+      window.__tourScrollPrevent = null;
+    }
+    if (window.__tourScrollPreventKeys) {
+      document.removeEventListener("keydown", window.__tourScrollPreventKeys, { passive: false });
+      window.__tourScrollPreventKeys = null;
+    }
   }
 
 
