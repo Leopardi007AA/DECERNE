@@ -7801,12 +7801,37 @@ window.activatePlan = async function(planName, forceCycle) {
       .select()
       .single();
 
-    if (error) {
-      console.error("Errore attivazione piano:", error);
-      return toast.error("Errore durante l'attivazione del piano.");
-    }
-
-    const updatedStore = {
+      if (error) {
+        console.error("Errore attivazione piano:", error);
+        return toast.error("Errore durante l'attivazione del piano.");
+      }
+  
+      // Storico rinnovi/upgrade (tabella subscription_events su Supabase).
+      // Non deve mai bloccare l'attivazione: se il log fallisce, il piano resta
+      // comunque attivato, si vede solo un warning in console.
+      const previousPlan = partner.plan;
+      const eventType = (PLAN_LEVELS[planName] || 0) > (PLAN_LEVELS[previousPlan] || 0)
+        ? 'upgrade'
+        : (PLAN_LEVELS[planName] || 0) < (PLAN_LEVELS[previousPlan] || 0)
+          ? 'downgrade'
+          : 'renewal';
+  
+      storeAuthClient.from('subscription_events').insert({
+        store_id: partner.id,
+        event_type: eventType,
+        previous_plan: previousPlan,
+        new_plan: storeRow.plan,
+        previous_status: partner.subscription?.status || null,
+        new_status: storeRow.subscription_status,
+        previous_billing_cycle: partner.subscription?.billingCycle || null,
+        new_billing_cycle: storeRow.billing_cycle,
+        previous_renewal_date: partner.subscription?.renewalDate || null,
+        new_renewal_date: storeRow.renewal_date
+      }).then(({ error: logError }) => {
+        if (logError) console.warn("Errore registrazione subscription_events:", logError);
+      });
+  
+      const updatedStore = {
       ...partner,
       plan: storeRow.plan,
       apiKey: storeRow.api_key || partner.apiKey || "",
@@ -9648,6 +9673,13 @@ const maybeStartTour = (function () {
       waitForModalClose: true
     },
     {
+      title: "Aggiungi al carrello",
+      text: "Ora aggiungi questo prodotto alla tua lista della spesa per poterlo trovare facilmente in negozio.",
+      highlight: null,
+      forceAddToCart: true,
+      blockRest: true
+    },
+    {
       title: "Il tuo carrello",
       text: "Ora clicca sul carrello in alto a destra per vedere la tua lista della spesa.",
       highlight: "#cartBtn",
@@ -9682,6 +9714,7 @@ const maybeStartTour = (function () {
   let waitingForModalClose = false;
   let waitingForProductClick = false;
   let modalCheckInterval = null;
+  let tourSearchTerm = "";
 
   let highlightedEls = [];
 
@@ -9734,12 +9767,16 @@ const maybeStartTour = (function () {
     }, { passive: false });
   }
 
-  function removeScrollBlock() {
-    if (window.__tourScrollPrevent) {
-      document.removeEventListener("wheel", window.__tourScrollPrevent, { passive: false });
-      document.removeEventListener("touchmove", window.__tourScrollPrevent, { passive: false });
-      window.__tourScrollPrevent = null;
-    }
+
+  function addModalBlocker() {
+    removeModalBlocker();
+    const blocker = document.createElement("div");
+    blocker.id = "tourModalBlocker";
+    document.body.appendChild(blocker);
+  }
+
+  function removeModalBlocker() {
+    document.getElementById("tourModalBlocker")?.remove();
   }
 
   function removeDemoOffers() {
@@ -9873,6 +9910,8 @@ const maybeStartTour = (function () {
     if (title) title.innerText = "Lista della Spesa";
     if (!content) return;
 
+    const productName = tourSearchTerm || "Prodotto Demo";
+
     content.innerHTML = `
       <div class="cart-toolbar">
         <button class="btn cart-smart-btn" onclick="if(window.openSmartShoppingListModal) openSmartShoppingListModal()">
@@ -9885,19 +9924,8 @@ const maybeStartTour = (function () {
           <div class="cart-row-body">
             <div class="cart-row-info">
               <div class="cart-row-store">Supermercato Demo - Via Roma 1</div>
-              <div class="cart-row-product">Pasta Barilla 500g</div>
+              <div class="cart-row-product">${productName}</div>
               <div class="cart-row-price">€ 1,29</div>
-            </div>
-            <button class="btn danger cart-remove-btn" onclick="event.stopPropagation();">Rimuovi</button>
-          </div>
-        </div>
-        <div class="cart-row" onclick="closeFullPageModal()">
-          <div class="cart-row-img"><img src="https://images.unsplash.com/photo-1583947581924-860bda6a26df?w=150&h=150&fit=crop" alt=""></div>
-          <div class="cart-row-body">
-            <div class="cart-row-info">
-              <div class="cart-row-store">Supermercato Demo - Via Roma 1</div>
-              <div class="cart-row-product">Detersivo Piatti 1L</div>
-              <div class="cart-row-price">€ 2,49</div>
             </div>
             <button class="btn danger cart-remove-btn" onclick="event.stopPropagation();">Rimuovi</button>
           </div>
@@ -10008,7 +10036,8 @@ const maybeStartTour = (function () {
         const inputEl = document.querySelector(step.requireInput);
         if (inputEl) {
           const checkInput = () => {
-            if (inputEl.value.trim().length > 0) {
+            tourSearchTerm = inputEl.value.trim();
+            if (tourSearchTerm.length > 0) {
               nextBtn.classList.add("enabled");
             } else {
               nextBtn.classList.remove("enabled");
@@ -10093,8 +10122,66 @@ const maybeStartTour = (function () {
         highlightElement(document.querySelector(step.highlight));
       }
     }
-  }
 
+    if (step.forceAddToCart) {
+      // Apri il modal prodotto con il nome della ricerca dell'utente
+      const demoProduct = {
+        id: "tour-added-product",
+        product: tourSearchTerm || "Prodotto selezionato",
+        price: 1.29,
+        originalPrice: 1.89,
+        category: "Generico",
+        startDate: "2026-01-01",
+        endDate: "2026-12-31",
+        description: "Prodotto aggiunto durante il tour.",
+        img: "https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=600&h=600&fit=crop",
+        status: "active",
+        storeName: "Supermercato Demo",
+        storeCity: "Milano",
+        storeCap: "20100",
+        storeAddress: "Via Roma 1",
+        storeId: "demo-store",
+        storeLogo: "",
+        storePhone: "02 1234567",
+        storeHours: "Lun-Sab 8:30-20:30",
+        plan: "Professional",
+        unit: "pezzo",
+        cardRequirement: null,
+        limitedQuantity: false,
+        storeCardName: "",
+        storeCardImage: ""
+      };
+      if (typeof displayProductInModal === "function") {
+        displayProductInModal(demoProduct);
+      }
+      const modal = $("#fullPagePopup");
+      if (modal) {
+        modal.style.display = "flex";
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => modal.classList.add("is-visible"));
+        });
+        document.body.style.overflow = "hidden";
+      }
+      // Aggiungi blocker sopra il modal (solo il pulsante Aggiungi resterà cliccabile)
+      setTimeout(() => {
+        addModalBlocker();
+        const addBtn = document.querySelector("#fullPagePopup button[onclick*='saveToShoppingList']");
+        if (addBtn) {
+          addBtn.classList.add("tour-highlight");
+          highlightedEl = addBtn;
+          addBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+          addBtn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            removeModalBlocker();
+            closeFullPageModal();
+            nextStep();
+          };
+        }
+      }, 400);
+    }
+  }
+  
   function closeTour() {
     clearHighlight();
     removeDemoOffers();
@@ -10108,6 +10195,7 @@ const maybeStartTour = (function () {
       modalCheckInterval = null;
     }
     removeScrollBlock();
+    removeModalBlocker();
     
     // Chiudi popup se aperto
     const modal = $("#fullPagePopup");
@@ -10143,6 +10231,7 @@ const maybeStartTour = (function () {
     }
     removeInputListeners();
     removeScrollBlock();
+    removeModalBlocker();
 
     if (current === steps.length - 1) {
       closeTour();

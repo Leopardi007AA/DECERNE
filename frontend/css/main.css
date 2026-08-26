@@ -588,6 +588,16 @@ body.tour-blocking .container {
   touch-action: none !important;
 }
 
+
+/* Overlay interno al modal: copre tutto il popup tranne il pulsante evidenziato */
+#tourModalBlocker {
+  position: fixed;
+  inset: 0;
+  z-index: 2201;
+  background: transparent;
+  pointer-events: auto;
+}
+
 /* Tasto Avanti del tour: disabilitato (grigio) */
 .tour-next-btn {
   opacity: 0.4 !important;
