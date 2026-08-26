@@ -561,11 +561,11 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
 }
 /* Per elementi che hanno già position: fixed/absolute (es. banner posizione) */
 .tour-highlight-fixed {
-  z-index: 2210;
+  z-index: 2210 !important;
   outline: 3px solid var(--primary);
   outline-offset: 4px;
   border-radius: var(--radius-sm);
-  pointer-events: auto;
+  pointer-events: auto !important;
 }
 
 /* Overlay che blocca i click su tutto il resto */
@@ -594,7 +594,7 @@ body.tour-blocking .container {
   position: fixed;
   inset: 0;
   z-index: 2201;
-  background: transparent;
+  background: rgba(2,6,23,0.55);
   pointer-events: auto;
 }
 
@@ -617,6 +617,17 @@ body.tour-blocking .container {
    la navbar stessa deve uscire sopra l'overlay del tour */
    .navbar.tour-highlight-parent {
     z-index: 2115 !important;
+  }
+
+  /* Fix: il resto della navbar (logo e altre icone) deve restare oscurato
+     e non cliccabile, non semplicemente "salire sopra" l'overlay insieme
+     all'elemento evidenziato */
+  .navbar.tour-highlight-parent .logo,
+  .navbar.tour-highlight-parent .nav-icons > .icon-btn:not(.tour-highlight) {
+    opacity: 0.35;
+    filter: grayscale(60%);
+    pointer-events: none;
+    transition: opacity 0.2s ease, filter 0.2s ease;
   }
   
   /* Fix: elementi evidenziati dentro il popup carrello

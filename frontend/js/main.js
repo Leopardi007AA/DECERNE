@@ -7040,6 +7040,9 @@ function renderStoreLoginForm(container) {
 
 // Funzione di supporto per iniettare i dati nel modal e aprirlo
 function displayProductInModal(product) {
+  // Usato dal tour guidato del primo accesso: al punto 6 ("Aggiungi al
+  // carrello") deve riaprire questo stesso prodotto, non uno diverso.
+  window.__tourLastProduct = product;
   const modal = $("#fullPagePopup");
   const title = $("#modalTitle");
   const content = $("#modalContent");
@@ -9664,7 +9667,8 @@ const maybeStartTour = (function () {
       text: "Qui trovi le offerte dei negozi della tua zona. Clicca su una per vederne prezzo, sconto e scadenza.",
       highlight: null,
       injectDemoOffers: true,
-      waitForProductClick: true
+      waitForProductClick: true,
+      blockRest: true
     },
     {
       title: "Dettaglio offerta",
@@ -9697,13 +9701,15 @@ const maybeStartTour = (function () {
       highlight: ".cart-map-btn",
       inModal: true,
       skipIfMissing: true,
-      reopenCart: true
+      reopenCart: true,
+      blockRest: true
     },
     {
       title: "Il resto è qui",
       text: "Dal menu trovi il tuo profilo, l'accesso e tutto quello che manca. Buona spesa.",
       highlight: "#menuBtn",
-      autoCloseModal: true
+      autoCloseModal: true,
+      blockRest: true
     }
   ];
 
@@ -9767,6 +9773,18 @@ const maybeStartTour = (function () {
     };
     window.__tourScrollPreventKeys = preventKeys;
     document.addEventListener("keydown", preventKeys, { passive: false });
+  }
+
+  function removeScrollBlock() {
+    if (window.__tourScrollPrevent) {
+      document.removeEventListener("wheel", window.__tourScrollPrevent, { passive: false });
+      document.removeEventListener("touchmove", window.__tourScrollPrevent, { passive: false });
+      window.__tourScrollPrevent = null;
+    }
+    if (window.__tourScrollPreventKeys) {
+      document.removeEventListener("keydown", window.__tourScrollPreventKeys, { passive: false });
+      window.__tourScrollPreventKeys = null;
+    }
   }
 
   function removeScrollBlock() {
@@ -9914,6 +9932,8 @@ const maybeStartTour = (function () {
           }
         }, 150);
       });
+      row.classList.add("tour-highlight");
+      highlightedEls.push(row);
       grid.prepend(row);
     });
   }
@@ -9989,7 +10009,7 @@ const maybeStartTour = (function () {
       }
     }
 
-    // Se richiesto, riapri il carrello (per il punto 8 dopo lista intelligente)
+    // Se richiesto, riapri il carrello (per il punto 9 dopo lista intelligente)
     if (step.reopenCart) {
       closeFullPageModal();
       setTimeout(() => {
@@ -10002,6 +10022,14 @@ const maybeStartTour = (function () {
           document.body.style.overflow = "hidden";
         }
         injectDemoCart();
+        // Il contenuto del carrello viene ricreato solo ora: evidenziare
+        // prima (sincrono, sopra) troverebbe il bottone non ancora nel DOM.
+        if (step.highlight) {
+          highlightElement(document.querySelector(step.highlight));
+        }
+        if (step.blockRest && step.inModal) {
+          addModalBlocker();
+        }
       }, 200);
     }
 
@@ -10092,9 +10120,16 @@ const maybeStartTour = (function () {
       closeFullPageModal();
     }
 
-    // Evidenzia elemento principale
-    if (step.highlight) {
+    // Evidenzia elemento principale (per gli step con reopenCart avviene sopra,
+    // dopo che il contenuto del popup è stato ricreato)
+    if (step.highlight && !step.reopenCart) {
       highlightElement(document.querySelector(step.highlight));
+    }
+
+    // Blocca il resto del popup lasciando cliccabile solo l'elemento evidenziato
+    // (per gli step con reopenCart avviene sopra, alla stessa condizione)
+    if (step.blockRest && step.inModal && !step.reopenCart) {
+      addModalBlocker();
     }
 
     // Evidenzia elemento secondario (es. banner posizione)
@@ -10137,9 +10172,11 @@ const maybeStartTour = (function () {
       }
     }
 
-    if (step.forceAddToCart) {
-      // Apri il modal prodotto con il nome della ricerca dell'utente
-      const demoProduct = {
+        if (step.forceAddToCart) {
+      // Riapri lo STESSO prodotto/offerta che l'utente ha appena guardato
+      // (memorizzato da displayProductInModal): prima veniva creato un
+      // prodotto finto diverso, dando l'impressione di "un altro popup".
+      const fallbackDemoProduct = {
         id: "tour-added-product",
         product: tourSearchTerm || "Prodotto selezionato",
         price: 1.29,
@@ -10165,6 +10202,7 @@ const maybeStartTour = (function () {
         storeCardName: "",
         storeCardImage: ""
       };
+      const demoProduct = window.__tourLastProduct || fallbackDemoProduct;
       if (typeof displayProductInModal === "function") {
         displayProductInModal(demoProduct);
       }
@@ -10243,9 +10281,9 @@ const maybeStartTour = (function () {
         savedCartOnclick = null;
       }
     }
-    removeInputListeners();
-    removeScrollBlock();
-    removeModalBlocker();
+    try { removeModalBlocker(); } catch (e) { console.error("Tour: errore removeModalBlocker", e); }
+    try { removeInputListeners(); } catch (e) { console.error("Tour: errore removeInputListeners", e); }
+    try { removeScrollBlock(); } catch (e) { console.error("Tour: errore removeScrollBlock", e); }
 
     if (current === steps.length - 1) {
       closeTour();
