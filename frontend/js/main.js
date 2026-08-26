@@ -3746,6 +3746,8 @@ async function renderMultiStopMap(cart) {
 
       if (multiRoute) {
         cartMultiRoute = multiRoute;
+        cartManeuvers = multiRoute.maneuvers || [];
+        cartNextManeuverIndex = 0;
         L.polyline(multiRoute.coords, { color: '#2563eb', weight: 5, opacity: 0.8 }).addTo(cartMap);
       }
 
@@ -3796,6 +3798,8 @@ let cartVisitOrder = [];
 let cartMultiRoute = null;
 let cartNextStopIndex = 0;
 let cartVoiceEnabled = false;
+let cartManeuvers = [];
+let cartNextManeuverIndex = 0;
 
 function computeVisitOrder(startLat, startLng, stores) {
   const remaining = [...stores];
@@ -3817,7 +3821,7 @@ function computeVisitOrder(startLat, startLng, stores) {
 async function fetchMultiStopRoute(points) {
   try {
     const coordsStr = points.map(p => `${p.lng},${p.lat}`).join(';');
-    const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=true`;
     const res = await fetch(url);
     const data = await res.json();
     if (data.routes && data.routes[0]) {
@@ -3826,13 +3830,92 @@ async function fetchMultiStopRoute(points) {
         coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
         totalDistanceKm: r.distance / 1000,
         totalDurationMin: r.duration / 60,
-        legs: r.legs.map(l => ({ distanceKm: l.distance / 1000, durationMin: l.duration / 60 }))
+        legs: r.legs.map(l => ({ distanceKm: l.distance / 1000, durationMin: l.duration / 60 })),
+        maneuvers: buildManeuverList(r.legs)
       };
     }
   } catch (e) {
     console.warn("Routing multi-tappa fallito:", e);
   }
   return null;
+}
+
+// Traduce le istruzioni di svolta di OSRM in frasi italiane per la guida vocale
+function sideItalian(modifier) {
+  if (!modifier) return 'dritto';
+  if (modifier.includes('right')) return 'destra';
+  if (modifier.includes('left')) return 'sinistra';
+  return 'dritto';
+}
+
+function ordinalItalian(n) {
+  const parole = ['', 'prima', 'seconda', 'terza', 'quarta', 'quinta', 'sesta', 'settima', 'ottava'];
+  return parole[n] || `${n}ª`;
+}
+
+function maneuverModifierText(modifier) {
+  const mappa = {
+    'uturn': "fai un'inversione a U",
+    'sharp right': 'svolta bruscamente a destra',
+    'right': 'svolta a destra',
+    'slight right': 'tieni la destra',
+    'straight': 'prosegui dritto',
+    'slight left': 'tieni la sinistra',
+    'left': 'svolta a sinistra',
+    'sharp left': 'svolta bruscamente a sinistra'
+  };
+  return mappa[modifier] || 'prosegui dritto';
+}
+
+function maneuverInstructionText(step) {
+  const m = step.maneuver;
+  const via = step.name ? ` su ${step.name}` : '';
+  switch (m.type) {
+    case 'turn':
+    case 'end of road':
+      return `${maneuverModifierText(m.modifier)}${via}`;
+    case 'new name':
+    case 'continue':
+      return `prosegui dritto${via}`;
+    case 'merge':
+      return `immettiti a ${sideItalian(m.modifier)}${via}`;
+    case 'fork':
+      return `al bivio tieni la ${sideItalian(m.modifier)}${via}`;
+    case 'on ramp':
+    case 'off ramp':
+      return `prendi la rampa a ${sideItalian(m.modifier)}${via}`;
+    case 'roundabout':
+    case 'rotary':
+    case 'roundabout turn':
+      return `entra nella rotonda e prendi la ${ordinalItalian(m.exit || 1)} uscita`;
+    case 'exit roundabout':
+    case 'exit rotary':
+      return `esci dalla rotonda${via}`;
+    default:
+      return `prosegui dritto${via}`;
+  }
+}
+
+// Trasforma gli step di OSRM in una lista piatta di manovre da annunciare,
+// escludendo partenza e arrivo (già gestiti dall'annuncio "sei arrivato a...")
+function buildManeuverList(legs) {
+  const manovre = [];
+  legs.forEach(leg => {
+    (leg.steps || []).forEach(step => {
+      if (step.maneuver.type === 'depart' || step.maneuver.type === 'arrive') return;
+      manovre.push({
+        lat: step.maneuver.location[1],
+        lng: step.maneuver.location[0],
+        text: maneuverInstructionText(step),
+        announcedFar: false
+      });
+    });
+  });
+  return manovre;
+}
+
+function capitalizeFirst(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function makeNumberedIcon(number, approximate) {
@@ -3870,6 +3953,8 @@ async function recalculateTrip(currentLat, currentLng) {
   const multiRoute = await fetchMultiStopRoute(routePoints);
   if (multiRoute) {
     cartMultiRoute = multiRoute;
+    cartManeuvers = multiRoute.maneuvers || [];
+    cartNextManeuverIndex = 0;
     updateTripInfoBar();
   }
 }
@@ -4413,6 +4498,19 @@ function startLiveTracking() {
         recalculateTrip(newLat, newLng);
       }
 
+      if (cartVoiceEnabled && cartManeuvers.length && cartNextManeuverIndex < cartManeuvers.length) {
+        const nextManeuver = cartManeuvers[cartNextManeuverIndex];
+        const distToManeuver = distanceMeters(newLat, newLng, nextManeuver.lat, nextManeuver.lng);
+        if (!nextManeuver.announcedFar && distToManeuver < 200) {
+          speakVoiceMessage(`Tra 200 metri, ${nextManeuver.text}.`);
+          nextManeuver.announcedFar = true;
+        }
+        if (distToManeuver < 35) {
+          speakVoiceMessage(`${capitalizeFirst(nextManeuver.text)}.`);
+          cartNextManeuverIndex++;
+        }
+      }
+
       if (cartVoiceEnabled && cartVisitOrder.length && cartNextStopIndex < cartVisitOrder.length) {
         const nextStop = cartVisitOrder[cartNextStopIndex];
         const d = distanceMeters(newLat, newLng, nextStop.latitude, nextStop.longitude);
@@ -4460,6 +4558,8 @@ function stopCartMapTracking() {
   cartVisitOrder = [];
   cartMultiRoute = null;
   cartNextStopIndex = 0;
+  cartManeuvers = [];
+  cartNextManeuverIndex = 0;
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   renderCartContent();
 }
@@ -9680,7 +9780,7 @@ const maybeStartTour = (function () {
       title: "Aggiungi al carrello",
       text: "Ora aggiungi questo prodotto alla tua lista della spesa per poterlo trovare facilmente in negozio.",
       highlight: null,
-      forceAddToCart: true,
+      highlightRowAddBtn: true,
       blockRest: true
     },
     {
@@ -9723,6 +9823,24 @@ const maybeStartTour = (function () {
   let tourSearchTerm = "";
 
   let highlightedEls = [];
+  let tourRowAddBtn = null;
+  let tourRowAddInterceptor = null;
+
+  function removeRowAddInterceptor() {
+    if (tourRowAddBtn && tourRowAddInterceptor) {
+      tourRowAddBtn.removeEventListener("click", tourRowAddInterceptor, { capture: true });
+    }
+    tourRowAddBtn = null;
+    tourRowAddInterceptor = null;
+  }
+
+  function tourSimulateAddToCart() {
+    const badge = document.querySelector("#cartBadge");
+    if (badge) badge.classList.remove("hidden");
+    if (typeof toast !== "undefined" && toast.success) {
+      toast.success("Aggiunto alla lista!");
+    }
+  }
 
   function clearHighlight() {
     // Pulisci TUTTI gli elementi con tour-highlight nel DOM (fix sovrapposizione)
@@ -9870,6 +9988,7 @@ const maybeStartTour = (function () {
       realOffers.forEach(row => {
         const origClick = row.onclick;
         row.onclick = function(e) {
+          window.__tourLastOfferRowEl = row;
           if (origClick) origClick.call(this, e);
           setTimeout(() => {
             if (waitingForProductClick) {
@@ -9918,12 +10037,20 @@ const maybeStartTour = (function () {
               <div class="price-tag">€ ${o.price.toFixed(2).replace(".", ",")}</div>
               <div style="font-size:0.75rem;color:#94a3b8;text-decoration:line-through;">€ ${o.original_price.toFixed(2).replace(".", ",")}</div>
             </div>
+            <button type="button" class="btn tour-row-add-btn">Aggiungi</button>
           </div>
         </div>
       `;
+      const demoAddBtn = row.querySelector(".tour-row-add-btn");
+      if (demoAddBtn) {
+        // Prima del punto 6 questo pulsante non deve fare nulla di suo,
+        // solo evitare di aprire il dettaglio (comportamento della riga).
+        demoAddBtn.onclick = (e) => { e.stopPropagation(); };
+      }
       row.addEventListener("click", function (e) {
         e.preventDefault();
         e.stopPropagation();
+        window.__tourLastOfferRowEl = row;
         openDemoProductDetail();
         setTimeout(() => {
           if (waitingForProductClick) {
@@ -10236,6 +10363,7 @@ const maybeStartTour = (function () {
   
   function closeTour() {
     clearHighlight();
+    removeRowAddInterceptor();
     removeDemoOffers();
     if (savedCartOnclick !== null) {
       const btn = document.querySelector("#cartBtn");
@@ -10282,6 +10410,7 @@ const maybeStartTour = (function () {
       }
     }
     try { removeModalBlocker(); } catch (e) { console.error("Tour: errore removeModalBlocker", e); }
+    try { removeRowAddInterceptor(); } catch (e) { console.error("Tour: errore removeRowAddInterceptor", e); }
     try { removeInputListeners(); } catch (e) { console.error("Tour: errore removeInputListeners", e); }
     try { removeScrollBlock(); } catch (e) { console.error("Tour: errore removeScrollBlock", e); }
 
