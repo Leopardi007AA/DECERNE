@@ -9981,7 +9981,7 @@ const maybeStartTour = (function () {
     const realOffers = grid.querySelectorAll(".offer-row:not(." + DEMO_OFFER_CLASS + ")");
     if (realOffers.length > 0) {
       const firstRow = realOffers[0];
-      firstRow.classList.add("tour-highlight");
+      firstRow.classList.add("tour-highlight", "in-view");
       highlightedEl = firstRow;
       firstRow.scrollIntoView({ behavior: "smooth", block: "center" });
       // Aggiungi listener temporaneo sulle card reali per avanzare il tour
@@ -10311,6 +10311,7 @@ const maybeStartTour = (function () {
       if (!targetRow || !document.contains(targetRow)) {
         targetRow = document.querySelector("#offersGrid .offer-row");
       }
+      if (targetRow) targetRow.classList.add("in-view");
       const addBtn = targetRow ? targetRow.querySelector(".product-actions button") : null;
       if (addBtn) {
         highlightElement(addBtn);

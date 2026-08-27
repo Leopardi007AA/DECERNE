@@ -553,11 +553,20 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
 .tour-skip-btn:hover, .tour-skip-btn:focus-visible { color: var(--primary-dark); }
 
 .tour-highlight {
+  position: relative;
   z-index: 2210;
   outline: 3px solid var(--primary);
   outline-offset: 4px;
   border-radius: var(--radius-sm);
   pointer-events: auto;
+}
+/* La card offerta ha overflow:hidden (serve per gli angoli arrotondati
+   dell'immagine): senza questa eccezione l'anello di evidenziazione
+   verrebbe tagliato ai bordi quando è la card intera a essere evidenziata,
+   o quando lo è il suo pulsante "Aggiungi" interno. */
+.offer-row:has(.tour-highlight),
+.offer-row.tour-highlight {
+  overflow: visible;
 }
 /* Per elementi che hanno già position: fixed/absolute (es. banner posizione) */
 .tour-highlight-fixed {
