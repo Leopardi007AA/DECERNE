@@ -9820,6 +9820,7 @@ const maybeStartTour = (function () {
   let waitingForModalClose = false;
   let waitingForProductClick = false;
   let modalCheckInterval = null;
+  let productClickPollInterval = null;
   let tourSearchTerm = "";
 
   let highlightedEls = [];
@@ -9990,10 +9991,23 @@ const maybeStartTour = (function () {
         row.onclick = function(e) {
           window.__tourLastOfferRowEl = row;
           if (origClick) origClick.call(this, e);
-          setTimeout(() => {
-            if (waitingForProductClick) {
-              waitingForProductClick = false;
-              nextStep();
+          // openProductDetail() per le offerte reali è ASINCRONA (fa una query
+          // a Supabase prima di mostrare il popup): aspettiamo che il popup
+          // sia davvero visibile invece di un timeout fisso, altrimenti il
+          // tour rischia di avanzare mentre il popup non è ancora apparso.
+          if (productClickPollInterval) clearInterval(productClickPollInterval);
+          let attempts = 0;
+          productClickPollInterval = setInterval(() => {
+            attempts++;
+            const modal = document.querySelector("#fullPagePopup");
+            const isOpen = modal && modal.style.display === "flex";
+            if (isOpen || attempts >= 20) {
+              clearInterval(productClickPollInterval);
+              productClickPollInterval = null;
+              if (waitingForProductClick) {
+                waitingForProductClick = false;
+                nextStep();
+              }
             }
           }, 150);
         };
@@ -10342,6 +10356,10 @@ const maybeStartTour = (function () {
     if (modalCheckInterval) {
       clearInterval(modalCheckInterval);
       modalCheckInterval = null;
+    }
+    if (productClickPollInterval) {
+      clearInterval(productClickPollInterval);
+      productClickPollInterval = null;
     }
     removeScrollBlock();
     removeModalBlocker();
