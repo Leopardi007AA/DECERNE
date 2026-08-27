@@ -3636,7 +3636,80 @@ async function openCartMapView() {
   await renderMultiStopMap(cart);
 }
 
-async function renderMultiStopMap(cart) {
+// ============ MAPPA DEMO PER IL TOUR GUIDATO ============
+// Il pulsante "Segui nella mappa" nel carrello demo del tour non può usare
+// openCartMapView() così com'è: quella richiede un utente loggato (per un
+// visitatore anonimo la mappa non si apriva affatto) e comunque leggerebbe
+// shopping_list_items da Supabase, dove il tour non ha mai scritto nulla
+// di vero (l'aggiunta al carrello nel tour è solo simulata).
+async function tourOpenCartMapView() {
+  const userId = state.currentUser?.id;
+  if (userId) {
+    // Se l'utente sta rifacendo il tour da loggato e ha già prodotti veri
+    // in lista, ha più senso mostrargli la mappa reale con indirizzi veri.
+    try {
+      const { data: items } = await supabaseClient
+        .from('shopping_list_items')
+        .select('offer_id, offers(id, store_id, location_id, product, price, img_url, status)')
+        .eq('user_id', userId);
+      const realCart = (items || []).map(i => i.offers).filter(o => o && o.status === 'active');
+      if (realCart.length > 0) {
+        await renderMultiStopMap(realCart);
+        return;
+      }
+    } catch (e) {
+      console.warn("Tour: lettura carrello reale fallita, uso la mappa demo.", e);
+    }
+  }
+  await tourRenderDemoMap();
+}
+
+async function tourRenderDemoMap() {
+  const productName = document.querySelector("#searchInput")?.value?.trim() || "Prodotto Demo";
+  const capOrCity = document.querySelector("#locationInput")?.value?.trim() || "Italia";
+  const center = await tourGeocodeDemoCenter(capOrCity);
+
+  const demoLocationId = "tour-demo-location";
+  const demoCart = [{ id: "tour-demo-offer", product: productName, price: 1.29, location_id: demoLocationId }];
+  const demoStoresById = {
+    [demoLocationId]: {
+      id: demoLocationId,
+      name: "Supermercato Demo",
+      latitude: center.lat,
+      longitude: center.lng,
+      approximateLocation: true
+    }
+  };
+
+  await renderMultiStopMap(demoCart, demoStoresById);
+}
+
+async function tourGeocodeDemoCenter(query) {
+  // Primo tentativo: il canale ufficiale (cache Supabase). Funziona solo
+  // se c'è una sessione attiva, quindi per un visitatore anonimo del tour
+  // normalmente restituisce null e si passa al fallback sotto.
+  const viaBackend = await tryGeocodeQuery(`${query}, Italia`);
+  if (viaBackend) return viaBackend;
+
+  // Fallback: chiamata diretta e pubblica a Nominatim, usata solo qui.
+  // Serve solo un centro indicativo per la mappa demo del tour (nessun
+  // indirizzo reale da salvare), quindi non ha senso farla passare dal
+  // backend riservato agli utenti autenticati.
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=it&q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    if (data && data[0]) {
+      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    }
+  } catch (e) {
+    console.warn("Tour: geocodifica demo fallita, uso il centro Italia.", e);
+  }
+
+  // Ultimo ripiego, così la mappa si apre comunque: centro Italia.
+  return { lat: 42.5, lng: 12.5 };
+}
+
+async function renderMultiStopMap(cart, overrideStoresById) {
   const content = $("#modalContent");
   content.innerHTML = `<div style="padding:50px; text-align:center; color:#64748b;">Preparazione mappa...</div>`;
 
@@ -3646,7 +3719,9 @@ async function renderMultiStopMap(cart) {
     cartItemsByStore[o.location_id].push({ product: o.product, price: o.price, offerId: o.id });
   });
   const storeIds = Object.keys(cartItemsByStore);
-  const storesById = await fetchPublicLocationsMap(storeIds);
+  // overrideStoresById permette di passare sedi già pronte (usato dal tour
+  // guidato per il negozio demo) senza interrogare il database.
+  const storesById = overrideStoresById || await fetchPublicLocationsMap(storeIds);
 
   let userPos = null;
   try {
@@ -4561,7 +4636,14 @@ function stopCartMapTracking() {
   cartManeuvers = [];
   cartNextManeuverIndex = 0;
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-  renderCartContent();
+  // Durante il tour, tornando indietro dalla mappa demo deve ricomparire
+  // il carrello demo, non quello vero (per un visitatore anonimo sarebbe
+  // vuoto/rotto).
+  if (document.body.classList.contains("tour-active") && typeof window.__tourInjectDemoCart === "function") {
+    window.__tourInjectDemoCart();
+  } else {
+    renderCartContent();
+  }
 }
 
 window.removeFromCart = async (id) => {
@@ -10101,6 +10183,10 @@ const maybeStartTour = (function () {
   }
 
   function injectDemoCart() {
+    // Esposta globalmente così stopCartMapTracking() (fuori da questa
+    // closure) può richiamarla per tornare al carrello demo invece che a
+    // quello vero, se si esce dalla mappa demo mentre il tour è attivo.
+    window.__tourInjectDemoCart = injectDemoCart;
     const title = $("#modalTitle");
     const content = $("#modalContent");
     if (title) title.innerText = "Lista della Spesa";
@@ -10126,7 +10212,7 @@ const maybeStartTour = (function () {
                       <button class="btn" onclick="event.stopPropagation(); if(typeof offerData !== 'undefined' && offerData && offerData.id) saveToShoppingList(offerData.id);">Aggiungi</button>
           </div>
         </div>
-        <button class="btn cart-map-btn" onclick="openCartMapView()">
+        <button class="btn cart-map-btn" onclick="tourOpenCartMapView()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align:-3px;margin-right:5px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> Segui nella mappa fino ai negozi
         </button>
       </div>
@@ -10364,8 +10450,12 @@ const maybeStartTour = (function () {
         highlightElement(addBtn);
         tourRowAddBtn = addBtn;
         tourRowAddInterceptor = function (e) {
-          // Lascia passare il click al gestore originale (saveToShoppingList)
-          // NON bloccare con stopImmediatePropagation()
+          // Blocca il click reale (che chiederebbe il login) e simula
+          // solo l'aggiunta: il tour deve restare tutta una prova, senza
+          // toccare mai Supabase né chiedere l'accesso.
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          tourSimulateAddToCart();
           setTimeout(nextStep, 400);
         };
         // Fase di cattura: intercetta il click PRIMA del vero onclick del
