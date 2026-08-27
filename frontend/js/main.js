@@ -4053,7 +4053,7 @@ window.openSmartShoppingListModal = () => {
 
       <div id="smartListResults" class="smart-list-results"></div>
 
-      <button id="traceSmartListBtn" class="btn smart-list-trace-btn" onclick="traceSmartListOnMap()">${PANEL_ICONS.route} Traccia la lista sulla mappa</button>
+            <button id="traceSmartListBtn" class="btn smart-list-trace-btn" onclick="traceSmartListOnMap()">${PANEL_ICONS.route} Traccia la lista sulla mappa</button>
     </div>
   `;
 };
@@ -9826,6 +9826,7 @@ const maybeStartTour = (function () {
   let highlightedEls = [];
   let tourRowAddBtn = null;
   let tourRowAddInterceptor = null;
+  let tourNeutralizedRow = null;
 
   function removeRowAddInterceptor() {
     if (tourRowAddBtn && tourRowAddInterceptor) {
@@ -9852,6 +9853,13 @@ const maybeStartTour = (function () {
     });
     highlightedEls = [];
     highlightedEl = null;
+    // Ripristina la card offerta che era stata "smontata" (transform/filter
+    // rimossi) per far uscire il pulsante Aggiungi sopra l'overlay scuro.
+    if (tourNeutralizedRow) {
+      tourNeutralizedRow.style.transform = "";
+      tourNeutralizedRow.style.filter = "";
+      tourNeutralizedRow = null;
+    }
   }
 
   function highlightElement(el, isFixed) {
@@ -9865,6 +9873,11 @@ const maybeStartTour = (function () {
     highlightedEl = el;
     const navbar = el.closest(".navbar");
     if (navbar) navbar.classList.add("tour-highlight-parent");
+    
+    // FIX: se l'elemento è dentro un modal, alza il modal sopra l'overlay #tourModalBlocker
+    const modal = el.closest(".full-page-modal");
+    if (modal) modal.classList.add("tour-has-highlight");
+    
     el.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
@@ -9923,7 +9936,15 @@ const maybeStartTour = (function () {
     removeModalBlocker();
     const blocker = document.createElement("div");
     blocker.id = "tourModalBlocker";
-    document.body.appendChild(blocker);
+    // Va inserito DENTRO al popup (#fullPagePopup), non su document.body:
+    // .full-page-modal ha z-index:1600 e transform, quindi crea il suo
+    // contesto di stacking. Se il blocker restasse un fratello a livello
+    // body con z-index 2201, l'intero popup (pulsante evidenziato compreso,
+    // che vale 2210 solo DENTRO quel contesto) resterebbe comunque sotto.
+    // Da figlio del popup, il confronto con .tour-highlight (2210) torna
+    // diretto all'interno dello stesso contesto.
+    const modal = document.getElementById("fullPagePopup");
+    (modal || document.body).appendChild(blocker);
   }
 
   function removeModalBlocker() {
@@ -10102,7 +10123,7 @@ const maybeStartTour = (function () {
               <div class="cart-row-product">${productName}</div>
               <div class="cart-row-price">€ 1,29</div>
             </div>
-            <button class="btn danger cart-remove-btn" onclick="event.stopPropagation();">Rimuovi</button>
+                      <button class="btn" onclick="event.stopPropagation(); if(typeof offerData !== 'undefined' && offerData && offerData.id) saveToShoppingList(offerData.id);">Aggiungi</button>
           </div>
         </div>
         <button class="btn cart-map-btn" onclick="openCartMapView()">
@@ -10325,16 +10346,27 @@ const maybeStartTour = (function () {
       if (!targetRow || !document.contains(targetRow)) {
         targetRow = document.querySelector("#offersGrid .offer-row");
       }
-      if (targetRow) targetRow.classList.add("in-view");
+      if (targetRow) {
+        targetRow.classList.add("in-view");
+        // Le card reali hanno classe "scroll-reveal": in-view applica
+        // transform/filter (anche a valori "neutri" tipo translateX(0))
+        // che creano comunque un nuovo contesto di stacking sulla card,
+        // intrappolando lo z-index del pulsante evidenziato al suo interno
+        // e impedendogli di salire sopra l'overlay scuro del tour.
+        // Azzerandoli qui il pulsante torna a "bucare" l'overlay
+        // normalmente; vengono ripristinati in clearHighlight().
+        targetRow.style.transform = "none";
+        targetRow.style.filter = "none";
+        tourNeutralizedRow = targetRow;
+      }
       const addBtn = targetRow ? targetRow.querySelector(".product-actions button") : null;
       if (addBtn) {
         highlightElement(addBtn);
         tourRowAddBtn = addBtn;
         tourRowAddInterceptor = function (e) {
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          tourSimulateAddToCart();
-          nextStep();
+          // Lascia passare il click al gestore originale (saveToShoppingList)
+          // NON bloccare con stopImmediatePropagation()
+          setTimeout(nextStep, 400);
         };
         // Fase di cattura: intercetta il click PRIMA del vero onclick del
         // pulsante (che richiederebbe login/scrittura reale su Supabase),

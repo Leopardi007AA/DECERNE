@@ -2161,7 +2161,7 @@ hr {
 #previewCardContainer .offer-row {
   box-shadow: 0 10px 30px rgba(0,0,0,0.1);
   margin: 0 auto;
-  /* pointer-events: none; rimosso — il pulsante Aggiungi deve essere cliccabile */
+  /* pointer-events: none rimosso — il pulsante Aggiungi deve essere cliccabile */
 }
 
 .status-scheduled { background: #e0f2fe; color: #0369a1; } /* Blu chiaro */
@@ -3556,3 +3556,38 @@ body.tour-active .cart-map-btn {
   z-index: 2215 !important;
   position: relative;
 }
+
+/* ============================================================
+   FIX TOUR: i pulsanti evidenziati devono essere visibili e cliccabili
+   ============================================================ */
+
+/* Quando il tour evidenzia un elemento dentro il modal carrello,
+   il modal deve stare sopra l'overlay #tourModalBlocker (z-index 2201) */
+   .full-page-modal.tour-has-highlight,
+   body.tour-active .full-page-modal.tour-has-highlight {
+     z-index: 2202 !important;
+   }
+   
+   /* Forza visibilità e cliccabilità sui pulsanti evidenziati dal tour */
+   .tour-highlight,
+   .tour-highlight-fixed {
+     pointer-events: auto !important;
+     opacity: 1 !important;
+     filter: none !important;
+   }
+   
+   /* Specifico per i pulsanti AGGIUNGI nelle card e SEGUI NELLA MAPPA */
+   .btn.tour-highlight,
+   .btn.tour-highlight-fixed,
+   .cart-map-btn.tour-highlight,
+   .cart-map-btn.tour-highlight-fixed,
+   .product-actions .btn.tour-highlight,
+   .product-actions .btn.tour-highlight-fixed {
+     pointer-events: auto !important;
+     opacity: 1 !important;
+     filter: none !important;
+     cursor: pointer !important;
+     position: relative !important;
+     z-index: 2215 !important;
+   }
+   
