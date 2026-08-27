@@ -2161,7 +2161,7 @@ hr {
 #previewCardContainer .offer-row {
   box-shadow: 0 10px 30px rgba(0,0,0,0.1);
   margin: 0 auto;
-  pointer-events: none; /* Disabilita i click nell'anteprima */
+  /* pointer-events: none; rimosso — il pulsante Aggiungi deve essere cliccabile */
 }
 
 .status-scheduled { background: #e0f2fe; color: #0369a1; } /* Blu chiaro */
@@ -2456,12 +2456,9 @@ hr {
 }
 
 .btn.disabled, .btn:disabled {
-  background-color: #cbd5e1 !important;
-  color: #64748b !important;
-  cursor: not-allowed !important;
-  border-color: #cbd5e1 !important;
-  transform: none !important;
-  box-shadow: none !important;
+  opacity: 0.55;
+  cursor: not-allowed;
+  /* pointer-events: none; rimosso per permettere eventuali tooltip/click */
 }
 
 /* --- LOCK SYSTEM STYLES --- */
@@ -3541,4 +3538,21 @@ hr {
   #previewOverlay { background: rgba(15, 23, 42, 0.97); }
   #drawer.drawer-dark { background: rgba(2, 6, 23, 1); }
   .store-info-overlay { background: rgba(15, 23, 42, 0.92); }
+}
+
+/* === RIPRISTINO CLICCABILITÀ PULSANTI DEDICATI === */
+.product-actions .btn,
+.cart-map-btn {
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  filter: none !important;
+  cursor: pointer !important;
+}
+
+/* Se il tour è attivo, i pulsanti reali restano cliccabili */
+body.tour-active .product-actions .btn,
+body.tour-active .cart-map-btn {
+  pointer-events: auto !important;
+  z-index: 2215 !important;
+  position: relative;
 }

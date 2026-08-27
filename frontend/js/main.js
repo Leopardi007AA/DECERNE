@@ -2091,7 +2091,7 @@ function renderOffersTab() {
       </div>
       <div style="display:flex; gap:10px;">
         <button class="btn outline" onclick="toggleSelectAllOffers(document.getElementById('selectAllOffersCb').checked = !document.getElementById('selectAllOffersCb').checked)">
-          <input type="checkbox" id="selectAllOffersCb" style="pointer-events:none; margin-right:6px;"> Seleziona tutto
+          <input type="checkbox" id="selectAllOffersCb" style="margin-right:6px;"> Seleziona tutto
         </button>
         <button class="btn ${isLimitReached ? 'disabled' : ''}" 
                 ${isLimitReached ? 'disabled' : ''} 
@@ -4053,7 +4053,7 @@ window.openSmartShoppingListModal = () => {
 
       <div id="smartListResults" class="smart-list-results"></div>
 
-      <button id="traceSmartListBtn" class="btn smart-list-trace-btn" onclick="traceSmartListOnMap()" disabled style="background:#cbd5e1; color:#94a3b8; cursor:not-allowed; box-shadow:none;">${PANEL_ICONS.route} Traccia la lista sulla mappa</button>
+      <button id="traceSmartListBtn" class="btn smart-list-trace-btn" onclick="traceSmartListOnMap()">${PANEL_ICONS.route} Traccia la lista sulla mappa</button>
     </div>
   `;
 };
@@ -5340,7 +5340,7 @@ window.showOfferPreview = () => {
           </div>
         </div>
         <div class="product-actions">
-          <button class="btn" style="pointer-events: none;">Aggiungi</button>
+          <button class="btn" onclick="event.stopPropagation(); saveToShoppingList(offerData?.id || '')">Aggiungi</button>
         </div>
       </div>
     </div>
@@ -10105,7 +10105,7 @@ const maybeStartTour = (function () {
             <button class="btn danger cart-remove-btn" onclick="event.stopPropagation();">Rimuovi</button>
           </div>
         </div>
-        <button class="btn cart-map-btn" onclick="closeFullPageModal(); toast.info('Nella demo la mappa non è attiva.')">
+        <button class="btn cart-map-btn" onclick="openCartMapView()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align:-3px;margin-right:5px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> Segui nella mappa fino ai negozi
         </button>
       </div>
