@@ -473,6 +473,199 @@ function stripDiacritics(str) {
   return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+// ============================================================
+// FUZZY SEARCH ENGINE - Ricerca intelligente con tolleranza errori
+// ============================================================
+
+/**
+ * Calcola la distanza di Levenshtein tra due stringhe.
+ * Utile per tollerare typo (1-2 lettere sbagliate).
+ */
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const matrix = Array.from({ length: m + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= n; j++) matrix[0][j] = j;
+  
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,      // cancellazione
+        matrix[i][j - 1] + 1,      // inserimento
+        matrix[i - 1][j - 1] + cost // sostituzione
+      );
+    }
+  }
+  return matrix[m][n];
+}
+
+/**
+ * Controlla se tutti i caratteri della query compaiono in ordine nel target.
+ * Es: "ml" matcha "Mele" (M -> e -> l), "psta" matcha "Pasta".
+ */
+function isSubsequence(query, target) {
+  let qi = 0, ti = 0;
+  while (qi < query.length && ti < target.length) {
+    if (query[qi] === target[ti]) qi++;
+    ti++;
+  }
+  return qi === query.length;
+}
+
+/**
+ * Calcola un punteggio fuzzy tra 0 e 1.
+ * - 1.0 = match perfetto o all'inizio della parola
+ * - >0.7 = match molto probabile (subsequence + inizio parola)
+ * - >0.5 = match tollerante (Levenshtein basso)
+ * - 0 = nessun match
+ */
+function fuzzyScore(target, query) {
+  if (!target || !query) return 0;
+  
+  const t = stripDiacritics(target).toLowerCase().trim();
+  const q = stripDiacritics(query).toLowerCase().trim();
+  
+  if (!q) return 0;
+  if (t === q) return 1.0;
+  if (t.includes(q)) return 0.95; // match esatto contenuto
+  
+  // 1. Subsequence match (caratteri in ordine, anche non consecutivi)
+  const subseq = isSubsequence(q, t);
+  
+  // 2. Levenshtein normalizzato (tollera typo)
+  const dist = levenshtein(q, t);
+  const maxLen = Math.max(q.length, t.length);
+  const levScore = maxLen === 0 ? 0 : 1 - (dist / maxLen);
+  
+  // 3. Match all'inizio di una parola (es: "me" in "Mele Biologiche")
+  const words = t.split(/\s+/);
+  const wordStartBonus = words.some(w => w.startsWith(q)) ? 0.3 : 0;
+  
+  // 4. Controlla se la query è "quasi" una parola intera (per typo in parole corte)
+  const wordSimilarBonus = words.some(w => {
+    if (Math.abs(w.length - q.length) <= 2) {
+      const d = levenshtein(w, q);
+      return d <= 2 && d < w.length;
+    }
+    return false;
+  }) ? 0.25 : 0;
+  
+  // Se la distanza Levenshtein è troppo alta e non c'è subsequence, scarta
+  if (levScore < 0.3 && !subseq) return 0;
+  
+  let score = Math.max(levScore, subseq ? 0.7 : 0);
+  score += wordStartBonus + wordSimilarBonus;
+  
+  // Penalità se le lunghezze sono molto diverse
+  const lenDiff = Math.abs(t.length - q.length);
+  if (lenDiff > q.length * 2) score -= 0.2;
+  
+  return Math.min(1, Math.max(0, score));
+}
+
+/**
+ * Verifica se una query matcha un'offerta in modo intelligente.
+ * Controlla: nome prodotto, nome negozio, categoria.
+ * 
+ * @param {Object} offer - L'offerta da verificare
+ * @param {string} query - La query utente
+ * @param {Object} options - Opzioni
+ * @param {boolean} options.includeCategory - Se true, cerca anche nella categoria
+ * @param {number} options.threshold - Soglia minima di punteggio (default 0.45)
+ */
+function smartMatch(offer, query, options = {}) {
+  const threshold = options.threshold ?? 0.45;
+  const q = query.trim();
+  if (!q) return true;
+  
+  const fields = [
+    offer.product,
+    offer.storeName,
+    offer.storeCity,
+    options.includeCategory ? offer.category : null
+  ].filter(Boolean);
+  
+  // Se anche un solo campo supera la soglia, è un match
+  return fields.some(field => fuzzyScore(field, q) >= threshold);
+}
+
+/**
+ * Ordina i risultati per rilevanza fuzzy (dal più pertinente al meno).
+ */
+function sortByRelevance(offers, query) {
+  const q = stripDiacritics(query).toLowerCase().trim();
+  if (!q) return offers;
+  
+  return [...offers].sort((a, b) => {
+    const scoreA = Math.max(
+      fuzzyScore(a.product || '', q),
+      fuzzyScore(a.storeName || '', q),
+      fuzzyScore(a.category || '', q)
+    );
+    const scoreB = Math.max(
+      fuzzyScore(b.product || '', q),
+      fuzzyScore(b.storeName || '', q),
+      fuzzyScore(b.category || '', q)
+    );
+    return scoreB - scoreA;
+  });
+}
+
+/**
+ * Filtra offerte con ricerca intelligente + categoria.
+ * Se la query matcha una categoria, include TUTTI i prodotti di quella categoria.
+ */
+function smartFilterOffers(offers, query, categoryFilter = null) {
+  let result = offers || [];
+  
+  // 1. Filtro per categoria dropdown (se presente)
+  if (categoryFilter && categoryFilter !== 'all') {
+    result = result.filter(o => {
+      const cat = stripDiacritics(o.category || '').toLowerCase();
+      const filterCat = stripDiacritics(categoryFilter).toLowerCase();
+      return cat === filterCat || fuzzyScore(cat, filterCat) > 0.8;
+    });
+  }
+  
+  // 2. Filtro testuale intelligente
+  if (query && query.trim()) {
+    const q = query.trim();
+    
+    // Se la query sembra una categoria (matcha molte offerte per categoria),
+    // includi tutti i prodotti di quella categoria
+    const categoryMatches = new Set();
+    result.forEach(o => {
+      if (o.category && fuzzyScore(o.category, q) >= 0.8) {
+        categoryMatches.add(o.id);
+      }
+    });
+    
+    result = result.filter(o => {
+      // Se questo prodotto è in una categoria matchata, includilo sempre
+      if (categoryMatches.has(o.id)) return true;
+      // Altrimenti applica fuzzy match normale
+      return smartMatch(o, q, { includeCategory: true, threshold: 0.4 });
+    });
+    
+    // Ordina per rilevanza
+    result = sortByRelevance(result, q);
+  }
+  
+  return result;
+}
+
+/**
+ * Fuzzy match per la ricerca negozi (nome, città, indirizzo).
+ */
+function smartMatchStore(store, query, threshold = 0.45) {
+  if (!query || !query.trim()) return true;
+  const q = query.trim();
+  const fields = [store.name, store.city, store.address].filter(Boolean);
+  return fields.some(f => fuzzyScore(f, q) >= threshold);
+}
+
 // URL della bandiera reale (immagine SVG), non emoji: le emoji bandiera non sono renderizzate su
 // molti browser/sistemi Windows, che mostrano solo le due lettere del codice nazione
 function flagUrl(iso2) {
@@ -4941,15 +5134,20 @@ function renderSearchModal() {
   
   // Debounce per non sovraccaricare il browser mentre si scrive
   const performModalSearch = debounce(async () => {
-    const query = input.value.toLowerCase().trim();
-    if (query.length < 2) {
+    const rawQuery = input.value.trim();
+    
+    // REGOLA: la modale inizia a cercare dalla PRIMA lettera
+    if (!rawQuery) {
       resultsDiv.innerHTML = "";
       return;
     }
-
+  
     const today = new Date().toISOString().split("T")[0];
     const userCity = getCleanUserCity();
-
+  
+    // Mostra stato di caricamento
+    resultsDiv.innerHTML = `<p style="text-align:center; padding:20px; color:#64748b;">Ricerca in corso...</p>`;
+  
     const { data: rows, error } = await supabaseClient
       .from('offers')
       .select('*')
@@ -4957,55 +5155,56 @@ function renderSearchModal() {
       .is('deleted_at', null)
       .lte('start_date', today)
       .gte('end_date', today);
-
+  
     if (error) {
       console.error("Errore ricerca:", error);
+      resultsDiv.innerHTML = `<p style="text-align:center; padding:20px; color:#ef4444;">Errore durante la ricerca.</p>`;
       return;
     }
-
+  
     const locationsById = await fetchPublicLocationsMap((rows || []).map(r => r.location_id));
-
+  
     const allOffers = (rows || []).map(r => {
       const loc = locationsById[r.location_id] || {};
       return {
         id: r.id,
         product: r.product,
         price: r.price,
+        originalPrice: r.original_price,
+        category: r.category,
         img: r.img_url,
         storeName: loc.name || "",
-        storeCity: loc.city ? loc.city.toLowerCase() : ""
+        storeCity: loc.city ? loc.city.toLowerCase() : "",
+        storeAddress: loc.address || ""
       };
     });
-
-    const filtered = allOffers.filter(o => {
-      const matchesQuery = o.product.toLowerCase().includes(query) || o.storeName.toLowerCase().includes(query);
-      const matchesLoc = !userCity || (o.storeCity === userCity);
-      return matchesQuery && matchesLoc;
-    });
-
+  
+    // Applica fuzzy search + filtro categoria
+    const filtered = smartFilterOffers(allOffers, rawQuery, null)
+      .filter(o => !userCity || (o.storeCity === userCity));
+  
     if (filtered.length === 0) {
-      resultsDiv.innerHTML = `<p style="text-align:center; padding:20px; color:#64748b;">Nessun risultato trovato per "${query}"${userCity ? ' nella tua zona' : ''}.</p>`;
+      resultsDiv.innerHTML = `<p style="text-align:center; padding:20px; color:#64748b;">Nessun risultato trovato per "<b>${escapeHtml(rawQuery)}</b>"${userCity ? ' nella tua zona' : ''}.<br><small>Prova con parole simili o controlla gli accenti.</small></p>`;
     } else {
+      // Raggruppa per rilevanza o mostra tutto
       resultsDiv.innerHTML = `
         <div class="cart-list">
-        ${filtered.map(o => `
-          <div class="cart-row" onclick="closeFullPageModal(); openProductDetail('${o.id}')">
-            <div class="cart-row-img"><img src="${getSafeImageUrl(o.img)}" alt=""></div>
-            <div class="cart-row-body">
-              <div class="cart-row-info">
-                <div class="cart-row-store">${o.storeName}</div>
-                <div class="cart-row-product">${o.product}</div>
-                <div class="cart-row-price">${formatPrice(o.price)}</div>
-              </div>
-            </div>
-          </div>
-        `).join('')}
+          ${filtered.map(o => buildStoreSearchCardElement(o)).join('')}
         </div>
+        <p style="text-align:center; padding:10px; color:#94a3b8; font-size:0.9em;">
+          ${filtered.length} risultato/i trovato/i
+        </p>
       `;
     }
-  }, 300);
+  }, 350);
 
   input.oninput = performModalSearch;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 // NUOVA FUNZIONE openFullPageModal SEMPLIFICATA
@@ -5606,33 +5805,69 @@ async function init() {
       }
     }, 300);
 
+// Render intelligente per la home con fuzzy search
+const debouncedSmartRender = debounce(() => {
+  const query = (searchInput?.value || "").trim();
+  const category = categorySelect?.value || "all";
+  
+  // Recupera le offerte correnti in memoria (dallo state o dal DOM)
+  // Nota: se usi già un array globale di offerte, adattalo. 
+  // Altrimenti filtriamo quelle già renderizzate.
+  
+  // Metodo A: se hai un array state.allOffers o simile, usa quello
+  const allOffers = window._cachedOffers || state.allOffers || [];
+  
+  if (allOffers.length > 0) {
+    const filtered = smartFilterOffers(allOffers, query, category === 'all' ? null : category);
+    renderOffersGrid(filtered);
+  } else {
+    // Fallback: se non hai l'array in memoria, ricarica con renderOffers()
+    renderOffers();
+  }
+}, 300);
+
     searchInput.oninput = () => {
+      const rawQuery = searchInput.value || "";
+      
+      // REGOLA: la navbar inizia a cercare dalla SECONDA lettera
+      if (rawQuery.trim().length === 1) {
+        // Non fare nulla se c'è solo 1 carattere (tranne nascondere consigliati)
+        const recommendedSection = $("#recommendedOffersSection");
+        if (recommendedSection) recommendedSection.classList.add("hidden");
+        return;
+      }
+      
       // Se il profilo di un negozio è aperto, la ricerca resta scoped a quel negozio
       if (currentStoreProfileId) {
         debouncedStoreProfileSearch();
         logSearchQuery();
         return;
       }
-
-      // Nasconde/mostra "Offerte Consigliate" SUBITO (non debounced): appena si
-      // scrive la prima lettera deve sparire; appena si svuota il campo torna.
-      const hasQuery = searchInput.value.trim().length > 0;
+    
+      // Nasconde/mostra "Offerte Consigliate"
+      const hasQuery = rawQuery.trim().length > 0;
       if (hasQuery) {
         const recommendedSection = $("#recommendedOffersSection");
         if (recommendedSection) recommendedSection.classList.add("hidden");
       } else {
-        fetchRecommendedOffers(); // Ripristina "Offerte Consigliate" se il campo torna vuoto
+        fetchRecommendedOffers();
       }
-
-      debouncedRender();
-      logSearchQuery(); // Traccia la ricerca per le Offerte Consigliate (solo utenti loggati)
+    
+      // Usa smart filter invece del render base
+      debouncedSmartRender();
+      logSearchQuery();
     };
   }
   
   if (categorySelect) {
     categorySelect.onchange = () => {
       state.currentPage = 1;
-      renderOffers();
+      // Se c'è testo nella searchbar, usa il fuzzy render
+      if (searchInput?.value?.trim()) {
+        debouncedSmartRender();
+      } else {
+        renderOffers();
+      }
     };
   }
 
@@ -7325,6 +7560,18 @@ function displayProductInModal(product) {
     </div>
   `;
   modal.style.display = "flex";
+  // Durante il tour guidato, il pulsante "Aggiungi alla lista spesa" qui
+  // dentro non deve scrivere davvero su Supabase né chiedere il login: è
+  // un'offerta finta ("demo-1") e per un visitatore anonimo richiederebbe
+  // comunque l'accesso. Il tour resta tutto in prova, quindi simuliamo
+  // solo l'aggiunta, come già fa il pulsante "Aggiungi" nella card.
+  if (document.body.classList.contains("tour-active") && typeof window.__tourSimulateAddToCart === "function") {
+    const cartBtn = content.querySelector(".detail-btn-cart");
+    if (cartBtn) {
+      cartBtn.removeAttribute("onclick");
+      cartBtn.onclick = () => window.__tourSimulateAddToCart();
+    }
+  }
   requestAnimationFrame(() => {
     requestAnimationFrame(() => modal.classList.add('is-visible'));
   });
@@ -7539,7 +7786,10 @@ async function loadStoreProfileOffers(store, productQuery = "") {
   if (userCap) storeOffers = storeOffers.filter(o => o.storeCap === userCap);
 
   const cleanQuery = (productQuery || "").toLowerCase().trim();
-  if (cleanQuery) storeOffers = storeOffers.filter(o => (o.product || "").toLowerCase().includes(cleanQuery));
+  if (cleanQuery) {
+    // Fuzzy search sulle offerte del negozio + ricerca per categoria
+    storeOffers = smartFilterOffers(storeOffers, cleanQuery, null);
+  }
 
   grid.innerHTML = "";
   if (storeOffers.length === 0) {
@@ -9930,6 +10180,11 @@ const maybeStartTour = (function () {
       toast.success("Aggiunto alla lista!");
     }
   }
+  // Esposta subito (non solo alla prima chiamata): displayProductInModal()
+  // (fuori da questa closure) la usa già al passaggio "Dettaglio offerta",
+  // PRIMA che questa funzione venga mai richiamata dal punto "Aggiungi al
+  // carrello".
+  window.__tourSimulateAddToCart = tourSimulateAddToCart;
 
   function clearHighlight() {
     // Pulisci TUTTI gli elementi con tour-highlight nel DOM (fix sovrapposizione)
@@ -10116,6 +10371,12 @@ const maybeStartTour = (function () {
         const origClick = row.onclick;
         row.onclick = function(e) {
           window.__tourLastOfferRowEl = row;
+          // Toglilo SUBITO, non aspettare il prossimo renderStep(): il popup
+          // sta per aprirsi (anche se async) e la card, finché ha
+          // tour-highlight, ha uno z-index (2210) più alto del popup
+          // (1600) — resterebbe visibile sovrapposta finché non arriva qui
+          // il prossimo clearHighlight().
+          row.classList.remove("tour-highlight");
           if (origClick) origClick.call(this, e);
           // openProductDetail() per le offerte reali è ASINCRONA (fa una query
           // a Supabase prima di mostrare il popup): aspettiamo che il popup
@@ -10162,22 +10423,31 @@ const maybeStartTour = (function () {
     ];
 
     demos.forEach((o) => {
+      const discPerc = o.original_price > o.price
+        ? Math.round(((o.original_price - o.price) / o.original_price) * 100)
+        : 0;
       const row = document.createElement("div");
+      // Stessa struttura/classi usate da createOfferCardElement() per le
+      // card reali (immagine+badge, poi store-name/h3/price-container nei
+      // dettagli, pulsante da solo nelle azioni): prima l'ordine era diverso
+      // e il prezzo finiva dentro alle azioni invece che sotto al titolo,
+      // per questo la card finta non sembrava una vera offerta.
       row.className = "offer-row " + DEMO_OFFER_CLASS;
       row.innerHTML = `
         <div class="product-image-container">
-          <img src="${o.img}" class="product-img" alt="">
+          <img src="${o.img}" class="product-img" alt="${o.product}">
+          ${discPerc > 0 ? `<span class="perc-badge">-${discPerc}%</span>` : ''}
         </div>
         <div class="product-info">
           <div class="product-details">
-            <h3>${o.product}</h3>
             <div class="store-name">${o.store}</div>
+            <h3>${o.product}</h3>
+            <div class="price-container">
+              <span class="price-tag" style="color:#0f62fe;font-weight:800;font-size:1.5rem;">${formatPrice(o.price)}</span>
+              ${discPerc > 0 ? `<span class="old-price-small" style="font-size:0.85rem;color:#94a3b8;text-decoration:line-through;margin-left:8px;">${formatPrice(o.original_price)}</span>` : ''}
+            </div>
           </div>
           <div class="product-actions">
-            <div style="text-align:right;">
-              <div class="price-tag">€ ${o.price.toFixed(2).replace(".", ",")}</div>
-              <div style="font-size:0.75rem;color:#94a3b8;text-decoration:line-through;">€ ${o.original_price.toFixed(2).replace(".", ",")}</div>
-            </div>
             <button type="button" class="btn tour-row-add-btn">Aggiungi</button>
           </div>
         </div>
@@ -10192,6 +10462,11 @@ const maybeStartTour = (function () {
         e.preventDefault();
         e.stopPropagation();
         window.__tourLastOfferRowEl = row;
+        // Toglilo SUBITO: il popup sta per aprirsi e finché la card ha
+        // tour-highlight il suo z-index (2210) resta più alto di quello
+        // del popup (1600), quindi si vedrebbe sovrapposta finché non
+        // arriva il prossimo clearHighlight() (fino a 150ms dopo).
+        row.classList.remove("tour-highlight");
         openDemoProductDetail();
         setTimeout(() => {
           if (waitingForProductClick) {
@@ -10242,7 +10517,11 @@ const maybeStartTour = (function () {
       </div>
     `;
   }
-  
+  // Esposta subito, non solo alla prima chiamata: stopCartMapTracking()
+  // (fuori da questa closure) può averne bisogno anche se injectDemoCart()
+  // non è ancora mai stata invocata.
+  window.__tourInjectDemoCart = injectDemoCart;
+
   function hookModalClose() {
     if (!originalCloseFullPageModal && typeof window.closeFullPageModal === "function") {
       originalCloseFullPageModal = window.closeFullPageModal;
