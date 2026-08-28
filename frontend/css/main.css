@@ -639,13 +639,28 @@ body.tour-blocking .container {
   /* Fix: il resto della navbar (logo e altre icone) deve restare oscurato
      e non cliccabile, non semplicemente "salire sopra" l'overlay insieme
      all'elemento evidenziato */
-  .navbar.tour-highlight-parent .logo,
-  .navbar.tour-highlight-parent .nav-icons > .icon-btn:not(.tour-highlight) {
-    opacity: 0.35;
-    filter: grayscale(60%);
-    pointer-events: none;
-    transition: opacity 0.2s ease, filter 0.2s ease;
-  }
+     .navbar.tour-highlight-parent .logo,
+     .navbar.tour-highlight-parent .nav-icons > .icon-btn:not(.tour-highlight) {
+       opacity: 0.35;
+       filter: grayscale(60%);
+       pointer-events: none;
+       transition: opacity 0.2s ease, filter 0.2s ease;
+     }
+   
+     /* Fix: quando è la card offerta INTERA a essere evidenziata (punto "Le
+        offerte vicino a te", prima di aprire il dettaglio), il suo pulsante
+        "Aggiungi" non deve sembrare cliccabile: deve restare uguale al resto
+        della pagina oscurata, non "salire sopra" l'overlay solo perché è
+        dentro la card che invece deve starci (per poterci cliccare sopra e
+        aprire il dettaglio). Il :not(.tour-highlight) esclude il caso
+        opposto (punto "Aggiungi al carrello"), dove è il pulsante stesso a
+        essere evidenziato: lì deve restare a piena visibilità e cliccabilità. */
+     .offer-row.tour-highlight .product-actions button:not(.tour-highlight) {
+       opacity: 0.35 !important;
+       filter: grayscale(60%);
+       pointer-events: none !important;
+       cursor: default !important;
+     }
   
   /* Fix: elementi evidenziati dentro il popup carrello
      devono stare sopra il popup (z-index 2200) */

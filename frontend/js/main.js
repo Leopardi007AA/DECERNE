@@ -3665,7 +3665,12 @@ async function tourOpenCartMapView() {
 }
 
 async function tourRenderDemoMap() {
-  const productName = document.querySelector("#searchInput")?.value?.trim() || "Prodotto Demo";
+  const rawProductName = document.querySelector("#searchInput")?.value?.trim();
+  // Stessa capitalizzazione usata per la card finta nella griglia offerte,
+  // così il nome del prodotto è identico in tutti i passaggi del tour.
+  const productName = rawProductName
+    ? rawProductName.charAt(0).toUpperCase() + rawProductName.slice(1)
+    : "Prodotto Demo";
   const capOrCity = document.querySelector("#locationInput")?.value?.trim() || "Italia";
   const center = await tourGeocodeDemoCenter(capOrCity);
 
@@ -9935,11 +9940,14 @@ const maybeStartTour = (function () {
     });
     highlightedEls = [];
     highlightedEl = null;
-    // Ripristina la card offerta che era stata "smontata" (transform/filter
-    // rimossi) per far uscire il pulsante Aggiungi sopra l'overlay scuro.
+    // Ripristina la card offerta che era stata "smontata" (transform/filter/
+    // opacity/transition rimossi) per far uscire il pulsante Aggiungi sopra
+    // l'overlay scuro.
     if (tourNeutralizedRow) {
       tourNeutralizedRow.style.transform = "";
       tourNeutralizedRow.style.filter = "";
+      tourNeutralizedRow.style.opacity = "";
+      tourNeutralizedRow.style.transition = "";
       tourNeutralizedRow = null;
     }
   }
@@ -10038,19 +10046,24 @@ const maybeStartTour = (function () {
   }
 
   function openDemoProductDetail() {
+    // Usa il prodotto e la zona che l'utente ha davvero scritto nei due
+    // passaggi precedenti, così il dettaglio non mostra un nome a caso
+    // scollegato da quello che ha appena cercato.
+    const demoProductName = tourSearchTerm || "Prodotto Demo";
+    const demoCity = document.querySelector("#locationInput")?.value?.trim() || "Milano";
     const product = {
       id: "demo-1",
-      product: "Pasta Barilla 500g",
+      product: demoProductName,
       price: 1.29,
       originalPrice: 1.89,
-      category: "Pasta, Riso e Cereali",
+      category: "Offerte",
       startDate: "2026-01-01",
       endDate: "2026-12-31",
-      description: "Pasta di semola di grano duro, ottima per ogni tipo di condimento. Prodotto 100% italiano.",
+      description: `Offerta dimostrativa su "${demoProductName}", per farti vedere come appare il dettaglio di un prodotto reale.`,
       img: "https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=600&h=600&fit=crop",
       status: "active",
       storeName: "Supermercato Demo",
-      storeCity: "Milano",
+      storeCity: demoCity,
       storeCap: "20100",
       storeAddress: "Via Roma 1",
       storeId: "demo-store",
@@ -10082,14 +10095,24 @@ const maybeStartTour = (function () {
     if (!grid) return;
 
     // Se ci sono già offerte reali, evidenzia la prima e aggiungi listener
-    const realOffers = grid.querySelectorAll(".offer-row:not(." + DEMO_OFFER_CLASS + ")");
-    if (realOffers.length > 0) {
-      const firstRow = realOffers[0];
+    const realOffers = Array.from(grid.querySelectorAll(".offer-row:not(." + DEMO_OFFER_CLASS + ")"));
+    // Tra le offerte reali già renderizzate, tieni solo quelle che
+    // corrispondono davvero al termine cercato. "realOffers.length > 0" da
+    // solo non basta: per via del debounce della ricerca, in griglia
+    // potrebbero essere rimaste offerte precedenti non pertinenti, e in tal
+    // caso mostrerebbero all'utente qualcosa che non ha cercato invece del
+    // prodotto (vero o finto) giusto.
+    const searchTerm = (tourSearchTerm || "").trim().toLowerCase();
+    const matchingRealOffers = searchTerm
+      ? realOffers.filter(row => (row.querySelector("h3")?.textContent || "").toLowerCase().includes(searchTerm))
+      : realOffers;
+    if (matchingRealOffers.length > 0) {
+      const firstRow = matchingRealOffers[0];
       firstRow.classList.add("tour-highlight", "in-view");
       highlightedEl = firstRow;
       firstRow.scrollIntoView({ behavior: "smooth", block: "center" });
       // Aggiungi listener temporaneo sulle card reali per avanzare il tour
-      realOffers.forEach(row => {
+      matchingRealOffers.forEach(row => {
         const origClick = row.onclick;
         row.onclick = function(e) {
           window.__tourLastOfferRowEl = row;
@@ -10120,20 +10143,21 @@ const maybeStartTour = (function () {
 
     removeDemoOffers();
 
+    // Nessuna offerta reale pertinente trovata: crea un prodotto finto col
+    // nome che l'utente ha davvero digitato, così la demo resta coerente
+    // con quello che ha appena cercato (invece di mostrare sempre gli
+    // stessi due prodotti generici).
+    const demoCity = document.querySelector("#locationInput")?.value?.trim();
+    const demoProductName = searchTerm
+      ? tourSearchTerm.trim().charAt(0).toUpperCase() + tourSearchTerm.trim().slice(1)
+      : "Pasta Barilla 500g";
     const demos = [
       {
-        product: "Pasta Barilla 500g",
-        store: "Supermercato Demo",
+        product: demoProductName,
+        store: demoCity ? `Supermercato Demo (${demoCity})` : "Supermercato Demo",
         price: 1.29,
         original_price: 1.89,
         img: "https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=300&h=300&fit=crop"
-      },
-      {
-        product: "Detersivo Piatti 1L",
-        store: "Supermercato Demo",
-        price: 2.49,
-        original_price: 3.99,
-        img: "https://images.unsplash.com/photo-1583947581924-860bda6a26df?w=300&h=300&fit=crop"
       }
     ];
 
@@ -10329,10 +10353,19 @@ const maybeStartTour = (function () {
         nextBtn.classList.add("tour-next-btn");
         const inputEl = document.querySelector(step.requireInput);
         if (inputEl) {
+          let checkInputDelay = null;
           const checkInput = () => {
             tourSearchTerm = inputEl.value.trim();
+            clearTimeout(checkInputDelay);
             if (tourSearchTerm.length > 0) {
-              nextBtn.classList.add("enabled");
+              // Piccolo ritardo prima di abilitare "Avanti": la ricerca/posizione
+              // ha un debounce di 300ms prima di rifiltrare davvero la griglia
+              // (renderOffers). Senza aspettare, un utente veloce potrebbe
+              // proseguire mentre la griglia mostra ancora risultati vecchi,
+              // facendo sembrare "introvabile" un prodotto che invece c'è.
+              checkInputDelay = setTimeout(() => {
+                if (inputEl.value.trim().length > 0) nextBtn.classList.add("enabled");
+              }, 350);
             } else {
               nextBtn.classList.remove("enabled");
             }
@@ -10434,15 +10467,20 @@ const maybeStartTour = (function () {
       }
       if (targetRow) {
         targetRow.classList.add("in-view");
-        // Le card reali hanno classe "scroll-reveal": in-view applica
-        // transform/filter (anche a valori "neutri" tipo translateX(0))
-        // che creano comunque un nuovo contesto di stacking sulla card,
-        // intrappolando lo z-index del pulsante evidenziato al suo interno
-        // e impedendogli di salire sopra l'overlay scuro del tour.
-        // Azzerandoli qui il pulsante torna a "bucare" l'overlay
-        // normalmente; vengono ripristinati in clearHighlight().
+        // Le card reali/demo hanno classe "scroll-reveal": in-view applica
+        // transform/filter/opacity (anche a valori "neutri" tipo
+        // translateX(0) o opacity:1) tramite una transizione di 1,6-1,9s.
+        // Un opacity < 1, come transform e filter, crea comunque un nuovo
+        // contesto di stacking: finché la transizione non termina, il
+        // pulsante resta intrappolato dietro l'overlay del tour anche col
+        // suo z-index più alto — è per questo che prima sembrava "accendersi"
+        // solo dopo un paio di secondi. Azzerando anche opacity e
+        // disattivando la transizione, lo stato finale si applica subito,
+        // senza finestra di animazione. Tutto ripristinato in clearHighlight().
+        targetRow.style.transition = "none";
         targetRow.style.transform = "none";
         targetRow.style.filter = "none";
+        targetRow.style.opacity = "1";
         tourNeutralizedRow = targetRow;
       }
       const addBtn = targetRow ? targetRow.querySelector(".product-actions button") : null;
