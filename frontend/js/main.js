@@ -10363,7 +10363,7 @@ const maybeStartTour = (function () {
       : realOffers;
     if (matchingRealOffers.length > 0) {
       const firstRow = matchingRealOffers[0];
-      firstRow.classList.add("tour-highlight", "in-view");
+      firstRow.classList.add("tour-highlight", "in-view", "tour-card-dim-btn");
       highlightedEl = firstRow;
       firstRow.scrollIntoView({ behavior: "smooth", block: "center" });
       // Aggiungi listener temporaneo sulle card reali per avanzare il tour
@@ -10475,7 +10475,7 @@ const maybeStartTour = (function () {
           }
         }, 150);
       });
-      row.classList.add("tour-highlight");
+      row.classList.add("tour-highlight", "tour-card-dim-btn");
       highlightedEls.push(row);
       grid.prepend(row);
     });
@@ -10746,6 +10746,9 @@ const maybeStartTour = (function () {
       }
       if (targetRow) {
         targetRow.classList.add("in-view");
+        // Ora il pulsante deve accendersi per davvero: togli lo scurimento
+        // che lo teneva spento dal punto "Le offerte vicino a te" in poi.
+        targetRow.classList.remove("tour-card-dim-btn");
         // Le card reali/demo hanno classe "scroll-reveal": in-view applica
         // transform/filter/opacity (anche a valori "neutri" tipo
         // translateX(0) o opacity:1) tramite una transizione di 1,6-1,9s.
@@ -10787,6 +10790,7 @@ const maybeStartTour = (function () {
     clearHighlight();
     removeRowAddInterceptor();
     removeDemoOffers();
+    document.querySelectorAll(".tour-card-dim-btn").forEach(el => el.classList.remove("tour-card-dim-btn"));
     if (savedCartOnclick !== null) {
       const btn = document.querySelector("#cartBtn");
       if (btn) btn.onclick = savedCartOnclick;

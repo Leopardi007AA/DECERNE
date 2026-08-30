@@ -647,20 +647,24 @@ body.tour-blocking .container {
        transition: opacity 0.2s ease, filter 0.2s ease;
      }
    
-     /* Fix: quando è la card offerta INTERA a essere evidenziata (punto "Le
-        offerte vicino a te", prima di aprire il dettaglio), il suo pulsante
-        "Aggiungi" non deve sembrare cliccabile: deve restare uguale al resto
-        della pagina oscurata, non "salire sopra" l'overlay solo perché è
-        dentro la card che invece deve starci (per poterci cliccare sopra e
-        aprire il dettaglio). Il :not(.tour-highlight) esclude il caso
-        opposto (punto "Aggiungi al carrello"), dove è il pulsante stesso a
-        essere evidenziato: lì deve restare a piena visibilità e cliccabilità. */
-     .offer-row.tour-highlight .product-actions button:not(.tour-highlight) {
-       opacity: 0.35 !important;
-       filter: grayscale(60%);
-       pointer-events: none !important;
-       cursor: default !important;
-     }
+       /* Fix: quando è la card offerta INTERA a essere evidenziata (punto "Le
+     offerte vicino a te", prima di aprire il dettaglio), il suo pulsante
+     "Aggiungi" non deve sembrare cliccabile: deve restare uguale al resto
+     della pagina oscurata. Usa una classe DEDICATA (tour-card-dim-btn),
+     non tour-highlight: quest'ultima viene tolta dalla card nell'istante
+     stesso del click (per evitare che resti sovrapposta al popup che si
+     apre, vedi JS), ma lo scurimento del pulsante deve restare attivo
+     anche dopo — altrimenti il pulsante torna a piena luce già mentre il
+     popup si sta aprendo, e ci resta per il resto del tour. Il
+     :not(.tour-highlight) esclude il caso opposto (punto "Aggiungi al
+     carrello"), dove è il pulsante stesso a essere evidenziato: lì deve
+     restare a piena visibilità e cliccabilità. */
+  .offer-row.tour-card-dim-btn .product-actions button:not(.tour-highlight) {
+    opacity: 0.35 !important;
+    filter: grayscale(60%);
+    pointer-events: none !important;
+    cursor: default !important;
+  }
   
   /* Fix: elementi evidenziati dentro il popup carrello
      devono stare sopra il popup (z-index 2200) */
