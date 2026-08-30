@@ -10183,6 +10183,8 @@ const maybeStartTour = (function () {
   let tourRowAddBtn = null;
   let tourRowAddInterceptor = null;
   let tourNeutralizedRow = null;
+  let tourSelectedOfferData = null;
+  let tourUsingRealOffer = false;
 
   function removeRowAddInterceptor() {
     if (tourRowAddBtn && tourRowAddInterceptor) {
@@ -10503,24 +10505,58 @@ const maybeStartTour = (function () {
 
     if (tryHighlightRealMatch()) return;
 
-    // Non trovata subito: renderOffers() ha un debounce di 300ms e poi una
-    // query Supabase (rete reale, tempi variabili) — un solo controllo
-    // istantaneo rischia di creare un'offerta finta solo perché la
-    // ricerca vera non aveva ancora finito. Riprova per fino a ~2 secondi
-    // prima di arrenderti davvero.
-    let attempts = 0;
-    const maxAttempts = 10; // 10 x 200ms = 2s
-    const pollId = setInterval(() => {
-      attempts++;
-      if (tryHighlightRealMatch()) {
-        clearInterval(pollId);
-        return;
-      }
-      if (attempts >= maxAttempts) {
-        clearInterval(pollId);
-        createFakeOffer();
-      }
-    }, 200);
+// Aspettiamo che la ricerca reale abbia avuto il tempo di completarsi.
+// La query Supabase e il rendering possono richiedere più di 2 secondi,
+// soprattutto con una connessione lenta o quando renderOffers() è debounced.
+let attempts = 0;
+const maxAttempts = 50; // 50 x 200ms = massimo 10 secondi
+
+const pollId = setInterval(() => {
+  attempts++;
+
+  // Se nel frattempo è comparsa un'offerta reale, usiamo quella.
+  if (tryHighlightRealMatch()) {
+    clearInterval(pollId);
+    return;
+  }
+
+  // Non creiamo subito una demo: prima controlliamo che la ricerca
+  // abbia realmente terminato e che non ci siano offerte corrispondenti.
+  const searchValue = ($("#searchInput")?.value || "")
+    .trim()
+    .toLowerCase();
+
+  const realOfferRows = [
+    ...document.querySelectorAll("#offersGrid .offer-row")
+  ].filter(row => !row.dataset.tourDemo);
+
+  const hasMatchingRealOffer = realOfferRows.some(row => {
+    const productName = (
+      row.querySelector(".offer-name, .product-name, .cart-row-product")
+        ?.textContent || row.textContent || ""
+    ).toLowerCase();
+
+    return searchValue && productName.includes(searchValue);
+  });
+
+  if (hasMatchingRealOffer) {
+    clearInterval(pollId);
+    tryHighlightRealMatch();
+    return;
+  }
+
+  // Solo dopo un'attesa sufficientemente lunga consideriamo davvero
+  // il prodotto non disponibile e creiamo l'offerta dimostrativa.
+  if (attempts >= maxAttempts) {
+    clearInterval(pollId);
+
+    // Controllo finale: una vera offerta potrebbe essere comparsa
+    // esattamente nell'ultima iterazione.
+    if (!tryHighlightRealMatch()) {
+      createFakeOffer();
+    }
+  }
+}, 200);
   }
 
   function injectDemoCart() {
@@ -10533,7 +10569,23 @@ const maybeStartTour = (function () {
     if (title) title.innerText = "Lista della Spesa";
     if (!content) return;
 
-    const productName = tourSearchTerm || "Prodotto Demo";
+    const usingRealOffer = tourUsingRealOffer && tourSelectedOfferData;
+
+const productName = usingRealOffer
+  ? tourSelectedOfferData.name
+  : (tourSearchTerm || "Prodotto Demo");
+
+const storeName = usingRealOffer
+  ? tourSelectedOfferData.store
+  : "Supermercato Demo - Via Roma 1";
+
+const productPrice = usingRealOffer
+  ? (tourSelectedOfferData.price || "Prezzo non disponibile")
+  : "€ 1,29";
+
+const productImage = usingRealOffer
+  ? (tourSelectedOfferData.image || PLACEHOLDER_IMG)
+  : "https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=150&h=150&fit=crop";
 
     content.innerHTML = `
       <div class="cart-toolbar">
@@ -10543,12 +10595,12 @@ const maybeStartTour = (function () {
       </div>
       <div class="cart-list">
         <div class="cart-row" onclick="closeFullPageModal()">
-          <div class="cart-row-img"><img src="https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=150&h=150&fit=crop" alt=""></div>
+          <div class="cart-row-img"><img src="${productImage}" alt="${productName}"></div>
           <div class="cart-row-body">
             <div class="cart-row-info">
-              <div class="cart-row-store">Supermercato Demo - Via Roma 1</div>
+              <div class="cart-row-store">${storeName}</div>
               <div class="cart-row-product">${productName}</div>
-              <div class="cart-row-price">€ 1,29</div>
+              <div class="cart-row-price">${productPrice}</div>
             </div>
                       <button class="btn" onclick="event.stopPropagation(); if(typeof offerData !== 'undefined' && offerData && offerData.id) saveToShoppingList(offerData.id);">Aggiungi</button>
           </div>
