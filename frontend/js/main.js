@@ -3841,6 +3841,14 @@ async function openCartMapView() {
 // shopping_list_items da Supabase, dove il tour non ha mai scritto nulla
 // di vero (l'aggiunta al carrello nel tour è solo simulata).
 async function tourOpenCartMapView() {
+  // Il blocco scuro del tour (creato per evidenziare SOLO questo pulsante)
+  // vive fuori dal contenuto del popup, quindi sopravvive anche quando la
+  // mappa sostituisce il carrello al suo interno: va tolto SUBITO qui,
+  // altrimenti la mappa appena aperta resta scurita finché l'utente non
+  // preme "Avanti" nel tour (comando separato, non ovvio).
+  if (typeof window.__tourRemoveModalBlocker === "function") {
+    window.__tourRemoveModalBlocker();
+  }
   const userId = state.currentUser?.id;
   if (userId) {
     // Se l'utente sta rifacendo il tour da loggato e ha già prodotti veri
@@ -10306,6 +10314,12 @@ const maybeStartTour = (function () {
   function removeModalBlocker() {
     document.getElementById("tourModalBlocker")?.remove();
   }
+  // Esposta subito: tourOpenCartMapView() (fuori da questa closure) deve
+  // poterlo togliere nell'istante in cui si apre davvero la mappa, non
+  // aspettare che l'utente prema "Avanti" nel tour — altrimenti la mappa
+  // appena aperta resta scurita sotto al blocco, che a quel punto non ha
+  // più nulla da evidenziare.
+  window.__tourRemoveModalBlocker = removeModalBlocker;
 
   function removeDemoOffers() {
     document.querySelectorAll("." + DEMO_OFFER_CLASS).forEach(el => el.remove());
@@ -10360,24 +10374,24 @@ const maybeStartTour = (function () {
     const grid = $("#offersGrid");
     if (!grid) return;
 
-    // Se ci sono già offerte reali, evidenzia la prima e aggiungi listener
-    const realOffers = Array.from(grid.querySelectorAll(".offer-row:not(." + DEMO_OFFER_CLASS + ")"));
-    // Tra le offerte reali già renderizzate, tieni solo quelle che
-    // corrispondono davvero al termine cercato. "realOffers.length > 0" da
-    // solo non basta: per via del debounce della ricerca, in griglia
-    // potrebbero essere rimaste offerte precedenti non pertinenti, e in tal
-    // caso mostrerebbero all'utente qualcosa che non ha cercato invece del
-    // prodotto (vero o finto) giusto.
     const searchTerm = (tourSearchTerm || "").trim().toLowerCase();
-    const matchingRealOffers = searchTerm
-      ? realOffers.filter(row => (row.querySelector("h3")?.textContent || "").toLowerCase().includes(searchTerm))
-      : realOffers;
-    if (matchingRealOffers.length > 0) {
+
+    // Prova a trovare ed evidenziare un'offerta reale già pertinente.
+    // Ritorna true se trovata (e già sistemata), false altrimenti.
+    function tryHighlightRealMatch() {
+      const realOffers = Array.from(grid.querySelectorAll(".offer-row:not(." + DEMO_OFFER_CLASS + ")"));
+      // Tra le offerte reali già renderizzate, tieni solo quelle che
+      // corrispondono davvero al termine cercato: "ce ne sono" da solo non
+      // basta, potrebbero essere rimaste da una ricerca precedente.
+      const matchingRealOffers = searchTerm
+        ? realOffers.filter(row => (row.querySelector("h3")?.textContent || "").toLowerCase().includes(searchTerm))
+        : realOffers;
+      if (matchingRealOffers.length === 0) return false;
+
       const firstRow = matchingRealOffers[0];
       firstRow.classList.add("tour-highlight", "in-view", "tour-card-dim-btn");
       highlightedEl = firstRow;
       firstRow.scrollIntoView({ behavior: "smooth", block: "center" });
-      // Aggiungi listener temporaneo sulle card reali per avanzare il tour
       matchingRealOffers.forEach(row => {
         const origClick = row.onclick;
         row.onclick = function(e) {
@@ -10410,86 +10424,103 @@ const maybeStartTour = (function () {
           }, 150);
         };
       });
-      return;
+      return true;
     }
 
-    removeDemoOffers();
+    function createFakeOffer() {
+      removeDemoOffers();
+      // Nessuna offerta reale pertinente trovata: crea un prodotto finto col
+      // nome che l'utente ha davvero digitato, così la demo resta coerente
+      // con quello che ha appena cercato (invece di mostrare sempre gli
+      // stessi due prodotti generici).
+      const demoCity = document.querySelector("#locationInput")?.value?.trim();
+      const demoProductName = searchTerm
+        ? tourSearchTerm.trim().charAt(0).toUpperCase() + tourSearchTerm.trim().slice(1)
+        : "Pasta Barilla 500g";
+      const demos = [
+        {
+          product: demoProductName,
+          store: demoCity ? `Supermercato Demo (${demoCity})` : "Supermercato Demo",
+          price: 1.29,
+          original_price: 1.89,
+          img: "https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=300&h=300&fit=crop"
+        }
+      ];
 
-    // Nessuna offerta reale pertinente trovata: crea un prodotto finto col
-    // nome che l'utente ha davvero digitato, così la demo resta coerente
-    // con quello che ha appena cercato (invece di mostrare sempre gli
-    // stessi due prodotti generici).
-    const demoCity = document.querySelector("#locationInput")?.value?.trim();
-    const demoProductName = searchTerm
-      ? tourSearchTerm.trim().charAt(0).toUpperCase() + tourSearchTerm.trim().slice(1)
-      : "Pasta Barilla 500g";
-    const demos = [
-      {
-        product: demoProductName,
-        store: demoCity ? `Supermercato Demo (${demoCity})` : "Supermercato Demo",
-        price: 1.29,
-        original_price: 1.89,
-        img: "https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=300&h=300&fit=crop"
-      }
-    ];
-
-    demos.forEach((o) => {
-      const discPerc = o.original_price > o.price
-        ? Math.round(((o.original_price - o.price) / o.original_price) * 100)
-        : 0;
-      const row = document.createElement("div");
-      // Stessa struttura/classi usate da createOfferCardElement() per le
-      // card reali (immagine+badge, poi store-name/h3/price-container nei
-      // dettagli, pulsante da solo nelle azioni): prima l'ordine era diverso
-      // e il prezzo finiva dentro alle azioni invece che sotto al titolo,
-      // per questo la card finta non sembrava una vera offerta.
-      row.className = "offer-row " + DEMO_OFFER_CLASS;
-      row.innerHTML = `
-        <div class="product-image-container">
-          <img src="${o.img}" class="product-img" alt="${o.product}">
-          ${discPerc > 0 ? `<span class="perc-badge">-${discPerc}%</span>` : ''}
-        </div>
-        <div class="product-info">
-          <div class="product-details">
-            <div class="store-name">${o.store}</div>
-            <h3>${o.product}</h3>
-            <div class="price-container">
-              <span class="price-tag" style="color:#0f62fe;font-weight:800;font-size:1.5rem;">${formatPrice(o.price)}</span>
-              ${discPerc > 0 ? `<span class="old-price-small" style="font-size:0.85rem;color:#94a3b8;text-decoration:line-through;margin-left:8px;">${formatPrice(o.original_price)}</span>` : ''}
+      demos.forEach((o) => {
+        const discPerc = o.original_price > o.price
+          ? Math.round(((o.original_price - o.price) / o.original_price) * 100)
+          : 0;
+        const row = document.createElement("div");
+        row.className = "offer-row " + DEMO_OFFER_CLASS;
+        row.innerHTML = `
+          <div class="product-image-container">
+            <img src="${o.img}" class="product-img" alt="${o.product}">
+            ${discPerc > 0 ? `<span class="perc-badge">-${discPerc}%</span>` : ''}
+          </div>
+          <div class="product-info">
+            <div class="product-details">
+              <div class="store-name">${o.store}</div>
+              <h3>${o.product}</h3>
+              <div class="price-container">
+                <span class="price-tag" style="color:#0f62fe;font-weight:800;font-size:1.5rem;">${formatPrice(o.price)}</span>
+                ${discPerc > 0 ? `<span class="old-price-small" style="font-size:0.85rem;color:#94a3b8;text-decoration:line-through;margin-left:8px;">${formatPrice(o.original_price)}</span>` : ''}
+              </div>
+            </div>
+            <div class="product-actions">
+              <button type="button" class="btn tour-row-add-btn">Aggiungi</button>
             </div>
           </div>
-          <div class="product-actions">
-            <button type="button" class="btn tour-row-add-btn">Aggiungi</button>
-          </div>
-        </div>
-      `;
-      const demoAddBtn = row.querySelector(".tour-row-add-btn");
-      if (demoAddBtn) {
-        // Prima del punto 6 questo pulsante non deve fare nulla di suo,
-        // solo evitare di aprire il dettaglio (comportamento della riga).
-        demoAddBtn.onclick = (e) => { e.stopPropagation(); };
-      }
-      row.addEventListener("click", function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        window.__tourLastOfferRowEl = row;
-        // Toglilo SUBITO: il popup sta per aprirsi e finché la card ha
-        // tour-highlight il suo z-index (2210) resta più alto di quello
-        // del popup (1600), quindi si vedrebbe sovrapposta finché non
-        // arriva il prossimo clearHighlight() (fino a 150ms dopo).
-        row.classList.remove("tour-highlight");
-        openDemoProductDetail();
-        setTimeout(() => {
-          if (waitingForProductClick) {
-            waitingForProductClick = false;
-            nextStep();
-          }
-        }, 150);
+        `;
+        const demoAddBtn = row.querySelector(".tour-row-add-btn");
+        if (demoAddBtn) {
+          // Prima del punto 6 questo pulsante non deve fare nulla di suo,
+          // solo evitare di aprire il dettaglio (comportamento della riga).
+          demoAddBtn.onclick = (e) => { e.stopPropagation(); };
+        }
+        row.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          window.__tourLastOfferRowEl = row;
+          // Toglilo SUBITO: il popup sta per aprirsi e finché la card ha
+          // tour-highlight il suo z-index (2210) resta più alto di quello
+          // del popup (1600), quindi si vedrebbe sovrapposta finché non
+          // arriva il prossimo clearHighlight() (fino a 150ms dopo).
+          row.classList.remove("tour-highlight");
+          openDemoProductDetail();
+          setTimeout(() => {
+            if (waitingForProductClick) {
+              waitingForProductClick = false;
+              nextStep();
+            }
+          }, 150);
+        });
+        row.classList.add("tour-highlight", "tour-card-dim-btn");
+        highlightedEls.push(row);
+        grid.prepend(row);
       });
-      row.classList.add("tour-highlight", "tour-card-dim-btn");
-      highlightedEls.push(row);
-      grid.prepend(row);
-    });
+    }
+
+    if (tryHighlightRealMatch()) return;
+
+    // Non trovata subito: renderOffers() ha un debounce di 300ms e poi una
+    // query Supabase (rete reale, tempi variabili) — un solo controllo
+    // istantaneo rischia di creare un'offerta finta solo perché la
+    // ricerca vera non aveva ancora finito. Riprova per fino a ~2 secondi
+    // prima di arrenderti davvero.
+    let attempts = 0;
+    const maxAttempts = 10; // 10 x 200ms = 2s
+    const pollId = setInterval(() => {
+      attempts++;
+      if (tryHighlightRealMatch()) {
+        clearInterval(pollId);
+        return;
+      }
+      if (attempts >= maxAttempts) {
+        clearInterval(pollId);
+        createFakeOffer();
+      }
+    }, 200);
   }
 
   function injectDemoCart() {
@@ -10787,6 +10818,12 @@ const maybeStartTour = (function () {
           e.preventDefault();
           e.stopImmediatePropagation();
           tourSimulateAddToCart();
+          // Il browser lascia spesso un anello di focus blu sul pulsante
+          // dopo il click (accessibilità da tastiera) — molto simile al
+          // nostro contorno di evidenziazione, quindi sembra che il
+          // pulsante resti "acceso" anche dopo. Ancora più visibile su una
+          // card isolata come quella finta, sola in griglia.
+          addBtn.blur();
           setTimeout(nextStep, 400);
         };
         // Fase di cattura: intercetta il click PRIMA del vero onclick del
