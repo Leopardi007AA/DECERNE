@@ -10390,6 +10390,29 @@ const maybeStartTour = (function () {
         : realOffers;
       if (matchingRealOffers.length === 0) return false;
 
+      tourUsingRealOffer = true;
+
+      tourSelectedOfferData = {
+        id: row.dataset.offerId || row.dataset.id || null,
+        name: (
+          row.querySelector(".offer-name, .product-name")
+            ?.textContent || tourSearchTerm
+        ).trim(),
+      
+        store: (
+          row.querySelector(".offer-store, .store-name")
+            ?.textContent || "Supermercato"
+        ).trim(),
+      
+        price: (
+          row.querySelector(".offer-price, .price")
+            ?.textContent || ""
+        ).trim(),
+      
+        image:
+          row.querySelector("img")?.src || PLACEHOLDER_IMG
+      };
+
       const firstRow = matchingRealOffers[0];
       firstRow.classList.add("tour-highlight", "in-view", "tour-card-dim-btn");
       highlightedEl = firstRow;
@@ -10431,6 +10454,8 @@ const maybeStartTour = (function () {
 
     function createFakeOffer() {
       removeDemoOffers();
+      tourUsingRealOffer = false;
+      tourSelectedOfferData = null;
       // Nessuna offerta reale pertinente trovata: crea un prodotto finto col
       // nome che l'utente ha davvero digitato, così la demo resta coerente
       // con quello che ha appena cercato (invece di mostrare sempre gli
