@@ -3471,6 +3471,19 @@ hr {
 }
 .smart-list-km-field:focus { outline: none; border-color: var(--primary); background: #fff; }
 
+.smart-list-checkbox-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border-radius: 14px 6px 14px 6px;
+  border: 1px solid var(--panel-border-soft); background: #f8fafc;
+  margin-bottom: 20px; font-size: 0.85rem; color: #475569; font-weight: 600;
+  cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease;
+}
+.smart-list-checkbox-row:hover { border-color: var(--primary); background: #fff; }
+.smart-list-checkbox-row input[type="checkbox"] {
+  width: 18px; height: 18px; accent-color: var(--primary); flex-shrink: 0; cursor: pointer;
+}
+
 .smart-list-fields { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
 .smart-list-field-row input.smart-list-item-input {
   width: 100%; box-sizing: border-box; padding: 12px 14px;

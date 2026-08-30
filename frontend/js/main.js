@@ -4321,6 +4321,11 @@ window.openSmartShoppingListModal = () => {
         <label class="smart-list-label" for="smartListCostPerKm">Consumo carburante (€/km) — facoltativo</label>
         <input type="number" id="smartListCostPerKm" class="smart-list-km-field" placeholder="Es: 0.15 (se vuoto, contiamo solo il prezzo più basso)" step="0.01" min="0">
 
+        <label class="smart-list-checkbox-row" for="smartListNoCardOnly">
+          <input type="checkbox" id="smartListNoCardOnly">
+          <span>Senza tessera — considera solo offerte che non richiedono la tessera del negozio</span>
+        </label>
+
         <label class="smart-list-label">Prodotti da cercare</label>
         <div id="smartListFieldsContainer" class="smart-list-fields">
           <div class="smart-list-field-row"><input type="text" class="smart-list-item-input" placeholder="Prodotto 1 (es: latte)" oninput="handleSmartListFieldInput(this)"></div>
@@ -4377,9 +4382,10 @@ window.searchSmartShoppingList = async () => {
   const useDistance = !isNaN(costPerKm) && costPerKm > 0;
 
   const today = new Date().toISOString().split('T')[0];
+  const noCardOnly = document.getElementById('smartListNoCardOnly')?.checked || false;
   const { data: allActiveOffers, error } = await supabaseClient
     .from('offers')
-    .select('id, product, price, location_id, unit_of_measure')
+    .select('id, product, price, location_id, unit_of_measure, card_requirement')
     .eq('status', 'active')
     .is('deleted_at', null)
     .lte('start_date', today)
@@ -4398,6 +4404,12 @@ window.searchSmartShoppingList = async () => {
     const distinctLocationIds = [...new Set(allActiveOffers.map(o => o.location_id).filter(Boolean))];
     const locationsMap = await fetchPublicLocationsMap(distinctLocationIds);
     offersInArea = allActiveOffers.filter(o => locationsMap[o.location_id]?.cap === userCap);
+  }
+
+  // Filtro "Senza tessera": esclude le offerte che richiedono la tessera fedeltà,
+  // stessa logica già usata nel filtro generale della griglia offerte.
+  if (noCardOnly) {
+    offersInArea = offersInArea.filter(o => o.card_requirement !== 'required');
   }
 
   const itemCandidates = lines.map(line => ({ line, matches: fuzzyMatchOffers(line, offersInArea) }));
