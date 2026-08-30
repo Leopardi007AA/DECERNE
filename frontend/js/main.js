@@ -2051,16 +2051,20 @@ function applyOfferRevealAnimation(grid) {
       };
     });
 
-    // Da qui in poi: stessa identica logica di filtro/ordinamento di sempre.
+    // Filtro base (città/CAP/tessera): la ricerca testuale intelligente viene dopo
     let filtered = allOffers.filter(o => {
-      const matchesSearch = !query || 
-                            o.product.toLowerCase().includes(query) || 
-                            o.storeName.toLowerCase().includes(query);
       const matchesCity = !userCity || (o.storeCity === userCity);
       const matchesCap = !userCap || (o.storeCap === userCap);
       const matchesNoCard = !noCardOnly || o.cardRequirement !== 'required';
-      return matchesSearch && matchesCity && matchesCap && matchesNoCard;
+      return matchesCity && matchesCap && matchesNoCard;
     });
+
+    // Ricerca intelligente: tollera typo/lettere invertite e, se la query
+    // corrisponde a una categoria, include tutti i prodotti di quella categoria.
+    const hasSearchQuery = query.length > 0;
+    if (hasSearchQuery) {
+      filtered = smartFilterOffers(filtered, query, null);
+    }
 
     if (sortMode === "price-asc") {
       filtered.sort((a, b) => a.price - b.price);
@@ -2075,17 +2079,18 @@ function applyOfferRevealAnimation(grid) {
         return discB - discA;
       });
     } 
-    else {
+    else if (!hasSearchQuery) {
+      // Ordinamento di default per piano: solo quando non si sta cercando nulla,
+      // altrimenti si mantiene l'ordine per rilevanza dato da smartFilterOffers
       const planWeight = { Enterprise: 4, Professional: 3, Standard: 2, Starter: 1 };
       filtered.sort((a, b) => (planWeight[b.plan] || 0) - (planWeight[a.plan] || 0));
     }
 
-    // Se la ricerca corrisponde al nome di un negozio, mostriamo in cima un
-    // riquadro "canale" stile YouTube (più grande delle offerte normali) che
-    // apre il profilo pubblico del negozio se cliccato.
+    // Se la ricerca corrisponde al nome di un negozio (anche con typo), mostriamo
+    // in cima un riquadro "canale" stile YouTube che apre il profilo pubblico.
     const matchedStore = query.length >= 2
       ? allOffers.find(o =>
-          o.storeId && o.storeName && o.storeName.toLowerCase().includes(query) &&
+          o.storeId && o.storeName && fuzzyScore(o.storeName, query) >= 0.5 &&
           (!userCity || o.storeCity === userCity) &&
           (!userCap || o.storeCap === userCap)
         )
@@ -5136,8 +5141,8 @@ function renderSearchModal() {
   const performModalSearch = debounce(async () => {
     const rawQuery = input.value.trim();
     
-    // REGOLA: la modale inizia a cercare dalla PRIMA lettera
-    if (!rawQuery) {
+    // REGOLA: la modale (navbar) inizia a cercare dalla SECONDA lettera
+    if (rawQuery.length < 2) {
       resultsDiv.innerHTML = "";
       return;
     }
@@ -5826,23 +5831,17 @@ const debouncedSmartRender = debounce(() => {
   }
 }, 300);
 
-    searchInput.oninput = () => {
-      const rawQuery = searchInput.value || "";
-      
-      // REGOLA: la navbar inizia a cercare dalla SECONDA lettera
-      if (rawQuery.trim().length === 1) {
-        // Non fare nulla se c'è solo 1 carattere (tranne nascondere consigliati)
-        const recommendedSection = $("#recommendedOffersSection");
-        if (recommendedSection) recommendedSection.classList.add("hidden");
-        return;
-      }
-      
-      // Se il profilo di un negozio è aperto, la ricerca resta scoped a quel negozio
-      if (currentStoreProfileId) {
-        debouncedStoreProfileSearch();
-        logSearchQuery();
-        return;
-      }
+searchInput.oninput = () => {
+  const rawQuery = searchInput.value || "";
+  
+  // REGOLA: questa barra inizia a cercare dalla PRIMA lettera
+  
+  // Se il profilo di un negozio è aperto, la ricerca resta scoped a quel negozio
+  if (currentStoreProfileId) {
+    debouncedStoreProfileSearch();
+    logSearchQuery();
+    return;
+  }
     
       // Nasconde/mostra "Offerte Consigliate"
       const hasQuery = rawQuery.trim().length > 0;
