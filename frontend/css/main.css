@@ -3581,16 +3581,15 @@ hr {
   cursor: pointer !important;
 }
 
-/* Se il tour è attivo, i pulsanti "Aggiungi" delle card offerta restano
-   cliccabili. NON includere qui .cart-map-btn: altrimenti resta sempre
-   acceso/sopra l'overlay del tour anche prima di essere evidenziato
-   (es. al punto "Crea la lista", dove deve restare scurito). Quando è il
-   suo turno di essere evidenziato, ci pensa già la regola dedicata più
-   sotto (.cart-map-btn.tour-highlight). */
+/* Se il tour è attivo, i pulsanti "Aggiungi" restano cliccabili. NIENTE
+   z-index qui: alzarlo per TUTTI i pulsanti "Aggiungi" della griglia,
+   evidenziati o no, li fa bucare sopra qualsiasi popup aperto sopra di
+   loro (es. il dettaglio offerta al punto 5), facendoli intravedere
+   scuriti dal velo del tour. Lo z-index elevato deve valere solo per il
+   pulsante DAVVERO evidenziato al punto 6: ci pensa già la regola
+   dedicata più sotto (.product-actions .btn.tour-highlight). */
    body.tour-active .product-actions .btn {
     pointer-events: auto !important;
-    z-index: 2215 !important;
-    position: relative;
   }
 
 /* ============================================================
