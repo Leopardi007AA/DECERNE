@@ -10747,7 +10747,16 @@ const pollId = setInterval(() => {
             window.__tourInputListeners.push({ el: denyBtn, fn: onLocDecision });
           }
         }
-      } else {
+      }
+      // Grigio finché non si clicca davvero "Aggiungi" sul prodotto:
+      // altrimenti si potrebbe passare al carrello senza aver mai
+      // aggiunto nulla. Si accende da tourRowAddInterceptor, subito
+      // prima di avanzare allo step successivo.
+      else if (step.highlightRowAddBtn) {
+        nextBtn.classList.remove("enabled");
+        nextBtn.classList.add("tour-next-btn");
+      }
+      else {
         nextBtn.classList.remove("tour-next-btn");
         nextBtn.classList.add("enabled");
       }
@@ -10856,6 +10865,10 @@ const pollId = setInterval(() => {
           // pulsante resti "acceso" anche dopo. Ancora più visibile su una
           // card isolata come quella finta, sola in griglia.
           addBtn.blur();
+          // Solo ora "Avanti" può accendersi: prima di questo click era
+          // tenuto spento apposta (vedi renderStep).
+          const nextBtn = $("#tourNextBtn");
+          if (nextBtn) nextBtn.classList.add("enabled");
           setTimeout(nextStep, 400);
         };
         // Fase di cattura: intercetta il click PRIMA del vero onclick del
