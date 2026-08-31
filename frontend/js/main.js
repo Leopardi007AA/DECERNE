@@ -5208,19 +5208,31 @@ function renderSearchModal() {
     const filtered = smartFilterOffers(allOffers, rawQuery, null)
       .filter(o => !userCity || (o.storeCity === userCity));
   
-    if (filtered.length === 0) {
-      resultsDiv.innerHTML = `<p style="text-align:center; padding:20px; color:#64748b;">Nessun risultato trovato per "<b>${escapeHtml(rawQuery)}</b>"${userCity ? ' nella tua zona' : ''}.<br><small>Prova con parole simili o controlla gli accenti.</small></p>`;
-    } else {
-      // Raggruppa per rilevanza o mostra tutto
-      resultsDiv.innerHTML = `
-        <div class="cart-list">
-          ${filtered.map(o => buildStoreSearchCardElement(o)).join('')}
-        </div>
-        <p style="text-align:center; padding:10px; color:#94a3b8; font-size:0.9em;">
-          ${filtered.length} risultato/i trovato/i
-        </p>
-      `;
-    }
+      if (filtered.length === 0) {
+        resultsDiv.innerHTML = `<p style="text-align:center; padding:20px; color:#64748b;">Nessun risultato trovato per "<b>${escapeHtml(rawQuery)}</b>"${userCity ? ' nella tua zona' : ''}.<br><small>Prova con parole simili o controlla gli accenti.</small></p>`;
+      } else {
+        // Ogni risultato è una riga prodotto cliccabile (apre il dettaglio offerta)
+        resultsDiv.innerHTML = `
+          <div class="cart-list">
+            ${filtered.map(o => `
+              <div class="cart-item" style="display:flex; align-items:center; cursor:pointer;" data-offer-id="${o.id}">
+                <img src="${getSafeImageUrl(o.img)}" alt="${escapeHtml(o.product)}" style="width:56px; height:56px; object-fit:cover; border-radius:8px; flex-shrink:0;">
+                <div style="flex:1; margin-left:12px; min-width:0;">
+                  <div style="font-weight:700;">${escapeHtml(o.product)}</div>
+                  <div style="font-size:0.85em; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(o.storeName)}${o.storeAddress ? ' · ' + escapeHtml(o.storeAddress) : ''}</div>
+                </div>
+                <div style="font-weight:800; color:#0f62fe; margin-left:12px; white-space:nowrap;">${formatPrice(o.price)}</div>
+              </div>
+            `).join('')}
+          </div>
+          <p style="text-align:center; padding:10px; color:#94a3b8; font-size:0.9em;">
+            ${filtered.length} risultato/i trovato/i
+          </p>
+        `;
+        resultsDiv.querySelectorAll('[data-offer-id]').forEach(el => {
+          el.onclick = () => openProductDetail(el.dataset.offerId);
+        });
+      }
   }, 350);
 
   input.oninput = performModalSearch;
