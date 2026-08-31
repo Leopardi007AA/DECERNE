@@ -10552,7 +10552,19 @@ const pollId = setInterval(() => {
     if (title) title.innerText = "Lista della Spesa";
     if (!content) return;
 
-    const productName = tourSearchTerm || "Prodotto Demo";
+    // Il prodotto da mostrare qui è quello DAVVERO aperto ai punti
+    // precedenti (reale se trovato tra le offerte vere, finto solo se
+    // creato al punto 4 perché non esisteva nulla): displayProductInModal()
+    // lo salva sempre in window.__tourLastProduct, sia nel caso reale che
+    // in quello finto. Ricostruirlo di nuovo dal solo termine di ricerca
+    // (come prima) mostrava dati finti anche per un prodotto esistente.
+    const lastProduct = window.__tourLastProduct;
+    const productName = lastProduct?.product || tourSearchTerm || "Prodotto Demo";
+    const productImg = lastProduct?.img || "https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=150&h=150&fit=crop";
+    const productPrice = typeof lastProduct?.price === "number" ? formatPrice(lastProduct.price) : "€ 1,29";
+    const storeLabel = lastProduct
+      ? [lastProduct.storeName, lastProduct.storeAddress].filter(Boolean).join(" - ")
+      : "Supermercato Demo - Via Roma 1";
 
     content.innerHTML = `
       <div class="cart-toolbar">
@@ -10562,14 +10574,14 @@ const pollId = setInterval(() => {
       </div>
       <div class="cart-list">
         <div class="cart-row" onclick="closeFullPageModal()">
-          <div class="cart-row-img"><img src="https://images.unsplash.com/photo-1612929633738-8fe4f4e3f5e8?w=150&h=150&fit=crop" alt=""></div>
+          <div class="cart-row-img"><img src="${productImg}" alt=""></div>
           <div class="cart-row-body">
             <div class="cart-row-info">
-              <div class="cart-row-store">Supermercato Demo - Via Roma 1</div>
+              <div class="cart-row-store">${storeLabel}</div>
               <div class="cart-row-product">${productName}</div>
-              <div class="cart-row-price">€ 1,29</div>
+              <div class="cart-row-price">${productPrice}</div>
             </div>
-                      <button class="btn" onclick="event.stopPropagation(); if(typeof offerData !== 'undefined' && offerData && offerData.id) saveToShoppingList(offerData.id);">Aggiungi</button>
+            <button class="btn danger cart-remove-btn" onclick="event.stopPropagation(); this.closest('.cart-row').remove();">Rimuovi</button>
           </div>
         </div>
         <button class="btn cart-map-btn" onclick="tourOpenCartMapView()">
