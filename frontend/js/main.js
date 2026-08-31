@@ -10161,7 +10161,8 @@ const maybeStartTour = (function () {
       title: "Crea la lista",
       text: "Da qui puoi creare una lista intelligente. Ti suggeriremo i negozi migliori per quello che ti manca.",
       highlight: ".cart-smart-btn",
-      inModal: true
+      inModal: true,
+      blockRest: true
     },
     {
       title: "Percorso in mappa",

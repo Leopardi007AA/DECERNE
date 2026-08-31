@@ -3581,13 +3581,17 @@ hr {
   cursor: pointer !important;
 }
 
-/* Se il tour è attivo, i pulsanti reali restano cliccabili */
-body.tour-active .product-actions .btn,
-body.tour-active .cart-map-btn {
-  pointer-events: auto !important;
-  z-index: 2215 !important;
-  position: relative;
-}
+/* Se il tour è attivo, i pulsanti "Aggiungi" delle card offerta restano
+   cliccabili. NON includere qui .cart-map-btn: altrimenti resta sempre
+   acceso/sopra l'overlay del tour anche prima di essere evidenziato
+   (es. al punto "Crea la lista", dove deve restare scurito). Quando è il
+   suo turno di essere evidenziato, ci pensa già la regola dedicata più
+   sotto (.cart-map-btn.tour-highlight). */
+   body.tour-active .product-actions .btn {
+    pointer-events: auto !important;
+    z-index: 2215 !important;
+    position: relative;
+  }
 
 /* ============================================================
    FIX TOUR: i pulsanti evidenziati devono essere visibili e cliccabili
