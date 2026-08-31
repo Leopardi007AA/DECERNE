@@ -594,6 +594,15 @@ body.tour-active .tour-card {
   z-index: 2202 !important;
 }
 
+/* Punto 2 del tour ("Imposta dove sei"): il banner posizione evidenziato
+   (tour-highlight-fixed, z-index 2210) coprirebbe la card della guida su
+   schermi piccoli, dove entrambi sono ancorati in basso. Qui la guida sale
+   sopra di lui solo in questo step; dal punto 3 in poi torna come al
+   punto 1, senza regole speciali. */
+body.tour-step-location .tour-card {
+  z-index: 2215 !important;
+}
+
 
 /* Blocca lo scroll quando il tour è in modalità blocking */
 body.tour-blocking,

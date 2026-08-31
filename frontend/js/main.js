@@ -10621,6 +10621,13 @@ const pollId = setInterval(() => {
     clearHighlight();
     removeInputListeners();
 
+    // Al punto 2 ("Imposta dove sei") il banner posizione viene evidenziato
+    // con tour-highlight-fixed (z-index 2210), che supera lo z-index della
+    // card della guida (2202) e la copre su schermi piccoli, dove sono
+    // entrambe ancorate in basso. Questa classe alza la guida sopra il
+    // banner solo in questo step; dal punto 3 in poi torna come al punto 1.
+    document.body.classList.toggle("tour-step-location", current === 1);
+
     // Gestione overlay bloccante + blocco scroll
     const overlay = $("#tourOverlay");
     if (overlay) {
