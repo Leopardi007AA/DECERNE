@@ -10918,6 +10918,20 @@ const pollId = setInterval(() => {
         if (btn) btn.onclick = savedCartOnclick;
         savedCartOnclick = null;
       }
+      if (prev.highlightRowAddBtn) {
+        // Dal punto "Aggiungi al carrello" in poi si lavora solo dentro al
+        // popup carrello: la card finta creata al punto 4 (quando il
+        // prodotto cercato non esisteva) non serve più. Se resta nel DOM,
+        // quando gli stili di smontaggio del pulsante "Aggiungi" vengono
+        // ripristinati (clearHighlight, sotto) non trova nessun transform
+        // di riserva nel CSS che lo re-intrappoli sotto il popup — a
+        // differenza di una card reale, che ha sempre la classe
+        // "scroll-reveal" con un suo transform. Risultato: il pulsante
+        // resta visibile sopra al popup, scurito dal velo del tour, fino
+        // alla fine. Rimuovendo subito la card finta il problema non si
+        // presenta nemmeno.
+        removeDemoOffers();
+      }
     }
     try { removeModalBlocker(); } catch (e) { console.error("Tour: errore removeModalBlocker", e); }
     try { removeRowAddInterceptor(); } catch (e) { console.error("Tour: errore removeRowAddInterceptor", e); }
