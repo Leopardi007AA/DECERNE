@@ -7065,9 +7065,16 @@ function renderDashboard(container) {
     ? `<div style="margin-top:6px;"><span class="badge-plan plan-standard" title="Stai operando come collaboratore di ${partner.name}">${PANEL_ICONS.users} Collaboratore · ${partner.collaboratorRole}</span></div>`
     : '';
 
-  container.innerHTML = `
+    container.innerHTML = `
     <div class="store-dashboard">
-      <aside class="store-sidebar">
+      <button class="partner-sidebar-handle" id="partnerSidebarHandle" onclick="togglePartnerSidebar()" aria-label="Apri il menu del pannello partner" aria-expanded="false">
+        <span class="partner-sidebar-handle-grip"></span>
+      </button>
+      <div class="partner-sidebar-overlay" id="partnerSidebarOverlay" onclick="closePartnerSidebar()"></div>
+      <aside class="store-sidebar" id="partnerSidebar">
+        <button class="partner-sidebar-close" onclick="closePartnerSidebar()" aria-label="Chiudi il menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+        </button>
         <div class="sidebar-title">PANNELLO PARTNER</div>
         ${collaboratorBadgeHTML}
         <button class="store-nav-btn ${storeData.activeTab === 'home' ? 'active' : ''}" onclick="switchStoreTab('home')">${PANEL_ICONS.home} Panoramica</button>
@@ -7102,6 +7109,39 @@ function renderDashboard(container) {
     else { contentArea.innerHTML = ""; contentArea.appendChild(tabResult); }
   }
 }
+
+// Menu laterale del Pannello Partner a comparsa su schermi piccoli (sotto i 900px):
+// nascosto di default, si apre toccando il rettangolo sul bordo destro dello schermo.
+function openPartnerSidebar() {
+  const sidebar = $("#partnerSidebar");
+  const overlay = $("#partnerSidebarOverlay");
+  const handle = $("#partnerSidebarHandle");
+  if (!sidebar) return;
+  sidebar.classList.add('open');
+  if (overlay) overlay.classList.add('open');
+  if (handle) { handle.classList.add('is-hidden'); handle.setAttribute('aria-expanded', 'true'); }
+  document.body.style.overflow = 'hidden';
+}
+
+function closePartnerSidebar() {
+  const sidebar = $("#partnerSidebar");
+  const overlay = $("#partnerSidebarOverlay");
+  const handle = $("#partnerSidebarHandle");
+  if (!sidebar) return;
+  sidebar.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
+  if (handle) { handle.classList.remove('is-hidden'); handle.setAttribute('aria-expanded', 'false'); }
+  document.body.style.overflow = '';
+}
+
+function togglePartnerSidebar() {
+  const sidebar = $("#partnerSidebar");
+  if (!sidebar) return;
+  sidebar.classList.contains('open') ? closePartnerSidebar() : openPartnerSidebar();
+}
+window.openPartnerSidebar = openPartnerSidebar;
+window.closePartnerSidebar = closePartnerSidebar;
+window.togglePartnerSidebar = togglePartnerSidebar;
 
 /**
  * Renderizza la Dashboard Home con statistiche a livelli, in base al piano attivo.
