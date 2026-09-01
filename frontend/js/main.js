@@ -10621,6 +10621,13 @@ const pollId = setInterval(() => {
     clearHighlight();
     removeInputListeners();
 
+    // Al punto 4/5 (griglia offerte -> dettaglio offerta) il popup del
+    // prodotto (#fullPagePopup) resta sotto la card della guida (2200 vs
+    // 2202 in tour-active) e su schermi piccoli, dove entrambi sono
+    // ancorati in basso, la card della guida ne taglia una parte. Questa
+    // classe alza il popup sopra la guida solo durante questi due step.
+    document.body.classList.toggle("tour-step-detail", current === 3 || current === 4);
+
     // Al punto 2 ("Imposta dove sei") il banner posizione viene evidenziato
     // con tour-highlight-fixed (z-index 2210), che supera lo z-index della
     // card della guida (2202) e la copre su schermi piccoli, dove sono

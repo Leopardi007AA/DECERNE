@@ -686,10 +686,18 @@ body.tour-blocking .container {
     z-index: 2202 !important;
   }
 
-body.tour-active .full-page-modal,
-body.tour-active .full-page-modal.is-visible {
-  z-index: 2200 !important;
-}
+  body.tour-active .full-page-modal,
+  body.tour-active .full-page-modal.is-visible {
+    z-index: 2200 !important;
+  }
+  
+  /* Punto 4-5 della guida (griglia offerte -> dettaglio offerta): su
+     schermi piccoli il popup del prodotto (2200 durante la guida) resta
+     sotto la card della guida (2202) e viene tagliato in basso. Qui il
+     popup sale sopra la guida solo durante questi due step. */
+  body.tour-step-detail #fullPagePopup.full-page-modal {
+    z-index: 2205 !important;
+  }
 
 /* --- NUOVO LAYOUT A RIGA --- */
 .offers-list-container {
@@ -975,6 +983,17 @@ body.tour-active .full-page-modal.is-visible {
   width: 90%;
   max-width: 500px;
   border: 1px solid #eef1f6;
+}
+
+/* Su schermi piccoli il banner posizione e la card della guida sono
+   entrambi ancorati in basso e si sovrappongono. Durante la guida
+   (body.tour-active) il banner resta nascosto del tutto: ricompare da
+   solo appena la guida finisce (closeTour toglie la classe tour-active),
+   senza bisogno di codice JS aggiuntivo. */
+@media (max-width: 768px) {
+  body.tour-active .location-banner {
+    display: none !important;
+  }
 }
 
 .banner-row { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
