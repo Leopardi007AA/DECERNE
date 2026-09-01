@@ -3940,7 +3940,7 @@ async function renderMultiStopMap(cart, overrideStoresById) {
       navigator.geolocation.getCurrentPosition(
         pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
         err => reject(err),
-        { timeout: 15000, maximumAge: 30000, enableHighAccuracy: true }
+        { timeout: 15000, maximumAge: 0, enableHighAccuracy: true }
       );
     });
   } catch (e) {
@@ -4170,10 +4170,14 @@ function maneuverInstructionText(step) {
     case 'on ramp':
     case 'off ramp':
       return `prendi la rampa a ${sideItalian(m.modifier)}${via}`;
-    case 'roundabout':
-    case 'rotary':
-    case 'roundabout turn':
-      return `entra nella rotonda e prendi la ${ordinalItalian(m.exit || 1)} uscita`;
+      case 'roundabout':
+        case 'rotary':
+        case 'roundabout turn': {
+          const exitNum = Number(m.exit);
+          return exitNum > 0
+            ? `entra nella rotonda e prendi la ${ordinalItalian(exitNum)} uscita`
+            : `entra nella rotonda e prendi l'uscita indicata dal navigatore`;
+        }
     case 'exit roundabout':
     case 'exit rotary':
       return `esci dalla rotonda${via}`;
@@ -4233,15 +4237,32 @@ function updateTripInfoBar() {
   `;
 }
 
+// Distanza minima (in metri) tra il punto dato e il tracciato disegnato sulla mappa.
+// Usata per capire se l'utente ha sbagliato strada e serve un ricalcolo immediato.
+function distanceToRouteMeters(lat, lng) {
+  if (!cartMultiRoute || !cartMultiRoute.coords || !cartMultiRoute.coords.length) return 0;
+  let min = Infinity;
+  for (let i = 0; i < cartMultiRoute.coords.length; i += 3) { // campiona ogni 3 punti, basta e costa meno
+    const [clat, clng] = cartMultiRoute.coords[i];
+    const d = distanceMeters(lat, lng, clat, clng);
+    if (d < min) min = d;
+  }
+  return min;
+}
+
 async function recalculateTrip(currentLat, currentLng) {
-  if (!cartVisitOrder.length) return;
-  const routePoints = [{ lat: currentLat, lng: currentLng }, ...cartVisitOrder.map(s => ({ lat: s.latitude, lng: s.longitude }))];
+  const remainingStops = cartVisitOrder.slice(cartNextStopIndex);
+  if (!remainingStops.length) return;
+  const routePoints = [{ lat: currentLat, lng: currentLng }, ...remainingStops.map(s => ({ lat: s.latitude, lng: s.longitude }))];
   const multiRoute = await fetchMultiStopRoute(routePoints);
   if (multiRoute) {
     cartMultiRoute = multiRoute;
     cartManeuvers = multiRoute.maneuvers || [];
     cartNextManeuverIndex = 0;
     updateTripInfoBar();
+  } else {
+    // Ricalcolo fallito (rete assente o OSRM pubblico sovraccarico): riprova tra 5s invece di aspettare i 20s pieni
+    cartLastRouteRecalc = Date.now() - 15000;
   }
 }
 
@@ -4772,6 +4793,10 @@ function startLiveTracking() {
   if (!navigator.geolocation) return;
   cartWatchId = navigator.geolocation.watchPosition(
     (pos) => {
+      // Scarta letture GPS troppo imprecise (galleria, palazzi alti):
+      // evita che l'icona auto salti su strade sbagliate
+      if (pos.coords.accuracy != null && pos.coords.accuracy > 100) return;
+
       const newLat = pos.coords.latitude;
       const newLng = pos.coords.longitude;
 
@@ -4791,7 +4816,9 @@ function startLiveTracking() {
       if (cartMap && cartFollowMe) cartMap.panTo([newLat, newLng]);
 
       const now = Date.now();
-      if (cartVisitOrder.length && now - cartLastRouteRecalc > 20000) {
+      const offRoute = cartMultiRoute && distanceToRouteMeters(newLat, newLng) > 60;
+      const recalcWait = offRoute ? 5000 : 20000;
+      if (cartVisitOrder.length && now - cartLastRouteRecalc > recalcWait) {
         cartLastRouteRecalc = now;
         recalculateTrip(newLat, newLng);
       }
@@ -4799,8 +4826,9 @@ function startLiveTracking() {
       if (cartVoiceEnabled && cartManeuvers.length && cartNextManeuverIndex < cartManeuvers.length) {
         const nextManeuver = cartManeuvers[cartNextManeuverIndex];
         const distToManeuver = distanceMeters(newLat, newLng, nextManeuver.lat, nextManeuver.lng);
-        if (!nextManeuver.announcedFar && distToManeuver < 200) {
-          speakVoiceMessage(`Tra 200 metri, ${nextManeuver.text}.`);
+        if (!nextManeuver.announcedFar && distToManeuver < 300) {
+          const roundedDist = Math.max(50, Math.round(distToManeuver / 50) * 50);
+          speakVoiceMessage(`Tra ${roundedDist} metri, ${nextManeuver.text}.`);
           nextManeuver.announcedFar = true;
         }
         if (distToManeuver < 35) {
@@ -7059,6 +7087,12 @@ function closeStatInfoOnEscape(e) {
 function renderDashboard(container) {
   const partner = getCurrentPartner();
   if (!partner) return;
+
+  // FIX: ogni cambio di tab ricostruisce l'intero pannello (nuovo menu sempre chiuso),
+  // ma se l'utente aveva aperto il menu a comparsa da mobile e poi cliccato una voce,
+  // il body restava con lo scroll bloccato per sempre (era stato messo "hidden" e
+  // nessuno lo rimetteva a posto). Lo resettiamo qui ad ogni render, così parte sempre pulito.
+  document.body.style.overflow = '';
 
   const isManager = partner.isCollaborator && partner.collaboratorRole === 'Manager';
   const collaboratorBadgeHTML = partner.isCollaborator

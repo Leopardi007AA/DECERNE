@@ -1142,6 +1142,17 @@ body.tour-blocking .container {
   width: 50%;
 }
 
+/* FIX: ".form-row" era definito SOLO dentro ".auth-form", quindi ovunque venisse
+   usato fuori da un form (es. Gestione Sedi nel Pannello Partner) i campi non
+   diventavano mai una riga: restavano impilati uno sotto l'altro, molto più alti
+   del previsto. Questa è la regola di base che mancava; dentro ".auth-form" resta
+   tutto come prima perché quella regola, più specifica, vince comunque. */
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+.form-row .input-group { min-width: 0; }
+
 .auth-switch {
   margin-top: 25px;
   font-size: 0.95rem;
@@ -3311,15 +3322,15 @@ hr {
       justify-content: center;
       position: fixed;
       top: 50%;
-      right: 0;
+      left: 0;
       transform: translateY(-50%);
       width: 16px;
       height: 72px;
       padding: 0;
       border: none;
-      border-radius: 10px 0 0 10px;
+      border-radius: 0 10px 10px 0;
       background: linear-gradient(180deg, var(--primary), var(--primary-dark));
-      box-shadow: -2px 2px 10px rgba(15, 23, 42, 0.18);
+      box-shadow: 2px 2px 10px rgba(15, 23, 42, 0.18);
       cursor: pointer;
       z-index: 1200;
       transition: opacity 0.2s ease;
@@ -3338,7 +3349,7 @@ hr {
     .store-sidebar {
       position: fixed;
       top: 0;
-      right: 0;
+      left: 0;
       height: 100%;
       width: min(78vw, 300px);
       max-width: 300px;
@@ -3346,12 +3357,12 @@ hr {
       flex-wrap: nowrap;
       overflow-y: auto;
       overflow-x: hidden;
-      transform: translateX(100%);
+      transform: translateX(-100%);
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       z-index: 1200;
       padding: 60px 16px 20px;
       border-radius: 0;
-      box-shadow: -6px 0 24px rgba(15, 23, 42, 0.18);
+      box-shadow: 6px 0 24px rgba(15, 23, 42, 0.18);
     }
     .store-sidebar.open { transform: translateX(0); }
 
@@ -3375,6 +3386,25 @@ hr {
   }
 
   /* --- Contenuto del pannello: niente tagli su schermi piccoli --- */
+  @media (max-width: 768px) {
+    /* Rete di sicurezza generica: nel pannello ci sono decine di righe scritte
+       "in stile PC" con display:flex inline e nessun wrap. Su schermo stretto,
+       invece di stringere ogni elemento fino a far andare il testo a capo (e quindi
+       "allungarsi" in verticale) o farli uscire dal bordo, li mandiamo a capo come
+       riga intera. Copre entrambe le convenzioni di scrittura usate nel file. */
+    .store-content [style*="display:flex"],
+    .store-content [style*="display: flex"] {
+      flex-wrap: wrap;
+    }
+    .upgrade-banner { flex-wrap: wrap; row-gap: 10px; }
+    /* I campi Indirizzo/Città/CAP e le coordinate (Gradi/Primi/Secondi) di
+       Gestione Sedi: in riga sul tablet/PC, impilati e leggibili sul telefono.
+       Uso flex-direction (non flex-wrap) apposta: alcuni di questi campi hanno
+       già un "flex: ..." scritto direttamente nell'HTML, e cambiare l'asse invece
+       che i valori evita di doverli sovrascrivere uno per uno. */
+    .form-row { flex-direction: column; }
+  }
+
   @media (max-width: 600px) {
     .store-content { padding: 18px 14px; }
     .tab-header { flex-wrap: wrap; row-gap: 10px; }
