@@ -530,7 +530,7 @@ body.dashboard-active .site-footer, body.mode-chisiamo .site-footer { display: n
 .tour-card {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
   width: min(420px, 92vw); box-sizing: border-box;
-  background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow-xl);
+  background: #fff; border-radius: var(--panel-radius-b, 16px 30px 14px 26px); box-shadow: var(--shadow-xl);
   z-index: 2101; padding: 24px;
   pointer-events: auto;
 }

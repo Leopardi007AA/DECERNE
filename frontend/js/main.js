@@ -10395,11 +10395,18 @@ const maybeStartTour = (function () {
       return;
     }
     const card = document.querySelector(".tour-card");
+    const navbar = document.querySelector(".navbar");
     const cardHeight = card ? card.getBoundingClientRect().height : 260;
-    const freeHeight = window.innerHeight - cardHeight - 24;
+    const navbarHeight = navbar ? navbar.getBoundingClientRect().height : 70;
+    const topMargin = navbarHeight + 16;
+    const bottomMargin = cardHeight + 24;
+    const freeHeight = window.innerHeight - topMargin - bottomMargin;
     const rect = el.getBoundingClientRect();
-    const targetTop = window.scrollY + rect.top - Math.max(20, (freeHeight - rect.height) / 2);
-    window.scrollTo({ top: targetTop, behavior: "smooth" });
+    const idealTop = freeHeight > rect.height
+      ? topMargin + (freeHeight - rect.height) / 2
+      : topMargin;
+    const targetTop = window.scrollY + rect.top - idealTop;
+    window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
   }
 
   function injectDemoOffers() {
@@ -10960,10 +10967,28 @@ const pollId = setInterval(() => {
       if (prev.waitForProductClick) {
         waitingForProductClick = false;
       }
-      if (prev.waitForCartClick && savedCartOnclick !== null) {
-        const btn = document.querySelector("#cartBtn");
-        if (btn) btn.onclick = savedCartOnclick;
-        savedCartOnclick = null;
+      if (prev.waitForCartClick) {
+        // Se l'utente ha premuto "Avanti" invece di cliccare davvero sul
+        // carrello, il popup non si sarebbe mai aperto: lo apriamo qui,
+        // così il punto successivo ("Crea la lista") trova sempre il
+        // carrello già pronto, qualunque strada abbia scelto l'utente.
+        const modal = $("#fullPagePopup");
+        const alreadyOpen = modal && (modal.style.display === "flex" || getComputedStyle(modal).display === "flex");
+        if (!alreadyOpen) {
+          if (modal) {
+            modal.style.display = "flex";
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => modal.classList.add("is-visible"));
+            });
+            document.body.style.overflow = "hidden";
+          }
+          injectDemoCart();
+        }
+        if (savedCartOnclick !== null) {
+          const btn = document.querySelector("#cartBtn");
+          if (btn) btn.onclick = savedCartOnclick;
+          savedCartOnclick = null;
+        }
       }
       if (prev.highlightRowAddBtn) {
         // Dal punto "Aggiungi al carrello" in poi si lavora solo dentro al
