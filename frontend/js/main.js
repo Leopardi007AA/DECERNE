@@ -10383,6 +10383,25 @@ const maybeStartTour = (function () {
     }
   }
 
+  // Su schermi piccoli la card della guida è fissa in basso (bottom:24px)
+  // e occupa una fetta consistente dello schermo: uno scrollIntoView
+  // "center" classico può lasciare l'offerta del punto 4 proprio dietro
+  // di lei. Qui calcoliamo lo scroll in modo che l'offerta resti centrata
+  // nello spazio LIBERO sopra la card, quindi più in alto del normale.
+  function scrollOfferRowAboveGuide(el) {
+    const isSmallScreen = window.innerWidth < 640;
+    if (!isSmallScreen) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    const card = document.querySelector(".tour-card");
+    const cardHeight = card ? card.getBoundingClientRect().height : 260;
+    const freeHeight = window.innerHeight - cardHeight - 24;
+    const rect = el.getBoundingClientRect();
+    const targetTop = window.scrollY + rect.top - Math.max(20, (freeHeight - rect.height) / 2);
+    window.scrollTo({ top: targetTop, behavior: "smooth" });
+  }
+
   function injectDemoOffers() {
     const grid = $("#offersGrid");
     if (!grid) return;
@@ -10405,7 +10424,7 @@ const maybeStartTour = (function () {
       const firstRow = matchingRealOffers[0];
       firstRow.classList.add("tour-highlight", "in-view", "tour-card-dim-btn");
       highlightedEl = firstRow;
-      firstRow.scrollIntoView({ behavior: "smooth", block: "center" });
+      scrollOfferRowAboveGuide(firstRow);
       matchingRealOffers.forEach(row => {
         const origClick = row.onclick;
         row.onclick = function(e) {
@@ -10513,6 +10532,7 @@ const maybeStartTour = (function () {
         row.classList.add("tour-highlight", "tour-card-dim-btn");
         highlightedEls.push(row);
         grid.prepend(row);
+        scrollOfferRowAboveGuide(row);
       });
     }
 
