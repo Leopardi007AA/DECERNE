@@ -2357,16 +2357,44 @@ if (matchedStore) {
 // Riquadro "canale" (stile YouTube) che compare in cima ai risultati di
 // ricerca quando la query corrisponde al nome di un negozio. Cliccandolo si
 // apre il profilo pubblico del negozio (openStoreProfile).
-async function buildStoreSearchCardElement(offer) {
+async function buildStoreSearchCardElement(offerOrStore) {
+  // Se arriva già con i dati del negozio (caso nuovo: ha name ma non storeName)
+  if (offerOrStore.name && !offerOrStore.storeName) {
+    const store = offerOrStore;
+    const isVerified = store.plan === 'Professional' || store.plan === 'Enterprise';
 
- // Se arriva già con i dati del negozio (caso nuovo)
- if (offerOrStore.name && !offerOrStore.storeName) {
-  const store = offerOrStore;
+    const card = document.createElement("div");
+    card.className = "store-search-card";
+    card.onclick = () => openStoreProfile(store.id);
+    card.innerHTML = `
+      <img src="${getSafeImageUrl(store.logo_url)}" class="store-search-card-logo" alt="${store.name}">
+      <div>
+        <div class="store-search-card-name">
+          ${store.name || 'Supermercato'}
+          ${isVerified ? `<span class="store-verified-blue" style="color:#0f62fe; font-weight:800; font-size:0.7rem;">✓ Negozio Verificato</span>` : ''}
+        </div>
+        <div class="store-search-card-sub">${store.address || ''}${store.city ? `, ${store.city}` : ''}</div>
+      </div>
+      <span class="store-search-card-cta">Vedi profilo →</span>
+    `;
+    return card;
+  }
+
+  // Comportamento originale (quando arriva un'offerta o matchedStore con storeId/storeName)
+  const storesById = await fetchPublicStoresMap([offerOrStore.storeId]);
+  const store = storesById[offerOrStore.storeId] || {
+    name: offerOrStore.storeName,
+    logo_url: offerOrStore.logo_url || "",
+    address: offerOrStore.storeAddress,
+    city: offerOrStore.storeCity,
+    plan: offerOrStore.plan
+  };
+
   const isVerified = store.plan === 'Professional' || store.plan === 'Enterprise';
 
   const card = document.createElement("div");
   card.className = "store-search-card";
-  card.onclick = () => openStoreProfile(store.id);
+  card.onclick = () => openStoreProfile(offerOrStore.storeId);
   card.innerHTML = `
     <img src="${getSafeImageUrl(store.logo_url)}" class="store-search-card-logo" alt="${store.name}">
     <div>
@@ -2381,35 +2409,7 @@ async function buildStoreSearchCardElement(offer) {
   return card;
 }
 
-// Comportamento originale (quando arriva un'offerta)
-const storesById = await fetchPublicStoresMap([offerOrStore.storeId]);
-const store = storesById[offerOrStore.storeId] || {
-  name: offerOrStore.storeName,
-  logo_url: "",
-  address: offerOrStore.storeAddress,
-  city: offerOrStore.storeCity,
-  plan: offerOrStore.plan
-};
 
-  
-  const isVerified = store.plan === 'Professional' || store.plan === 'Enterprise';
-
-  const card = document.createElement("div");
-  card.className = "store-search-card";
-  card.onclick = () => openStoreProfile(offer.storeId);
-  card.innerHTML = `
-    <img src="${getSafeImageUrl(store.logo_url)}" class="store-search-card-logo" alt="${store.name}">
-    <div>
-      <div class="store-search-card-name">
-        ${store.name || 'Supermercato'}
-        ${isVerified ? `<span class="store-verified-blue" style="color:#0f62fe; font-weight:800; font-size:0.7rem;">✓ Negozio Verificato</span>` : ''}
-      </div>
-      <div class="store-search-card-sub">${store.address || ''}${store.city ? `, ${store.city}` : ''}</div>
-    </div>
-    <span class="store-search-card-cta">Vedi profilo →</span>
-  `;
-  return card;
-}
 
 /**
  * Helper: Crea l'elemento DOM della card prodotto (usato da renderOffers)
