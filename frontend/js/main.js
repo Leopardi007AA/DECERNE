@@ -4034,7 +4034,7 @@ async function renderMultiStopMap(cart, overrideStoresById) {
         cartMultiRoute = multiRoute;
         cartManeuvers = multiRoute.maneuvers || [];
         cartNextManeuverIndex = 0;
-        L.polyline(multiRoute.coords, { color: '#2563eb', weight: 5, opacity: 0.8 }).addTo(cartMap);
+        drawRoutePolyline(multiRoute.coords);
       }
 
       visitOrder.forEach((store, idx) => {
@@ -4067,6 +4067,8 @@ async function renderMultiStopMap(cart, overrideStoresById) {
     cartMap.on('dragstart', () => { cartFollowMe = false; updateFollowBtnLabel(); });
 
     startLiveTracking();
+    requestWakeLock();
+    document.addEventListener('visibilitychange', handleWakeLockVisibilityChange);
   }, 50);
 }
 
@@ -4086,6 +4088,10 @@ let cartNextStopIndex = 0;
 let cartVoiceEnabled = false;
 let cartManeuvers = [];
 let cartNextManeuverIndex = 0;
+let cartWakeLock = null;
+let cartRoutePolyline = null;
+let cartNavigationCompleted = false;
+let cartRecalcInFlight = false;
 
 function computeVisitOrder(startLat, startLng, stores) {
   const remaining = [...stores];
@@ -4208,6 +4214,105 @@ function capitalizeFirst(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// ============================================================
+// MAPPA NEGOZI (Home Utenti) — un pin per ogni sede con abbonamento
+// attivo o in prova. Cliccando si apre lo stesso popup info negozio
+// già usato altrove nell'app (showStoreInfoPopup).
+// ============================================================
+let storesMap = null;
+
+function makeStoreMapIcon(logoUrl) {
+  const safeUrl = logoUrl ? getSafeImageUrl(logoUrl) : '';
+  const inner = safeUrl
+    ? `<img src="${safeUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`
+    : '';
+  return L.divIcon({
+    html: `
+      <div style="width:36px; height:36px; border-radius:50% 50% 50% 0; background:#0f62fe; transform:rotate(-45deg); box-shadow:0 3px 8px rgba(0,0,0,0.35); border:2px solid white;">
+        <div style="width:100%; height:100%; border-radius:50%; overflow:hidden; transform:rotate(45deg); display:flex; align-items:center; justify-content:center;">
+          ${inner}
+        </div>
+      </div>`,
+    className: '', iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -34]
+  });
+}
+
+async function fetchAllMapLocations() {
+  const { data, error } = await supabaseClient
+    .from('public_map_locations')
+    .select('location_id, store_id, location_name, store_name, address, city, cap, latitude, longitude, logo_url, phone, hours, is_primary');
+
+  if (error) { console.error("Errore caricamento negozi per la mappa:", error); return []; }
+  return (data || []).filter(l => l.latitude != null && l.longitude != null);
+}
+
+async function initStoresMap() {
+  const container = $("#storesMapContainer");
+  if (!container) return;
+
+  let center = { lat: 41.9028, lng: 12.4964 }; // fallback: Roma
+  try {
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, maximumAge: 60000 });
+    });
+    center = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+  } catch (e) {
+    console.warn("Posizione non disponibile per centrare la mappa negozi:", e);
+  }
+
+  storesMap = L.map('storesMapContainer').setView([center.lat, center.lng], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(storesMap);
+
+  const locations = await fetchAllMapLocations();
+  const bounds = [[center.lat, center.lng]];
+
+  locations.forEach(loc => {
+    const marker = L.marker([loc.latitude, loc.longitude], { icon: makeStoreMapIcon(loc.logo_url) }).addTo(storesMap);
+    bounds.push([loc.latitude, loc.longitude]);
+
+    marker.on('click', () => {
+      showStoreInfoPopup({
+        id: loc.store_id,
+        name: (loc.location_name && loc.location_name !== 'Sede Principale') ? `${loc.store_name} (${loc.location_name})` : loc.store_name,
+        logo: loc.logo_url,
+        address: [loc.address, loc.cap, loc.city].filter(Boolean).join(', '),
+        phone: loc.phone,
+        hours: loc.hours
+      });
+    });
+  });
+
+  if (locations.length) storesMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+  setTimeout(() => storesMap.invalidateSize(), 100);
+}
+
+async function toggleStoresMap() {
+  const mapSection = $("#storesMapSection");
+  const listWrapper = $("#offersListWrapper");
+  const btn = $("#toggleMapViewBtn");
+  if (!mapSection || !listWrapper) return;
+
+  const isOpening = mapSection.classList.contains("hidden");
+  mapSection.classList.toggle("hidden", !isOpening);
+  listWrapper.classList.toggle("hidden", isOpening);
+
+  if (btn) {
+    btn.innerHTML = isOpening
+      ? `Torna alla lista`
+      : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align:-3px; margin-right:4px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>Mappa negozi`;
+  }
+
+  if (!isOpening) return;
+
+  if (!storesMap) {
+    await initStoresMap();
+  } else {
+    setTimeout(() => storesMap.invalidateSize(), 50);
+  }
+}
+
 function makeNumberedIcon(number, approximate) {
   const bg = approximate ? '#b45309' : '#2563eb';
   const border = approximate ? 'border:2px dashed white;' : '';
@@ -4250,19 +4355,37 @@ function distanceToRouteMeters(lat, lng) {
   return min;
 }
 
+// Disegna o aggiorna il tracciato blu sulla mappa (senza questa funzione
+// separata non potremmo "accorciarlo" man mano che si avanza).
+function drawRoutePolyline(coords) {
+  if (cartRoutePolyline) {
+    cartRoutePolyline.setLatLngs(coords);
+  } else if (cartMap) {
+    cartRoutePolyline = L.polyline(coords, { color: '#2563eb', weight: 5, opacity: 0.8 }).addTo(cartMap);
+  }
+}
+
 async function recalculateTrip(currentLat, currentLng) {
   const remainingStops = cartVisitOrder.slice(cartNextStopIndex);
   if (!remainingStops.length) return;
-  const routePoints = [{ lat: currentLat, lng: currentLng }, ...remainingStops.map(s => ({ lat: s.latitude, lng: s.longitude }))];
+
+  // Ricalcola anche l'ordine delle tappe non ancora visitate: da dove ti trovi ora
+  // il tragitto più breve potrebbe non coincidere più con l'ordine di partenza.
+  const reordered = computeVisitOrder(currentLat, currentLng, remainingStops);
+  cartVisitOrder = [...cartVisitOrder.slice(0, cartNextStopIndex), ...reordered];
+  reordered.forEach((store, i) => {
+    const marker = cartStoreMarkers[store.id];
+    if (marker) marker.setIcon(makeNumberedIcon(cartNextStopIndex + i + 1, store.approximateLocation));
+  });
+
+  const routePoints = [{ lat: currentLat, lng: currentLng }, ...reordered.map(s => ({ lat: s.latitude, lng: s.longitude }))];
   const multiRoute = await fetchMultiStopRoute(routePoints);
   if (multiRoute) {
     cartMultiRoute = multiRoute;
     cartManeuvers = multiRoute.maneuvers || [];
     cartNextManeuverIndex = 0;
     updateTripInfoBar();
-  } else {
-    // Ricalcolo fallito (rete assente o OSRM pubblico sovraccarico): riprova tra 5s invece di aspettare i 20s pieni
-    cartLastRouteRecalc = Date.now() - 15000;
+    drawRoutePolyline(multiRoute.coords);
   }
 }
 
@@ -4789,6 +4912,49 @@ function updateVoiceBtnLabel() {
     : `${PANEL_ICONS.headset} Voce`;
 }
 
+// Impedisce allo schermo di spegnersi/oscurarsi mentre la navigazione è attiva.
+// Il browser rilascia da solo il wake lock se l'utente cambia tab o blocca
+// manualmente lo schermo: per questo lo ri-richiediamo al ritorno in primo piano.
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    cartWakeLock = await navigator.wakeLock.request('screen');
+    cartWakeLock.addEventListener('release', () => { cartWakeLock = null; });
+  } catch (e) {
+    console.warn("Wake lock non disponibile:", e);
+  }
+}
+
+function releaseWakeLock() {
+  if (cartWakeLock) {
+    cartWakeLock.release();
+    cartWakeLock = null;
+  }
+}
+
+function handleWakeLockVisibilityChange() {
+  if (document.visibilityState === 'visible' && cartMap) {
+    requestWakeLock();
+  }
+}
+
+// Trova il punto più vicino sul tracciato disegnato e restituisce la distanza (metri).
+// Come effetto collaterale "mangia" il tratto già percorso, così la linea blu
+// si accorcia dietro l'utente man mano che avanza, come nei navigatori veri.
+function updateRouteProgress(lat, lng) {
+  if (!cartMultiRoute || !cartMultiRoute.coords || cartMultiRoute.coords.length < 2) return 0;
+  let nearestIdx = 0, nearestDist = Infinity;
+  cartMultiRoute.coords.forEach(([clat, clng], i) => {
+    const d = distanceMeters(lat, lng, clat, clng);
+    if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+  });
+  if (nearestIdx > 0) {
+    cartMultiRoute.coords = cartMultiRoute.coords.slice(nearestIdx);
+    drawRoutePolyline(cartMultiRoute.coords);
+  }
+  return nearestDist;
+}
+
 function startLiveTracking() {
   if (!navigator.geolocation) return;
   cartWatchId = navigator.geolocation.watchPosition(
@@ -4815,12 +4981,17 @@ function startLiveTracking() {
       }
       if (cartMap && cartFollowMe) cartMap.panTo([newLat, newLng]);
 
+      if (cartNavigationCompleted) return; // ultima tappa raggiunta: niente più ricalcoli o annunci
+
+      const distFromRoute = updateRouteProgress(newLat, newLng);
+
       const now = Date.now();
-      const offRoute = cartMultiRoute && distanceToRouteMeters(newLat, newLng) > 60;
-      const recalcWait = offRoute ? 5000 : 20000;
-      if (cartVisitOrder.length && now - cartLastRouteRecalc > recalcWait) {
+      const offRoute = cartMultiRoute && distFromRoute > 60;
+      const recalcWait = offRoute ? 0 : 20000;
+      if (cartVisitOrder.length && !cartRecalcInFlight && now - cartLastRouteRecalc > recalcWait) {
         cartLastRouteRecalc = now;
-        recalculateTrip(newLat, newLng);
+        cartRecalcInFlight = true;
+        recalculateTrip(newLat, newLng).finally(() => { cartRecalcInFlight = false; });
       }
 
       if (cartVoiceEnabled && cartManeuvers.length && cartNextManeuverIndex < cartManeuvers.length) {
@@ -4844,7 +5015,9 @@ function startLiveTracking() {
           const isLast = cartNextStopIndex === cartVisitOrder.length - 1;
           speakVoiceMessage(`Sei arrivato a ${nextStop.name}.` + (isLast ? ' Hai completato il percorso.' : ''));
           cartNextStopIndex++;
-          if (!isLast) {
+          if (isLast) {
+            cartNavigationCompleted = true;
+          } else {
             const upcoming = cartVisitOrder[cartNextStopIndex];
             setTimeout(() => speakVoiceMessage(`Prossima tappa: ${upcoming.name}.`), 3500);
           }
@@ -4870,6 +5043,8 @@ function updateFollowBtnLabel() {
 }
 
 function stopCartMapTracking() {
+  releaseWakeLock();
+  document.removeEventListener('visibilitychange', handleWakeLockVisibilityChange);
   if (cartWatchId !== null) {
     navigator.geolocation.clearWatch(cartWatchId);
     cartWatchId = null;
@@ -4886,6 +5061,9 @@ function stopCartMapTracking() {
   cartNextStopIndex = 0;
   cartManeuvers = [];
   cartNextManeuverIndex = 0;
+  cartRoutePolyline = null;
+  cartNavigationCompleted = false;
+  cartRecalcInFlight = false;
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   // Durante il tour, tornando indietro dalla mappa demo deve ricomparire
   // il carrello demo, non quello vero (per un visitatore anonimo sarebbe
