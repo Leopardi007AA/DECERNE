@@ -3409,6 +3409,94 @@ hr {
     .store-content { padding: 18px 14px; }
     .tab-header { flex-wrap: wrap; row-gap: 10px; }
     .offer-table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
+
+    /* Via l'effetto "foglio dentro la pagina": niente più un pannello bianco
+       che galleggia su uno sfondo grigio con margini sprecati ai lati. Sotto
+       i 600px lo sfondo diventa un unico colore continuo e il contenuto usa
+       tutta la larghezza disponibile. */
+    body.dashboard-active { background-color: #fff; }
+    body.dashboard-active .container { padding-left: 8px; padding-right: 8px; }
+    body.dashboard-active .card,
+    body.dashboard-active .card-saas,
+    body.dashboard-active .stat-card-saas {
+      background: transparent;
+      border-left: none;
+      border-right: none;
+      border-radius: 0;
+      box-shadow: none;
+      padding-left: 4px;
+      padding-right: 4px;
+    }
+    body.dashboard-active .card-saas:hover,
+    body.dashboard-active .stat-card-saas:hover {
+      box-shadow: none;
+      transform: none;
+    }
+    /* Un filo di separazione tra una statistica e l'altra, ora che non hanno più
+       una cornice propria: senza, sembrerebbero tutte un blocco unico confuso. */
+    body.dashboard-active .stat-card-saas {
+      border-top: none;
+      border-bottom: 1px solid #eef2f7;
+      padding-top: 14px;
+      padding-bottom: 14px;
+    }
+    /* #myOffersCard si allargava apposta di 16px per lato per compensare il
+       padding di ".card": ora che quel padding è stato azzerato qui sopra,
+       lasciarla così la farebbe uscire dai bordi dello schermo. */
+    body.dashboard-active #myOffersCard {
+      margin-left: 0;
+      margin-right: 0;
+      width: 100%;
+    }
+  }
+
+  /* --- Azioni secondarie compresse in un menu "..." invece di stare a impatto
+     tutte in riga (es. Copia/Rigenera della API Key): il bottone dei tre puntini
+     resta nascosto e appare solo sotto i 600px, quando le versioni inline scompaiono. */
+  .actions-kebab-wrap { position: relative; display: none; }
+  .actions-kebab-btn {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .actions-kebab-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 170px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+    z-index: 60;
+    overflow: hidden;
+  }
+  .actions-kebab-menu.open { display: block; }
+  .actions-kebab-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 11px 14px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #334155;
+  }
+  .actions-kebab-menu button:hover { background: #f1f5f9; }
+
+  @media (max-width: 600px) {
+    .api-key-actions-inline { display: none !important; }
+    .actions-kebab-wrap { display: inline-flex; }
   }
   
   /* --- Box contenuto: linee curve "stonate" invece di riquadri netti --- */

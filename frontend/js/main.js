@@ -2409,8 +2409,6 @@ async function buildStoreSearchCardElement(offerOrStore) {
   return card;
 }
 
-
-
 /**
  * Helper: Crea l'elemento DOM della card prodotto (usato da renderOffers)
  */
@@ -7491,15 +7489,33 @@ window.showStatInfo = (event, key) => {
   popover.innerHTML = `<p>${text}</p>`;
   document.body.appendChild(popover);
 
-  // Leggermente più largo del label che l'ha aperto, entro un minimo/massimo leggibile
-  const popWidth = Math.min(Math.max(rect.width + 60, 220), 300);
+  // Leggermente più largo del label che l'ha aperto, entro un minimo/massimo leggibile,
+  // ma senza mai superare lo spazio realmente disponibile sullo schermo (su telefono
+  // 220-300px possono non starci, e il popup veniva tagliato fuori dal bordo).
+  const viewportW = document.documentElement.clientWidth;
+  const viewportH = document.documentElement.clientHeight;
+  const popWidth = Math.min(Math.max(rect.width + 60, 220), 300, viewportW - 24);
   popover.style.width = popWidth + 'px';
 
-  let top = rect.bottom + window.scrollY + 8;
-  let left = rect.left + window.scrollX - 10;
+  // Ora che il popover esiste nel DOM possiamo misurarne l'altezza reale, per
+  // decidere se sotto l'etichetta c'è abbastanza spazio o se conviene farlo
+  // comparire sopra (era proprio questo il caso che tagliava il popup delle
+  // interazioni in fondo alla pagina).
+  const popHeight = popover.offsetHeight;
 
-  const maxLeft = window.scrollX + document.documentElement.clientWidth - popWidth - 12;
-  if (left > maxLeft) left = Math.max(maxLeft, window.scrollX + 12);
+  let left = rect.left + window.scrollX - 10;
+  const maxLeft = window.scrollX + viewportW - popWidth - 12;
+  left = Math.min(left, maxLeft);
+  left = Math.max(left, window.scrollX + 12);
+
+  const spaceBelow = viewportH - rect.bottom;
+  const spaceAbove = rect.top;
+  let top;
+  if (spaceBelow < popHeight + 16 && spaceAbove > popHeight + 16) {
+    top = rect.top + window.scrollY - popHeight - 8; // non c'entra sotto: si apre sopra l'etichetta
+  } else {
+    top = rect.bottom + window.scrollY + 8;
+  }
 
   popover.style.top = top + 'px';
   popover.style.left = left + 'px';
@@ -7526,6 +7542,27 @@ function closeStatInfoOnOutsideClick(e) {
 
 function closeStatInfoOnEscape(e) {
   if (e.key === 'Escape') closeStatInfo();
+}
+
+// Menu "..." per azioni secondarie compresse su schermi piccoli (es. Copia/Rigenera
+// della API Key): un solo menu aperto per volta, si chiude toccando fuori.
+window.toggleKebabMenu = (id) => {
+  const menu = document.getElementById(id);
+  if (!menu) return;
+  const alreadyOpen = menu.classList.contains('open');
+  document.querySelectorAll('.actions-kebab-menu.open').forEach(m => m.classList.remove('open'));
+  if (!alreadyOpen) {
+    menu.classList.add('open');
+    setTimeout(() => document.addEventListener('click', closeKebabMenuOnOutsideClick), 0);
+  }
+};
+
+function closeKebabMenuOnOutsideClick(e) {
+  const openMenu = document.querySelector('.actions-kebab-menu.open');
+  if (openMenu && !openMenu.parentElement.contains(e.target)) {
+    openMenu.classList.remove('open');
+  }
+  document.removeEventListener('click', closeKebabMenuOnOutsideClick);
 }
 
 // MODIFICA: renderDashboard più sicura
@@ -9937,8 +9974,19 @@ function renderApiTab() {
       <div style="display: flex; gap: 10px; align-items: center; margin-top: 15px;">
         <input type="text" id="apiKeyDisplay" value="${partner.apiKey || 'Genera una chiave...'}" readonly
                style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-family: monospace; background: #f8fafc; font-size: 0.9rem;">
-        <button class="btn outline" onclick="copyApiKeyToClipboard()">Copia</button>
-        <button class="btn" style="background: #ef4444;" onclick="regeneratePartnerApiKey()">Rigenera</button>
+        <div class="api-key-actions-inline" style="display: flex; gap: 10px;">
+          <button class="btn outline" onclick="copyApiKeyToClipboard()">Copia</button>
+          <button class="btn" style="background: #ef4444;" onclick="regeneratePartnerApiKey()">Rigenera</button>
+        </div>
+        <div class="actions-kebab-wrap">
+          <button class="actions-kebab-btn" onclick="toggleKebabMenu('apiKeyKebabMenu')" aria-label="Altre azioni sulla API Key">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+          </button>
+          <div class="actions-kebab-menu" id="apiKeyKebabMenu">
+            <button onclick="copyApiKeyToClipboard(); toggleKebabMenu('apiKeyKebabMenu')">Copia chiave</button>
+            <button onclick="regeneratePartnerApiKey(); toggleKebabMenu('apiKeyKebabMenu')" style="color:#ef4444;">Rigenera chiave</button>
+          </div>
+        </div>
       </div>
       <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 12px;">
         <strong>Sicurezza:</strong> Non condividere mai la tua API Key. Se rigeneri la chiave, le integrazioni attuali smetteranno di funzionare immediatamente.
