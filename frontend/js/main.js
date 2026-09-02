@@ -39,6 +39,163 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 const DEV_MODE = false;
 
+// ============================================================
+// ROUTER — URL professionali (History API)
+// ============================================================
+const ROUTES = {
+  home: '/',
+  partner: '/partner',
+  partnerPanel: '/partner/pannello',
+  chiSiamo: '/chi-siamo',
+  legale: '/legale',
+  prodotto: (id) => `/prodotto/${id}`,
+  carrello: '/carrello',
+  carrelloLista: '/carrello/lista',
+  carrelloMappa: '/carrello/mappa',
+  accedi: '/accedi',
+  registrati: '/registrati',
+  profilo: '/profilo',
+  cerca: '/cerca'
+};
+
+// Base path: utile se in locale apri /frontend/index.html
+function getBasePath() {
+  // Es: /frontend/index.html -> /frontend
+  // Es: / oppure /carrello -> ''
+  const path = window.location.pathname;
+  if (path.endsWith('.html')) {
+    return path.replace(/\/[^/]+\.html$/, '') || '';
+  }
+  // Se il sito è servito dalla root del dominio
+  return '';
+}
+
+function normalizePath(pathname) {
+  let p = pathname || '/';
+  const base = getBasePath();
+  if (base && p.startsWith(base)) p = p.slice(base.length) || '/';
+  // togli index.html
+  p = p.replace(/\/index\.html$/, '/') || '/';
+  if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+  return p || '/';
+}
+
+let _routerSilent = false; // evita loop quando applichiamo una route dall'URL
+
+function navigate(path, { replace = false, state = null } = {}) {
+  const base = getBasePath();
+  const full = (base + path).replace(/\/{2,}/g, '/') || '/';
+  const method = replace ? 'replaceState' : 'pushState';
+  history[method](state || { path }, '', full);
+  applyRoute(path);
+}
+
+function applyRoute(path) {
+  _routerSilent = true;
+  try {
+    const p = normalizePath(path || window.location.pathname);
+
+    // Chiudi modal generici prima di applicare (tranne se la route stessa apre un modal)
+    const isModalRoute = (
+      p.startsWith('/prodotto/') ||
+      p === '/carrello' || p.startsWith('/carrello/') ||
+      p === '/accedi' || p === '/registrati' || p === '/profilo' || p === '/cerca'
+    );
+
+    // --- Viste principali ---
+    if (p === '/' || p === '') {
+      if (state.mode !== 'user') setMode('user');
+      closeFullPageModal();
+      return;
+    }
+    if (p === '/partner') {
+      setMode('store');
+      // restiamo su pricing/login, non forziamo pannello
+      return;
+    }
+    if (p === '/partner/pannello') {
+      setMode('store');
+      if (getCurrentPartner()) {
+        storeData.step = 'dashboard';
+        renderStoreView();
+      } else {
+        storeData.step = 'login';
+        renderStoreView();
+      }
+      return;
+    }
+    if (p === '/chi-siamo') {
+      setMode('chisiamo');
+      return;
+    }
+    if (p === '/legale' || p.startsWith('/legale')) {
+      // pagina separata: se siamo ancora su index, reindirizza
+      window.location.href = (getBasePath() || '') + '/legale.html' + (window.location.hash || '');
+      return;
+    }
+
+    // --- Modal / deep link ---
+    if (p.startsWith('/prodotto/')) {
+      const id = p.split('/')[2];
+      if (id) openProductDetail(id);
+      return;
+    }
+    if (p === '/carrello') {
+      openFullPageModal('cart');
+      return;
+    }
+    if (p === '/carrello/lista') {
+      openFullPageModal('cart');
+      // dopo render cart
+      setTimeout(() => { if (typeof openSmartShoppingListModal === 'function') openSmartShoppingListModal(); }, 50);
+      syncUrlFromAction(ROUTES.carrelloLista);
+      return;
+    }
+    if (p === '/carrello/mappa') {
+      openFullPageModal('cart');
+      setTimeout(() => { if (typeof openCartMapView === 'function') openCartMapView(); }, 50);
+      syncUrlFromAction(ROUTES.carrelloMappa);
+      return;
+    }
+    if (p === '/accedi') {
+      openFullPageModal('profile');
+      renderLoginForm();
+      syncUrlFromAction(ROUTES.accedi);
+      return;
+    }
+    if (p === '/registrati') {
+      openFullPageModal('profile');
+      showRegisterForm();
+      syncUrlFromAction(ROUTES.registrati);
+      return;
+    }
+    if (p === '/profilo') {
+      openFullPageModal('profile');
+      return;
+    }
+    if (p === '/cerca') {
+      openFullPageModal('search');
+      return;
+    }
+
+    // fallback
+    if (state.mode !== 'user') setMode('user');
+  } finally {
+    _routerSilent = false;
+  }
+}
+
+function syncUrlFromAction(path) {
+  if (_routerSilent) return;
+  const current = normalizePath(window.location.pathname);
+  if (current === path) return;
+  navigate(path, { replace: false });
+}
+
+window.addEventListener('popstate', () => {
+  applyRoute(window.location.pathname);
+});
+
 const PARTNER_AUTH_KEY = "decerne_partner_auth"; // Per il "Remember Me"
 
 const STORAGE_RATE_LIMIT = "decerne_rate_limits";
@@ -1723,6 +1880,17 @@ function setMode(mode) {
 
     closeDrawer();
     window.scrollTo(0,0);
+        // URL
+        if (!_routerSilent) {
+          if (mode === 'user') syncUrlFromAction(ROUTES.home);
+          else if (mode === 'store') {
+            const path = (getCurrentPartner() && storeData.step === 'dashboard')
+              ? ROUTES.partnerPanel
+              : ROUTES.partner;
+            syncUrlFromAction(path);
+          }
+          else if (mode === 'chisiamo') syncUrlFromAction(ROUTES.chiSiamo);
+        }
   } catch (e) {
     console.error("Errore nel cambio modalità:", e);
   }
@@ -3679,6 +3847,7 @@ async function renderCartContent() {
         <h3>La tua lista è vuota</h3>
         <p>Aggiungi le offerte che ti interessano per trovarle facilmente in negozio.</p>
         <button class="btn cart-map-btn" onclick="openBrowseStoresMap()">${PANEL_ICONS.pin} Mappa negozi</button>
+          syncUrlFromAction(ROUTES.carrelloMappa);
       </div>
     `;
     return;
@@ -4457,7 +4626,7 @@ window.openSmartShoppingListModal = () => {
   content.innerHTML = `
     <div style="padding:14px;">
       <button class="btn outline" onclick="renderCartContent()" style="margin-bottom:14px;">← Torna al carrello</button>
-
+  syncUrlFromAction(ROUTES.carrello);
       <div class="smart-list-card">
         <h3>${PANEL_ICONS.basket} La tua lista della spesa</h3>
         <p class="smart-list-subtitle">Scrivi un prodotto per campo: cerchiamo tra tutte le offerte attive il negozio più conveniente per ognuno.</p>
@@ -5450,20 +5619,24 @@ function openFullPageModal(type) {
   modal.classList.toggle("auth-modal", type === 'profile');
   modal.style.display = "flex";
   document.body.style.overflow = 'hidden';
-  // Doppio rAF: forza un frame di layout con display:flex e opacity:0
-  // prima di aggiungere is-visible, altrimenti browser e CSS collassano
-  // "display:none -> flex + opacity:1" nello stesso frame e non si vede la transizione.
   requestAnimationFrame(() => {
     requestAnimationFrame(() => modal.classList.add('is-visible'));
   });
 
   if (type === 'profile') {
-    if (state.currentUser) renderProfileInfo();
-    else renderLoginForm();
+    if (state.currentUser) {
+      renderProfileInfo();
+      syncUrlFromAction(ROUTES.profilo);
+    } else {
+      renderLoginForm();
+      syncUrlFromAction(ROUTES.accedi);
+    }
   } else if (type === 'search') {
-    renderSearchModal(); // La sistemeremo nel prossimo punto
+    renderSearchModal();
+    syncUrlFromAction(ROUTES.cerca);
   } else if (type === 'cart') {
     renderCartContent();
+    syncUrlFromAction(ROUTES.carrello);
   }
 }
 
@@ -5476,6 +5649,7 @@ function openRegisterFromDrawer() {
   if (state.mode === 'chisiamo') setMode('user');
   openFullPageModal('profile');
   showRegisterForm();
+  syncUrlFromAction(ROUTES.registrati);
 }
 
 async function validateRegistration() {
@@ -5512,13 +5686,20 @@ function closeFullPageModal() {
   try {
     const modal = $("#fullPagePopup");
     modal.classList.remove('is-visible');
-    // RIPRISTINA SCORRIMENTO
     document.body.style.overflow = '';
-    // Aspetta la fine della transizione di uscita (0.25s, vedi .full-page-modal in CSS)
-    // prima di nascondere davvero l'elemento con display:none, altrimenti sparisce di scatto.
     setTimeout(() => {
       modal.style.display = "none";
       modal.classList.remove("auth-modal");
+      // torna all'URL della vista corrente
+      if (!_routerSilent) {
+        if (state.mode === 'store') {
+          syncUrlFromAction(getCurrentPartner() && storeData.step === 'dashboard' ? ROUTES.partnerPanel : ROUTES.partner);
+        } else if (state.mode === 'chisiamo') {
+          syncUrlFromAction(ROUTES.chiSiamo);
+        } else {
+          syncUrlFromAction(ROUTES.home);
+        }
+      }
     }, 250);
   } catch (e) { console.error(e); }
 }
@@ -6127,6 +6308,18 @@ searchInput.oninput = () => {
   setMode(state.mode); // Forza il rendering della vista corretta
   renderOffers();
   
+  // Routing iniziale (deep link / refresh)
+  const initialPath = normalizePath(window.location.pathname);
+  if (initialPath !== '/' && initialPath !== '') {
+    applyRoute(initialPath);
+  } else {
+    setMode(state.mode);
+  }
+  // se non siamo su una route prodotto/modal, carica le offerte
+  if (!initialPath.startsWith('/prodotto/')) {
+    renderOffers();
+  }
+
   console.log("Sistema Decerne Pronto.");
  }catch (e) {
   console.error("Errore critico durante l'inizializzazione:", e);
@@ -6266,8 +6459,10 @@ function renderStoreView() {
   }                                                                                                                   
   } else {
     // Se NON è loggato e prova ad andare in Dashboard, rimandalo ai Piani
-    if (storeData.step === 'dashboard') {
-      storeData.step = 'pricing';
+    if (!_routerSilent && storeData.step === 'dashboard') {
+      syncUrlFromAction(ROUTES.partnerPanel);
+    } else if (!_routerSilent && state.mode === 'store') {
+      syncUrlFromAction(ROUTES.partner);
     }
   }
 
@@ -8627,7 +8822,7 @@ window.openProductDetail = async (id) => {
     storeCardName: loc.membershipCardName || "",
     storeCardImage: loc.membershipCardImage || ""
   };
-
+  syncUrlFromAction(ROUTES.prodotto(id));
   displayProductInModal(product);
 };
 
