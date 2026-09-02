@@ -111,21 +111,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="loc-icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
         <input id="locationInput" type="text" placeholder="Posizione non impostata" title="Scrivi la tua città o il CAP e premi Invio" />
       </div>
-
-      <button id="toggleMapViewBtn" class="btn outline" type="button" onclick="toggleStoresMap()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align:-3px; margin-right:4px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>Mappa negozi
-      </button>
     </section>
 
     <!-- VIEWS -->
     
     <section id="user-view" class="view">
-
-      <section id="storesMapSection" class="stores-map-section hidden">
-        <div id="storesMapContainer" style="height:65vh; border-radius:var(--radius-md); overflow:hidden;"></div>
-      </section>
-
-      <div id="offersListWrapper">
 
       <!-- PROFILO PUBBLICO NEGOZIO: sostituisce Offerte Consigliate + Offerte Vicine
            quando l'utente apre il profilo di un negozio (pulsante "Vedi Profilo" nel
@@ -173,8 +163,6 @@
   </div>
 
   <div id="emptyMsg" class="empty" style="display:none;">Nessuna offerta trovata.</div>
-
-      </div>
 </section>
 
 <section id="store-view" class="view hidden">

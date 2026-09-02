@@ -3678,6 +3678,7 @@ async function renderCartContent() {
         <div class="round-ico">${PANEL_ICONS.basket}</div>
         <h3>La tua lista è vuota</h3>
         <p>Aggiungi le offerte che ti interessano per trovarle facilmente in negozio.</p>
+        <button class="btn cart-map-btn" onclick="openBrowseStoresMap()">${PANEL_ICONS.pin} Mappa negozi</button>
       </div>
     `;
     return;
@@ -4060,6 +4061,7 @@ async function renderMultiStopMap(cart, overrideStoresById) {
           ? `Percorso pronto. Direzione ${firstStopName}.`
           : `Percorso pronto con ${visitOrder.length} tappe. Prima tappa: ${firstStopName}.`);
       }
+      addAllStoresLayer(cartMap, visitOrder.map(s => s.id)); // gli altri negozi, solo come riferimento
       cartMap.fitBounds(bounds, { padding: [40, 40] });
       setTimeout(() => cartMap.invalidateSize(), 100);
     })();
@@ -4215,12 +4217,11 @@ function capitalizeFirst(s) {
 }
 
 // ============================================================
-// MAPPA NEGOZI (Home Utenti) — un pin per ogni sede con abbonamento
-// attivo o in prova. Cliccando si apre lo stesso popup info negozio
-// già usato altrove nell'app (showStoreInfoPopup).
+// MAPPA NEGOZI — un pin per ogni sede con abbonamento attivo o in prova.
+// Cliccando si apre lo stesso popup info negozio già usato altrove
+// nell'app (showStoreInfoPopup). Usata sia dalla mappa "solo esplora"
+// (carrello vuoto) sia, in sovrapposizione, dalla mappa di navigazione.
 // ============================================================
-let storesMap = null;
-
 function makeStoreMapIcon(logoUrl) {
   const safeUrl = logoUrl ? getSafeImageUrl(logoUrl) : '';
   const inner = safeUrl
@@ -4246,32 +4247,15 @@ async function fetchAllMapLocations() {
   return (data || []).filter(l => l.latitude != null && l.longitude != null);
 }
 
-async function initStoresMap() {
-  const container = $("#storesMapContainer");
-  if (!container) return;
-
-  let center = { lat: 41.9028, lng: 12.4964 }; // fallback: Roma
-  try {
-    const pos = await new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, maximumAge: 60000 });
-    });
-    center = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-  } catch (e) {
-    console.warn("Posizione non disponibile per centrare la mappa negozi:", e);
-  }
-
-  storesMap = L.map('storesMapContainer').setView([center.lat, center.lng], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(storesMap);
-
+// Aggiunge alla mappa un pin per ogni sede attiva, escludendo quelle già
+// presenti come tappa numerata del percorso (evita pin doppi sullo stesso punto).
+async function addAllStoresLayer(map, excludeLocationIds = []) {
   const locations = await fetchAllMapLocations();
-  const bounds = [[center.lat, center.lng]];
+  const excludeSet = new Set(excludeLocationIds);
 
   locations.forEach(loc => {
-    const marker = L.marker([loc.latitude, loc.longitude], { icon: makeStoreMapIcon(loc.logo_url) }).addTo(storesMap);
-    bounds.push([loc.latitude, loc.longitude]);
-
+    if (excludeSet.has(loc.location_id)) return;
+    const marker = L.marker([loc.latitude, loc.longitude], { icon: makeStoreMapIcon(loc.logo_url) }).addTo(map);
     marker.on('click', () => {
       showStoreInfoPopup({
         id: loc.store_id,
@@ -4284,33 +4268,41 @@ async function initStoresMap() {
     });
   });
 
-  if (locations.length) storesMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
-  setTimeout(() => storesMap.invalidateSize(), 100);
+  return locations;
 }
 
-async function toggleStoresMap() {
-  const mapSection = $("#storesMapSection");
-  const listWrapper = $("#offersListWrapper");
-  const btn = $("#toggleMapViewBtn");
-  if (!mapSection || !listWrapper) return;
+// Mappa "solo esplora": aperta dal pulsante "Mappa negozi" quando il carrello
+// è vuoto. Nessun percorso, nessuna tappa numerata: solo tutti i punti vendita.
+async function openBrowseStoresMap() {
+  const content = $("#modalContent");
+  content.innerHTML = `
+    <div style="padding:16px;">
+      <button class="btn outline" style="margin-bottom:12px;" onclick="renderCartContent()">← Torna alla lista</button>
+      <div id="cartMapContainer" style="width:100%; height:65vh; border-radius:12px; overflow:hidden;"></div>
+    </div>
+  `;
 
-  const isOpening = mapSection.classList.contains("hidden");
-  mapSection.classList.toggle("hidden", !isOpening);
-  listWrapper.classList.toggle("hidden", isOpening);
-
-  if (btn) {
-    btn.innerHTML = isOpening
-      ? `Torna alla lista`
-      : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align:-3px; margin-right:4px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>Mappa negozi`;
+  let center = { lat: 41.9028, lng: 12.4964 }; // fallback: Roma
+  try {
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, maximumAge: 60000 });
+    });
+    center = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+  } catch (e) {
+    console.warn("Posizione non disponibile per centrare la mappa negozi:", e);
   }
 
-  if (!isOpening) return;
+  cartMap = L.map('cartMapContainer').setView([center.lat, center.lng], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(cartMap);
 
-  if (!storesMap) {
-    await initStoresMap();
-  } else {
-    setTimeout(() => storesMap.invalidateSize(), 50);
+  const locations = await addAllStoresLayer(cartMap);
+  if (locations.length) {
+    const bounds = [[center.lat, center.lng], ...locations.map(l => [l.latitude, l.longitude])];
+    cartMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
   }
+  setTimeout(() => cartMap.invalidateSize(), 100);
 }
 
 function makeNumberedIcon(number, approximate) {
