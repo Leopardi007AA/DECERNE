@@ -2254,16 +2254,64 @@ function applyOfferRevealAnimation(grid) {
       filtered.sort((a, b) => (planWeight[b.plan] || 0) - (planWeight[a.plan] || 0));
     }
 
-    // Se la ricerca corrisponde al nome di un negozio (anche con typo), mostriamo
-    // in cima un riquadro "canale" stile YouTube che apre il profilo pubblico.
-    const matchedStore = query.length >= 2
-      ? allOffers.find(o =>
-          o.storeId && o.storeName && fuzzyScore(o.storeName, query) >= 0.5 &&
-          (!userCity || o.storeCity === userCity) &&
-          (!userCap || o.storeCap === userCap)
-        )
-      : null;
-    const storeCardEl = matchedStore ? await buildStoreSearchCardElement(matchedStore) : null;
+    
+
+// 1. Cerca il negozio direttamente (anche se non ha offerte attive)
+let matchedStore = null;
+let storeCardEl = null;
+
+if (query.length >= 2) {
+  // Prima prova a trovare un negozio per nome (indipendente dalle offerte)
+  const { data: matchingStores, error: storeSearchError } = await supabaseClient
+    .from('public_stores')
+    .select('id, name, city, cap, address, plan, logo_url, phone, hours')
+    .ilike('name', `%${query}%`)   // oppure usa un filtro più soft se preferisci
+    .limit(5);
+
+  if (!storeSearchError && matchingStores?.length) {
+    // Filtra per città/CAP se l'utente ne ha impostati
+    const filteredStores = matchingStores.filter(s => {
+      const matchesCity = !userCity || (s.city || '').toLowerCase() === userCity;
+      const matchesCap  = !userCap  || s.cap === userCap;
+      return matchesCity && matchesCap;
+    });
+
+    // Usa fuzzyScore per scegliere il migliore
+    let bestScore = 0;
+    let bestStore = null;
+    for (const s of filteredStores) {
+      const score = fuzzyScore(s.name || '', query);
+      if (score >= 0.5 && score > bestScore) {
+        bestScore = score;
+        bestStore = s;
+      }
+    }
+
+    if (bestStore) {
+      matchedStore = {
+        storeId: bestStore.id,
+        storeName: bestStore.name,
+        storeCity: (bestStore.city || '').toLowerCase(),
+        storeCap: bestStore.cap || '',
+        storeAddress: bestStore.address || '',
+        plan: bestStore.plan || 'Starter'
+      };
+    }
+  }
+
+  // Fallback: se non trovato direttamente, prova ancora con le offerte (comportamento vecchio)
+  if (!matchedStore) {
+    matchedStore = allOffers.find(o =>
+      o.storeId && o.storeName && fuzzyScore(o.storeName, query) >= 0.5 &&
+      (!userCity || o.storeCity === userCity) &&
+      (!userCap || o.storeCap === userCap)
+    );
+  }
+}
+
+if (matchedStore) {
+  storeCardEl = await buildStoreSearchCardElement(matchedStore);
+}
 
     const emptyMsg = $("#emptyMsg");
     if (filtered.length === 0) {
@@ -2310,8 +2358,40 @@ function applyOfferRevealAnimation(grid) {
 // ricerca quando la query corrisponde al nome di un negozio. Cliccandolo si
 // apre il profilo pubblico del negozio (openStoreProfile).
 async function buildStoreSearchCardElement(offer) {
-  const storesById = await fetchPublicStoresMap([offer.storeId]);
-  const store = storesById[offer.storeId] || { name: offer.storeName, logo_url: "", address: offer.storeAddress, city: offer.storeCity, plan: offer.plan };
+
+ // Se arriva già con i dati del negozio (caso nuovo)
+ if (offerOrStore.name && !offerOrStore.storeName) {
+  const store = offerOrStore;
+  const isVerified = store.plan === 'Professional' || store.plan === 'Enterprise';
+
+  const card = document.createElement("div");
+  card.className = "store-search-card";
+  card.onclick = () => openStoreProfile(store.id);
+  card.innerHTML = `
+    <img src="${getSafeImageUrl(store.logo_url)}" class="store-search-card-logo" alt="${store.name}">
+    <div>
+      <div class="store-search-card-name">
+        ${store.name || 'Supermercato'}
+        ${isVerified ? `<span class="store-verified-blue" style="color:#0f62fe; font-weight:800; font-size:0.7rem;">✓ Negozio Verificato</span>` : ''}
+      </div>
+      <div class="store-search-card-sub">${store.address || ''}${store.city ? `, ${store.city}` : ''}</div>
+    </div>
+    <span class="store-search-card-cta">Vedi profilo →</span>
+  `;
+  return card;
+}
+
+// Comportamento originale (quando arriva un'offerta)
+const storesById = await fetchPublicStoresMap([offerOrStore.storeId]);
+const store = storesById[offerOrStore.storeId] || {
+  name: offerOrStore.storeName,
+  logo_url: "",
+  address: offerOrStore.storeAddress,
+  city: offerOrStore.storeCity,
+  plan: offerOrStore.plan
+};
+
+  
   const isVerified = store.plan === 'Professional' || store.plan === 'Enterprise';
 
   const card = document.createElement("div");
