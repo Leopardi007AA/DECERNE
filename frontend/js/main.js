@@ -3925,7 +3925,6 @@ async function renderCartContent() {
         <h3>La tua lista è vuota</h3>
         <p>Aggiungi le offerte che ti interessano per trovarle facilmente in negozio.</p>
         <button class="btn cart-map-btn" onclick="openBrowseStoresMap()">${PANEL_ICONS.pin} Mappa negozi</button>
-          syncUrlFromAction(ROUTES.carrelloMappa);
       </div>
     `;
     return;
@@ -4060,6 +4059,7 @@ async function openCartMapView() {
   const userId = state.currentUser?.id;
   if (!userId) return;
 
+  syncUrlFromAction(ROUTES.carrelloMappa);
   const content = $("#modalContent");
   content.innerHTML = `<div style="padding:50px; text-align:center; color:#64748b;">Preparazione mappa...</div>`;
 
@@ -4521,6 +4521,7 @@ async function addAllStoresLayer(map, excludeLocationIds = []) {
 // Mappa "solo esplora": aperta dal pulsante "Mappa negozi" quando il carrello
 // è vuoto. Nessun percorso, nessuna tappa numerata: solo tutti i punti vendita.
 async function openBrowseStoresMap() {
+  syncUrlFromAction(ROUTES.carrelloMappa);
   const content = $("#modalContent");
   content.innerHTML = `
     <div style="padding:16px;">
@@ -4700,11 +4701,11 @@ window.smartListLastResults = [];
 window.smartListQuantities = {}; // quantità (kg o litri) specificate dall'utente per i prodotti a peso, chiave = testo prodotto normalizzato
 
 window.openSmartShoppingListModal = () => {
+  syncUrlFromAction(ROUTES.carrelloLista);
   const content = $("#modalContent");
   content.innerHTML = `
     <div style="padding:14px;">
       <button class="btn outline" onclick="renderCartContent()" style="margin-bottom:14px;">← Torna al carrello</button>
-  syncUrlFromAction(ROUTES.carrello);
       <div class="smart-list-card">
         <h3>${PANEL_ICONS.basket} La tua lista della spesa</h3>
         <p class="smart-list-subtitle">Scrivi un prodotto per campo: cerchiamo tra tutte le offerte attive il negozio più conveniente per ognuno.</p>
