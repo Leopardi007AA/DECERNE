@@ -2656,9 +2656,13 @@ function renderSubTab() {
       </div>`;
 
       const canRenewNow = daysToRenewal <= 0;
+      const annualSwitchBtn = (sub.billingCycle !== 'annual' && !canRenewNow)
+        ? `<button class="btn outline" onclick="switchToAnnual()">Passa a fatturazione annuale</button>`
+        : '';
       actionButtons = `
         <button class="btn" style="background: #6929c4;" ${canRenewNow ? `onclick="activatePlan('Professional', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Professional</button>
-        <button class="btn outline" onclick="storeData.billingCycle = '${sub.billingCycle || 'monthly'}'; storeData.step='pricing'; renderStoreView();">Gestisci Piani</button>`;
+        <button class="btn outline" onclick="storeData.billingCycle = '${sub.billingCycle || 'monthly'}'; storeData.step='pricing'; renderStoreView();">Gestisci Piani</button>
+        ${annualSwitchBtn}`;
   }
 
   else if (plan === 'Standard' && status === 'active') {
@@ -2679,7 +2683,10 @@ function renderSubTab() {
         <p>Giorni al rinnovo: <strong style="${daysToRenewal <= 5 ? 'color: #f97316;' : ''}">${daysToRenewal}</strong></p>
       </div>`;
       const canRenewNow = daysToRenewal <= 0;
-      actionButtons = `<button class="btn" ${canRenewNow ? `onclick="activatePlan('Standard', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Ora</button>`;
+      const annualSwitchBtn = (sub.billingCycle !== 'annual' && !canRenewNow)
+        ? `<button class="btn outline" onclick="switchToAnnual()">Passa a fatturazione annuale</button>`
+        : '';
+      actionButtons = `<button class="btn" ${canRenewNow ? `onclick="activatePlan('Standard', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Ora</button> ${annualSwitchBtn}`;
   }
 
   else if (plan === 'Enterprise' && status === 'active') {
@@ -2706,7 +2713,10 @@ function renderSubTab() {
       </div>`;
 
       const canRenewNow = daysToRenewal <= 0;
-      actionButtons = `<button class="btn" style="background: #1e40af;" ${canRenewNow ? `onclick="activatePlan('Enterprise', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Enterprise</button>`;
+      const annualSwitchBtn = (sub.billingCycle !== 'annual' && !canRenewNow)
+        ? `<button class="btn outline" onclick="switchToAnnual()">Passa a fatturazione annuale</button>`
+        : '';
+      actionButtons = `<button class="btn" style="background: #1e40af;" ${canRenewNow ? `onclick="activatePlan('Enterprise', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Enterprise</button> ${annualSwitchBtn}`;
   }
 
   else if (plan === 'Professional' && status === 'expired') {
@@ -8879,6 +8889,91 @@ window.activatePlan = async function(planName, forceCycle) {
     storeData.step = 'dashboard';
     renderStoreView();
   });
+};
+
+// Passaggio da fatturazione mensile ad annuale a meta' abbonamento: stesso
+// piano (mai un cambio di piano), i giorni rimasti del mese in corso si
+// sommano ai 365 giorni del nuovo anno, quindi la nuova scadenza supera
+// sempre i 365 giorni da oggi.
+window.switchToAnnual = async function() {
+  const partner = getCurrentPartner();
+  if (!partner) return toast.error("Esegui il login come partner per modificare l'abbonamento.");
+
+  const sub = partner.subscription;
+  if (!sub || sub.status !== 'active') {
+    return toast.error("Puoi passare alla fatturazione annuale solo con un abbonamento attivo.");
+  }
+  if (sub.billingCycle === 'annual') {
+    return toast.error("Il tuo abbonamento e' gia' annuale.");
+  }
+  if (!sub.renewalDate) {
+    return toast.error("Nessuna data di rinnovo trovata per questo abbonamento.");
+  }
+
+  const currentRenewal = new Date(sub.renewalDate);
+  const today = new Date();
+  const remainingDays = Math.ceil((currentRenewal - today) / (1000 * 60 * 60 * 24));
+  if (remainingDays <= 0) {
+    return toast.error("Il piano e' scaduto: rinnovalo prima di passare alla fatturazione annuale.");
+  }
+
+  const newRenewalDate = new Date(currentRenewal);
+  newRenewalDate.setFullYear(newRenewalDate.getFullYear() + 1);
+  const totalDaysFromToday = Math.ceil((newRenewalDate - today) / (1000 * 60 * 60 * 24));
+
+  showConfirm(
+    `Passare il piano ${partner.plan} a fatturazione annuale? I ${remainingDays} giorni rimanenti del mese in corso si sommano al nuovo anno: la prossima scadenza sara' il ${newRenewalDate.toLocaleDateString()} (tra ${totalDaysFromToday} giorni).`,
+    async () => {
+      const updates = {
+        billing_cycle: 'annual',
+        renewal_date: newRenewalDate.toISOString().split('T')[0]
+      };
+
+      const { data: storeRow, error } = await storeAuthClient
+        .from('stores')
+        .update(updates)
+        .eq('id', partner.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Errore passaggio a fatturazione annuale:", error);
+        return toast.error("Errore durante il passaggio alla fatturazione annuale.");
+      }
+
+      storeAuthClient.from('subscription_events').insert({
+        store_id: partner.id,
+        event_type: 'billing_cycle_change',
+        previous_plan: partner.plan,
+        new_plan: storeRow.plan,
+        previous_status: sub.status,
+        new_status: storeRow.subscription_status,
+        previous_billing_cycle: 'monthly',
+        new_billing_cycle: storeRow.billing_cycle,
+        previous_renewal_date: sub.renewalDate,
+        new_renewal_date: storeRow.renewal_date
+      }).then(({ error: logError }) => {
+        if (logError) console.warn("Errore registrazione subscription_events:", logError);
+      });
+
+      const updatedStore = {
+        ...partner,
+        subscription: {
+          ...sub,
+          status: storeRow.subscription_status,
+          renewalDate: storeRow.renewal_date,
+          billingCycle: storeRow.billing_cycle
+        }
+      };
+      const dataString = JSON.stringify(updatedStore);
+      sessionStorage.setItem(SESSION_PARTNER, dataString);
+      localStorage.setItem(PARTNER_AUTH_KEY, dataString);
+      state.currentStore = updatedStore;
+
+      toast.success("Fatturazione annuale attivata!");
+      renderStoreView();
+    }
+  );
 };
 
 // --- INTEGRAZIONE NELLE VISTE ---

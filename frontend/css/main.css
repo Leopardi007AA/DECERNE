@@ -3329,6 +3329,13 @@ hr {
   @media (max-width: 900px) {
     .store-dashboard { position: relative; overflow: hidden; grid-template-columns: 1fr; }
 
+    /* Da qui in giu' il pannello e' gia' in visuale mobile (menu a comparsa),
+       quindi qualsiasi tabella troppo larga deve scorrere col dito invece di
+       essere tagliata dal contenitore: prima questa regola scattava solo
+       sotto i 600px, lasciando un buco tra 601 e 900px. */
+    .offer-table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
+    .offer-table.team-table-compact { display: table; white-space: normal; overflow-x: visible; }
+
     .partner-sidebar-handle {
       display: flex;
       align-items: center;
@@ -3373,7 +3380,9 @@ hr {
       transform: translateX(-100%);
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       z-index: 1200;
-      padding: 60px 16px 20px;
+      /* 90px e non 60px: la navbar fissa e' alta 70px, quindi il titolo
+         restava per meta' coperto invece di stare sotto per intero. */
+      padding: 90px 16px 20px;
       border-radius: 0;
       box-shadow: 6px 0 24px rgba(15, 23, 42, 0.18);
     }
@@ -3384,7 +3393,7 @@ hr {
       align-items: center;
       justify-content: center;
       position: absolute;
-      top: 14px;
+      top: 78px;
       right: 14px;
       width: 32px;
       height: 32px;
