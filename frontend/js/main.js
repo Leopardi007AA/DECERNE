@@ -9741,8 +9741,7 @@ function renderTeamTab() {
   h3List.textContent = "Collaboratori Attivi";
 
   const table = document.createElement("table");
-  table.className = "offer-table";
-  table.style.minWidth = "420px";
+  table.className = "offer-table team-table-compact";
   
   // Header Tabella
   const thead = document.createElement("thead");
