@@ -3327,7 +3327,7 @@ hr {
   }
 
   @media (max-width: 900px) {
-    .store-dashboard { position: relative; overflow: hidden; }
+    .store-dashboard { position: relative; overflow: hidden; grid-template-columns: 1fr; }
 
     .partner-sidebar-handle {
       display: flex;
@@ -3474,8 +3474,7 @@ hr {
     body.dashboard-active { background-color: #fff; }
     body.dashboard-active .container { padding-left: 8px; padding-right: 8px; }
     body.dashboard-active .card,
-    body.dashboard-active .card-saas,
-    body.dashboard-active .stat-card-saas {
+    body.dashboard-active .card-saas {
       background: transparent;
       border-left: none;
       border-right: none;
@@ -3484,18 +3483,27 @@ hr {
       padding-left: 4px;
       padding-right: 4px;
     }
-    body.dashboard-active .card-saas:hover,
-    body.dashboard-active .stat-card-saas:hover {
+    body.dashboard-active .card-saas:hover {
       box-shadow: none;
       transform: none;
     }
-    /* Un filo di separazione tra una statistica e l'altra, ora che non hanno più
-       una cornice propria: senza, sembrerebbero tutte un blocco unico confuso. */
+    /* Le card statistica mantengono la loro forma organica anche su schermo
+       piccolo: qui sopra restavano piatte, senza contorno né ombra, come
+       testo scritto su un foglio invece di un dato in evidenza. */
     body.dashboard-active .stat-card-saas {
-      border-top: none;
-      border-bottom: 1px solid #eef2f7;
-      padding-top: 14px;
-      padding-bottom: 14px;
+      background: #fff;
+      border: 1px solid var(--panel-border-soft);
+      border-radius: var(--panel-radius-b);
+      box-shadow: var(--panel-shadow-soft);
+      padding: 16px 14px;
+    }
+    body.dashboard-active .stat-card-saas:hover {
+      box-shadow: var(--panel-shadow-hover);
+      transform: translateY(-2px);
+    }
+    body.dashboard-active .stat-card-saas.primary {
+      background: linear-gradient(135deg, #eff6ff, #ffffff);
+      border-color: rgba(15, 98, 254, 0.18);
     }
     /* #myOffersCard si allargava apposta di 16px per lato per compensare il
        padding di ".card": ora che quel padding è stato azzerato qui sopra,
