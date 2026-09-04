@@ -1739,7 +1739,7 @@ select.location-field-input {
 @media (max-width: 900px) { .store-dashboard { grid-template-columns: 1fr; } .store-sidebar { display: flex; overflow-x: auto; border-right: none; border-bottom: 1px solid #eee; padding-bottom: 10px; } }
 
 /* Dashboard Layout */
-.store-content { padding: 30px; text-align: left; }
+.store-content { padding: 30px; text-align: left; min-width: 0; }
 .tab-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
 
 /* Stat Cards */
