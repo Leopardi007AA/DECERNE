@@ -5404,7 +5404,8 @@ function renderLoginForm() {
       <p class="auth-switch">Non sei registrato? <a href="javascript:void(0)" onclick="showRegisterForm()">Registrati</a></p>
     </div>
   `;
-  
+  syncUrlFromAction(ROUTES.accedi);
+
   $("#loginForm").onsubmit = (e) => {
     e.preventDefault();
     showLoading(); // ATTIVA SPINNER
@@ -5525,16 +5526,16 @@ function showRegisterForm() {
         <input type="email" id="regEmail" placeholder="Email" required>
         <input type="password" id="regPass" placeholder="Password (min. 8)" required>
         <input type="password" id="regPassConfirm" placeholder="Conferma Password" required>
-        <div class="form-row">
+                <div class="form-row">
           <input type="text" id="regCap" placeholder="CAP" maxlength="5" required>
           <input type="text" id="regCitta" placeholder="Città" required>
         </div>
-        <label style="display:flex; align-items:flex-start; gap:8px; font-size:0.85rem; cursor:pointer; margin-top:4px;">
-          <input type="checkbox" id="regPrivacy" required style="margin-top:3px;">
+        <label class="auth-consent-row">
+          <input type="checkbox" id="regPrivacy" required>
           <span>Ho letto e accetto l'<a href="legale.html#privacy" target="_blank" rel="noopener">informativa sulla privacy</a> e acconsento al trattamento dei miei dati personali *</span>
         </label>
-        <label style="display:flex; align-items:flex-start; gap:8px; font-size:0.85rem; cursor:pointer;">
-          <input type="checkbox" id="regMarketing" style="margin-top:3px;">
+        <label class="auth-consent-row">
+          <input type="checkbox" id="regMarketing">
           <span>Desidero ricevere offerte e comunicazioni promozionali via email</span>
         </label>
         <button type="submit" class="btn">Registrati</button>
@@ -5557,6 +5558,7 @@ function showRegisterForm() {
       <p class="auth-switch">Hai già un account? <a href="javascript:void(0)" onclick="renderLoginForm()">Accedi</a></p>
     </div>
   `;
+  syncUrlFromAction(ROUTES.registrati);
 
   $("#registerForm").onsubmit = (e) => {
     e.preventDefault();
@@ -6560,7 +6562,13 @@ function renderStoreView() {
     // 'pricing' invece resta valido anche da loggato: è la pagina di upgrade volontario.
     if (storeData.step === 'login') {
       storeData.step = 'dashboard';
-  }                                                                                                                   
+    }
+    // FIX: prima il login riuscito cambiava vista ma non l'URL, che restava
+    // fermo su /partner anche a Pannello ormai aperto. Sincronizziamo qui,
+    // nello stesso punto in cui ogni cambio di step del partner passa comunque.
+    if (!_routerSilent && storeData.step === 'dashboard' && state.mode === 'store') {
+      syncUrlFromAction(ROUTES.partnerPanel);
+    }
   } else {
     // Se NON è loggato e prova ad andare in Dashboard, rimandalo ai Piani
     if (!_routerSilent && storeData.step === 'dashboard') {

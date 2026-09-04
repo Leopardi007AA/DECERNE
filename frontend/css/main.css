@@ -1170,6 +1170,38 @@ body.tour-blocking .container {
   text-decoration: underline;
 }
 
+/* Spunte di consenso nel form di registrazione (privacy / marketing) */
+.auth-consent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  text-align: left;
+  border-radius: 14px 6px 14px 6px;
+  border: 1px solid var(--panel-border-soft, rgba(15, 23, 42, 0.07));
+  background: #f8fafc;
+  font-size: 0.85rem;
+  color: #475569;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.auth-consent-row:hover { border-color: var(--primary); background: #fff; }
+.auth-consent-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.auth-consent-row a {
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+.auth-consent-row a:hover { text-decoration: underline; }
+
 /* Messaggi di errore */
 .error-msg {
   background-color: #ffe5e5;
