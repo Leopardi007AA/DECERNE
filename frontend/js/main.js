@@ -3450,7 +3450,9 @@ async function registerUser(userData) {
           name: userData.nome,
           surname: userData.cognome,
           city: userData.citta,
-          cap: userData.cap
+          cap: userData.cap,
+          privacy_accepted: userData.privacyAccepted,
+          marketing_consent: userData.marketingConsent
         }
       }
     });
@@ -5527,6 +5529,14 @@ function showRegisterForm() {
           <input type="text" id="regCap" placeholder="CAP" maxlength="5" required>
           <input type="text" id="regCitta" placeholder="Città" required>
         </div>
+        <label style="display:flex; align-items:flex-start; gap:8px; font-size:0.85rem; cursor:pointer; margin-top:4px;">
+          <input type="checkbox" id="regPrivacy" required style="margin-top:3px;">
+          <span>Ho letto e accetto l'<a href="legale.html#privacy" target="_blank" rel="noopener">informativa sulla privacy</a> e acconsento al trattamento dei miei dati personali *</span>
+        </label>
+        <label style="display:flex; align-items:flex-start; gap:8px; font-size:0.85rem; cursor:pointer;">
+          <input type="checkbox" id="regMarketing" style="margin-top:3px;">
+          <span>Desidero ricevere offerte e comunicazioni promozionali via email</span>
+        </label>
         <button type="submit" class="btn">Registrati</button>
       </form>
       <div class="social-divider"><span>oppure</span></div>
@@ -5746,11 +5756,14 @@ async function validateRegistration() {
   const pass = document.getElementById("regPass").value;
   const passConf = document.getElementById("regPassConfirm").value;
   const nome = document.getElementById("regNome").value.trim();
+  const privacyAccepted = document.getElementById("regPrivacy").checked;
+  const marketingConsent = document.getElementById("regMarketing").checked;
 
   // Validazioni base
   if (!VALIDATION_RULES.email.test(email)) return toast.error("Inserisci un'email valida.");
   if (pass.length < VALIDATION_RULES.minPassword) return toast.error("La password deve essere di almeno 8 caratteri.");
   if (pass !== passConf) return toast.error("Le password non coincidono.");
+  if (!privacyAccepted) return toast.error("Devi accettare l'informativa sulla privacy per registrarti.");
 
   const newUser = {
     nome: nome,
@@ -5758,7 +5771,9 @@ async function validateRegistration() {
     email: email.toLowerCase(),
     pass: pass,
     cap: document.getElementById("regCap").value.trim(),
-    citta: document.getElementById("regCitta").value.trim()
+    citta: document.getElementById("regCitta").value.trim(),
+    privacyAccepted: privacyAccepted,
+    marketingConsent: marketingConsent
   };
 
   const result = await registerUser(newUser);
