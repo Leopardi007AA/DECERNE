@@ -4420,7 +4420,7 @@ function maneuverModifierText(modifier) {
   return mappa[modifier] || 'prosegui dritto';
 }
 
-function maneuverInstructionText(step) {
+function maneuverInstructionText(step, exitVia) {
   const m = step.maneuver;
   const via = step.name ? ` su ${step.name}` : '';
   switch (m.type) {
@@ -4437,14 +4437,15 @@ function maneuverInstructionText(step) {
     case 'on ramp':
     case 'off ramp':
       return `prendi la rampa a ${sideItalian(m.modifier)}${via}`;
-      case 'roundabout':
-        case 'rotary':
-        case 'roundabout turn': {
-          const exitNum = Number(m.exit);
-          return exitNum > 0
-            ? `entra nella rotonda e prendi la ${ordinalItalian(exitNum)} uscita`
-            : `entra nella rotonda e prendi l'uscita indicata dal navigatore`;
-        }
+    case 'roundabout':
+    case 'rotary':
+    case 'roundabout turn': {
+      const exitNum = Number(m.exit);
+      const suffix = exitVia ? ` su ${exitVia}` : '';
+      return exitNum > 0
+        ? `entra nella rotonda e prendi la ${ordinalItalian(exitNum)} uscita${suffix}`
+        : `entra nella rotonda e prendi l'uscita indicata dal navigatore${suffix}`;
+    }
     case 'exit roundabout':
     case 'exit rotary':
       return `esci dalla rotonda${via}`;
@@ -4454,19 +4455,36 @@ function maneuverInstructionText(step) {
 }
 
 // Trasforma gli step di OSRM in una lista piatta di manovre da annunciare,
-// escludendo partenza e arrivo (già gestiti dall'annuncio "sei arrivato a...")
+// escludendo partenza e arrivo (già gestiti dall'annuncio "sei arrivato a...").
+// Lo step "exit roundabout" non diventa una manovra a sé: la fondiamo
+// nell'annuncio di ingresso, perché la rotonda è troppo piccola perché i
+// due annunci restino separati senza accavallarsi.
 function buildManeuverList(legs) {
   const manovre = [];
   legs.forEach(leg => {
-    (leg.steps || []).forEach(step => {
-      if (step.maneuver.type === 'depart' || step.maneuver.type === 'arrive') return;
+    const steps = leg.steps || [];
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const type = step.maneuver.type;
+      if (type === 'depart' || type === 'arrive') continue;
+      if (type === 'exit roundabout' || type === 'exit rotary') continue;
+
+      let text;
+      if (type === 'roundabout' || type === 'rotary' || type === 'roundabout turn') {
+        const nextStep = steps[i + 1];
+        const isExitStep = nextStep && (nextStep.maneuver.type === 'exit roundabout' || nextStep.maneuver.type === 'exit rotary');
+        text = maneuverInstructionText(step, isExitStep ? nextStep.name : null);
+      } else {
+        text = maneuverInstructionText(step);
+      }
+
       manovre.push({
         lat: step.maneuver.location[1],
         lng: step.maneuver.location[0],
-        text: maneuverInstructionText(step),
+        text,
         announcedFar: false
       });
-    });
+    }
   });
   return manovre;
 }
@@ -4617,6 +4635,19 @@ function drawRoutePolyline(coords) {
   }
 }
 
+// Quando il ricalcolo del percorso rigenera le manovre da zero, una svolta
+// già segnalata (annuncio "tra X metri...") non deve tornare "nuova" solo
+// perché è la stessa fisica svolta ricapitata nella lista rigenerata:
+// altrimenti la si annuncia di nuovo a ogni ricalcolo (ogni 20s, o subito
+// se fuori percorso) finché non la si supera.
+function carryOverManeuverState(oldManeuvers, oldIndex, newManeuvers) {
+  const giaAvvisate = oldManeuvers.slice(oldIndex).filter(m => m.announcedFar);
+  newManeuvers.forEach(nm => {
+    const stessaSvolta = giaAvvisate.some(om => distanceMeters(nm.lat, nm.lng, om.lat, om.lng) < 25);
+    if (stessaSvolta) nm.announcedFar = true;
+  });
+}
+
 async function recalculateTrip(currentLat, currentLng) {
   const remainingStops = cartVisitOrder.slice(cartNextStopIndex);
   if (!remainingStops.length) return;
@@ -4633,8 +4664,10 @@ async function recalculateTrip(currentLat, currentLng) {
   const routePoints = [{ lat: currentLat, lng: currentLng }, ...reordered.map(s => ({ lat: s.latitude, lng: s.longitude }))];
   const multiRoute = await fetchMultiStopRoute(routePoints);
   if (multiRoute) {
+    const newManeuvers = multiRoute.maneuvers || [];
+    carryOverManeuverState(cartManeuvers, cartNextManeuverIndex, newManeuvers);
     cartMultiRoute = multiRoute;
-    cartManeuvers = multiRoute.maneuvers || [];
+    cartManeuvers = newManeuvers;
     cartNextManeuverIndex = 0;
     updateTripInfoBar();
     drawRoutePolyline(multiRoute.coords);
