@@ -13,6 +13,11 @@
   connect-src 'self' https://noqdpjlbmyjqzlmstfvx.supabase.co https://nominatim.openstreetmap.org https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://router.project-osrm.org;
   font-src 'self' data:;">
   <title>Decerne — Trova le migliori offerte vicino a te</title>
+  <meta name="description" content="Decerne aiuta a trovare le offerte dei supermercati vicino a te: confronta prezzi, crea la lista della spesa e raggiungi il negozio con il percorso più conveniente.">
+  <meta property="og:title" content="Decerne — Trova le migliori offerte vicino a te">
+  <meta property="og:description" content="Confronta le offerte dei supermercati della tua zona e risparmia sulla spesa.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.decerne.it">
   <meta name="referrer" content="no-referrer-when-downgrade">
   <link rel="stylesheet" href="css/main.css">
   <script type="application/ld+json">
@@ -75,7 +80,7 @@
   </header>
 
   <!-- POPUP A TUTTO SCHERMO -->
-  <div id="fullPagePopup" class="full-page-modal">
+  <div id="fullPagePopup" class="full-page-modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1">
     <div class="modal-card">
       <div class="modal-header">
         <h2 id="modalTitle">Carrello</h2>
@@ -88,7 +93,7 @@
   </div>
 
   <!-- POPUP INFO NEGOZIO (aperto dal nome del negozio nel dettaglio offerta) -->
-  <div id="storeInfoOverlay" class="store-info-overlay hidden" onclick="if(event.target === this) closeStoreInfoPopup()">
+  <div id="storeInfoOverlay" class="store-info-overlay hidden" role="dialog" aria-modal="true" aria-label="Informazioni negozio" tabindex="-1" onclick="if(event.target === this) closeStoreInfoPopup()">
     <div class="store-info-card">
       <button class="store-info-close" onclick="closeStoreInfoPopup()" aria-label="Chiudi">&times;</button>
       <div id="storeInfoContent"></div>
@@ -98,9 +103,9 @@
   <main id="app" class="container">
     <!-- SEARCH BAR / FILTERS (Visibili solo in modalità utente) -->
     <section class="controls" id="controls">
-      <input id="searchInput" type="search" placeholder="Cerca prodotto..." />
+      <input id="searchInput" type="search" placeholder="Cerca prodotto..." aria-label="Cerca prodotto" />
       
-      <select id="categorySelect">
+      <select id="categorySelect" aria-label="Ordina offerte">
         <option value="">Ordina per: in evidenza</option>
         <option value="best">Migliori offerte</option>
         <option value="price-asc">Prezzo: dal più basso</option>
@@ -110,7 +115,7 @@
     
       <div class="location-wrapper">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="loc-icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-        <input id="locationInput" type="text" placeholder="Posizione non impostata" title="Scrivi la tua città o il CAP e premi Invio" />
+        <input id="locationInput" type="text" placeholder="Posizione non impostata" title="Scrivi la tua città o il CAP e premi Invio" aria-label="Posizione di ricerca" />
       </div>
     </section>
 
@@ -174,11 +179,11 @@
 </section>
 
 <!-- Template per il Modal delle Offerte -->
-<div id="offerModal" class="full-page-modal" style="display:none; z-index: 3000;">
+<div id="offerModal" class="full-page-modal" style="display:none; z-index: 3000;" role="dialog" aria-modal="true" aria-labelledby="offerModalTitle" tabindex="-1">
   <div class="modal-header">
     <h2 id="offerModalTitle">Gestione Offerta</h2>
     <div id="offerError" class="error-msg hidden" style="margin-bottom: 15px;"></div>
-    <button type="button" onclick="closeOfferModal()" class="close-btn" style="cursor:pointer; padding: 10px;">&times;</button>
+    <button type="button" onclick="closeOfferModal()" class="close-btn" aria-label="Chiudi finestra" style="cursor:pointer; padding: 10px;">&times;</button>
   </div>
 
   <div class="modal-content">

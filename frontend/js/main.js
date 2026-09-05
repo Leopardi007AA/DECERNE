@@ -2942,14 +2942,15 @@ window.addNewLocationField = () => {
 // --- GESTIONE MODALE OFFERTE (NUOVA/EDIT) ---
 window.openOfferModal = (offer = null) => {
   try {
-  const modal = $("#offerModal");
-  const partner = getCurrentPartner();
-  modal.style.display = "flex";
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => modal.classList.add('is-visible'));
-  });
-
-  document.body.style.overflow = 'hidden';
+    const modal = $("#offerModal");
+    const partner = getCurrentPartner();
+    modal.style.display = "flex";
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => modal.classList.add('is-visible'));
+    });
+    trapFocusOnOpen(modal);
+  
+    document.body.style.overflow = 'hidden';
 
   // Gestione dinamica del Dropdown Sedi
   const locSelect = $("#offLocation");
@@ -3052,6 +3053,7 @@ window.closeOfferModal = () => {
     const modal = $("#offerModal");
     modal.classList.remove('is-visible');
     document.body.style.overflow = '';
+    releaseFocusOnClose(modal);
     setTimeout(() => { modal.style.display = "none"; }, 250);
   } catch (e) { console.error(e); }
 };
@@ -4502,7 +4504,7 @@ function capitalizeFirst(s) {
 function makeStoreMapIcon(logoUrl) {
   const safeUrl = logoUrl ? getSafeImageUrl(logoUrl) : '';
   const inner = safeUrl
-    ? `<img src="${safeUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`
+    ? `<img src="${safeUrl}" alt="" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`
     : '';
   return L.divIcon({
     html: `
@@ -5412,8 +5414,8 @@ function renderLoginForm() {
       <h3>Bentornato su Decerne</h3>
       <div id="loginError" class="error-msg hidden"></div>
       <form id="loginForm" class="auth-form">
-        <input type="email" id="loginEmail" placeholder="Email" required>
-        <input type="password" id="loginPass" placeholder="Password" required>
+        <input type="email" id="loginEmail" placeholder="Email" autocomplete="username" required>
+        <input type="password" id="loginPass" placeholder="Password" autocomplete="current-password" required>
         <button type="submit" class="btn">Accedi</button>
       </form>
       <p style="text-align:center; margin-top:10px;">
@@ -5473,7 +5475,7 @@ function renderForgotPasswordForm() {
       <p style="color:#64748b; margin-bottom:15px; font-size:0.9rem;">Inserisci l'email con cui ti sei registrato: ti invieremo un link per reimpostarla.</p>
       <div id="forgotError" class="error-msg hidden"></div>
       <form id="forgotForm" class="auth-form">
-        <input type="email" id="forgotEmail" placeholder="Email" required>
+        <input type="email" id="forgotEmail" placeholder="Email" autocomplete="email" required>
         <button type="submit" class="btn">Invia link di recupero</button>
       </form>
       <p class="auth-switch"><a href="javascript:void(0)" onclick="renderLoginForm()">Torna al login</a></p>
@@ -5506,8 +5508,8 @@ function renderResetPasswordForm() {
       <h3>Imposta la nuova password</h3>
       <div id="resetError" class="error-msg hidden"></div>
       <form id="resetForm" class="auth-form">
-        <input type="password" id="resetPass" placeholder="Nuova password (min. 8)" required>
-        <input type="password" id="resetPassConfirm" placeholder="Conferma nuova password" required>
+        <input type="password" id="resetPass" placeholder="Nuova password (min. 8)" autocomplete="new-password" required>
+        <input type="password" id="resetPassConfirm" placeholder="Conferma nuova password" autocomplete="new-password" required>
         <button type="submit" class="btn">Salva nuova password</button>
       </form>
     </div>
@@ -5556,9 +5558,9 @@ function showRegisterForm() {
           <input type="text" id="regNome" placeholder="Nome" required>
           <input type="text" id="regCognome" placeholder="Cognome" required>
         </div>
-        <input type="email" id="regEmail" placeholder="Email" required>
-        <input type="password" id="regPass" placeholder="Password (min. 8)" required>
-        <input type="password" id="regPassConfirm" placeholder="Conferma Password" required>
+        <input type="email" id="regEmail" placeholder="Email" autocomplete="email" required>
+        <input type="password" id="regPass" placeholder="Password (min. 8)" autocomplete="new-password" required>
+        <input type="password" id="regPassConfirm" placeholder="Conferma Password" autocomplete="new-password" required>
                 <div class="form-row">
           <input type="text" id="regCap" placeholder="CAP" maxlength="5" required>
           <input type="text" id="regCitta" placeholder="Città" required>
@@ -5745,6 +5747,51 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// ============================================================
+// GESTIONE FOCUS POPUP (accessibilità da tastiera)
+// Usata da fullPagePopup, offerModal e storeInfoOverlay.
+// ============================================================
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+let _lastFocusedBeforeModal = null;
+
+function trapFocusOnOpen(modalEl) {
+  if (!modalEl) return;
+  _lastFocusedBeforeModal = document.activeElement;
+  setTimeout(() => {
+    const first = modalEl.querySelector(FOCUSABLE_SELECTOR);
+    (first || modalEl).focus();
+  }, 260); // dopo la transizione di apertura (250ms)
+
+  const handleTab = (e) => {
+    if (e.key !== 'Tab') return;
+    const focusables = Array.from(modalEl.querySelectorAll(FOCUSABLE_SELECTOR))
+      .filter(el => el.offsetParent !== null); // solo elementi visibili
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+  modalEl._focusTrapHandler = handleTab;
+  modalEl.addEventListener('keydown', handleTab);
+}
+
+function releaseFocusOnClose(modalEl) {
+  if (modalEl && modalEl._focusTrapHandler) {
+    modalEl.removeEventListener('keydown', modalEl._focusTrapHandler);
+    modalEl._focusTrapHandler = null;
+  }
+  if (_lastFocusedBeforeModal && typeof _lastFocusedBeforeModal.focus === 'function') {
+    _lastFocusedBeforeModal.focus();
+  }
+  _lastFocusedBeforeModal = null;
+}
+
 // NUOVA FUNZIONE openFullPageModal SEMPLIFICATA
 function openFullPageModal(type) {
   const modal = $("#fullPagePopup");
@@ -5756,6 +5803,7 @@ function openFullPageModal(type) {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => modal.classList.add('is-visible'));
   });
+  trapFocusOnOpen(modal);
 
   if (type === 'profile') {
     if (state.currentUser) {
@@ -5826,6 +5874,7 @@ function closeFullPageModal() {
     const modal = $("#fullPagePopup");
     modal.classList.remove('is-visible');
     document.body.style.overflow = '';
+    releaseFocusOnClose(modal);
     setTimeout(() => {
       modal.style.display = "none";
       modal.classList.remove("auth-modal");
@@ -6065,7 +6114,7 @@ if (offImgInput) {
     const url = offImgInput.value.trim();
     const hint = $("#imgHint");
     if (url.startsWith('http')) {
-      hint.innerHTML = `<img src="${url}" style="width:50px; height:50px; object-fit:cover; border-radius:4px; margin-top:5px; border:1px solid #ddd;">`;
+      hint.innerHTML = `<img src="${url}" alt="Anteprima immagine prodotto" style="width:50px; height:50px; object-fit:cover; border-radius:4px; margin-top:5px; border:1px solid #ddd;">`;
     } else {
       hint.innerText = "Inserisci un URL valido (es. https://...)";
     }
@@ -6276,7 +6325,7 @@ async function refreshPartnerSession(storeId) {
 // ---------- Init ----------
 async function init() {
   try {
-    console.log("Sistema Decerne in fase di avvio...");
+    if (DEV_MODE) console.log("Sistema Decerne in fase di avvio...");
   
     setupEventListeners();
   
@@ -6459,7 +6508,7 @@ searchInput.oninput = () => {
     renderOffers();
   }
 
-  console.log("Sistema Decerne Pronto.");
+  if (DEV_MODE) console.log("Sistema Decerne Pronto.");
  }catch (e) {
   console.error("Errore critico durante l'inizializzazione:", e);
  }
@@ -6638,7 +6687,7 @@ function renderStoreForgotPasswordForm() {
         <p style="color:#64748b; margin-bottom:15px; font-size:0.9rem;">Inserisci l'email aziendale: ti invieremo un link per reimpostare la password.</p>
         <div id="storeForgotError" class="error-msg hidden"></div>
         <form id="storeForgotForm" class="auth-form">
-          <input type="email" id="storeForgotEmail" placeholder="Email aziendale" required>
+          <input type="email" id="storeForgotEmail" placeholder="Email aziendale" autocomplete="email" required>
           <button type="submit" class="btn full-width">Invia codice di recupero</button>
         </form>
         <p class="auth-switch" style="text-align:center; margin-top:15px;">
@@ -6719,8 +6768,8 @@ function renderStoreResetNewPasswordForm() {
         <h3>Imposta la nuova password</h3>
         <div id="storeResetNewPassError" class="error-msg hidden"></div>
         <form id="storeResetNewPassForm" class="auth-form">
-          <input type="password" id="storeResetNewPass" placeholder="Nuova password (min. 8)" required>
-          <input type="password" id="storeResetNewPassConfirm" placeholder="Conferma nuova password" required>
+          <input type="password" id="storeResetNewPass" placeholder="Nuova password (min. 8)" autocomplete="new-password" required>
+          <input type="password" id="storeResetNewPassConfirm" placeholder="Conferma nuova password" autocomplete="new-password" required>
           <button type="submit" class="btn full-width">Salva nuova password</button>
         </form>
       </div>
@@ -6815,8 +6864,8 @@ function renderTeamSetPasswordForm(email) {
         <p style="color:#64748b; margin-bottom:15px; font-size:0.9rem;">Email verificata. Imposta una password personale per accedere al Pannello Partner (nessuna email di conferma).</p>
         <div id="teamNewPassError" class="error-msg hidden"></div>
         <form id="teamNewPassForm" class="auth-form">
-          <input type="password" id="teamNewPass" placeholder="Nuova password (min. 8)" required>
-          <input type="password" id="teamNewPassConfirm" placeholder="Conferma password" required>
+          <input type="password" id="teamNewPass" placeholder="Nuova password (min. 8)" autocomplete="new-password" required>
+          <input type="password" id="teamNewPassConfirm" placeholder="Conferma password" autocomplete="new-password" required>
           <button type="submit" class="btn full-width">Salva e accedi</button>
         </form>
       </div>
@@ -7147,15 +7196,15 @@ function renderOnboarding(container) {
             <option value="Abbigliamento e Accessori">Abbigliamento e Accessori</option>
             <option value="Altro">Altro</option>
           </select>
-          <input type="email" id="obEmail" placeholder="Email Aziendale" required value="${storeData.tempReg?.email || ''}">
+          <input type="email" id="obEmail" placeholder="Email Aziendale" autocomplete="email" required value="${storeData.tempReg?.email || ''}">
           ${storeData.tempReg?.existingAccount ? `
             <p style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px; font-size:0.85rem; color:#1e40af;">
               Questa email è già registrata su Decerne. Userai la password che hai già — non serve impostarne una nuova.
             </p>
           ` : `
             <div class="form-row">
-              <input type="password" id="obPass" placeholder="Password" required>
-              <input type="password" id="obPassConfirm" placeholder="Conferma Password" required>
+              <input type="password" id="obPass" placeholder="Password" autocomplete="new-password" required>
+              <input type="password" id="obPassConfirm" placeholder="Conferma Password" autocomplete="new-password" required>
             </div>
           `}
           <input type="text" id="obRef" placeholder="Nome Referente" required value="${storeData.tempReg?.ref || ''}">
@@ -8042,8 +8091,8 @@ function renderStoreLoginForm(container) {
       <div id="storeLoginError" class="error-msg hidden"></div>
       
       <form id="storeLoginForm" class="auth-form">
-        <input type="email" id="stEmail" placeholder="Email Aziendale" required>
-        <input type="password" id="stPass" placeholder="Password" required>
+        <input type="email" id="stEmail" placeholder="Email Aziendale" autocomplete="username" required>
+        <input type="password" id="stPass" placeholder="Password" autocomplete="current-password" required>
         
         <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer;">
           <input type="checkbox" id="stRemember"> Resta collegato per 30 giorni
@@ -8261,12 +8310,14 @@ window.showStoreInfoPopup = (store) => {
 
   overlay.classList.remove("hidden");
   document.body.style.overflow = 'hidden';
+  trapFocusOnOpen(overlay);
 };
 
 window.closeStoreInfoPopup = () => {
   const overlay = $("#storeInfoOverlay");
   if (overlay) overlay.classList.add("hidden");
   document.body.style.overflow = '';
+  releaseFocusOnClose(overlay);
 };
 
 // ============================================================
@@ -10780,16 +10831,28 @@ function renderCsvImportResults(results) {
   `;
 }
 
-// GESTIONE CHIUSURA DRAWER CON TASTO ESC
+// GESTIONE CHIUSURA DRAWER E POPUP CON TASTO ESC
 document.addEventListener('keydown', (e) => {
   try {
     if (e.key === 'Escape') {
       closeDrawer();
-      // Opzionale: chiude anche i popup a tutto schermo se aperti
       closeFullPageModal();
+      closeOfferModal();
+      closeStoreInfoPopup();
     }
   } catch (e) {
     console.error("Errore durante la gestione del tasto Escape:", e);
+  }
+});
+
+// Click sullo sfondo scurito per chiudere il popup login/registrazione/profilo.
+// Si applica solo quando è attiva la classe auth-modal (card centrata con
+// sfondo scurito): negli altri usi di #fullPagePopup (ricerca, carrello) il
+// contenuto riempie tutto lo schermo e non esiste un'area di sfondo da cliccare.
+document.getElementById("fullPagePopup")?.addEventListener('click', (e) => {
+  const modal = e.currentTarget;
+  if (e.target === modal && modal.classList.contains('auth-modal')) {
+    closeFullPageModal();
   }
 });
 
