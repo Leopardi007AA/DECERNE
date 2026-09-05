@@ -91,9 +91,6 @@
       justify-content: center;
       width: 40px;
       height: 40px;
-      background: rgba(34, 211, 238, 0.08);
-      border: 1px solid rgba(34, 211, 238, 0.2);
-      border-radius: 10px;
       cursor: pointer;
       padding: 0;
     }
@@ -279,6 +276,7 @@
       width: 0;
       height: 0;
       transform-style: preserve-3d;
+      will-change: transform;
       z-index: 5;
     }
     
@@ -296,6 +294,7 @@
       padding: 22px 14px;
       text-align: center;
       transform-style: preserve-3d;
+      will-change: transform;
     }
     
     .dc-cylinder-tile.front {
@@ -634,6 +633,13 @@
         transform: translateX(-50%);
         flex-direction: row;
         gap: 8px;
+      }
+      .dc-cylinder-tile.front,
+      .dc-cylinder-tile.back {
+        box-shadow: none;
+      }
+      .ct-emoji {
+        filter: none;
       }
     }
     
