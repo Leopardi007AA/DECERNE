@@ -2897,6 +2897,7 @@ hr {
     body.mode-chisiamo #drawer {
       top: 64px;
       height: calc(100% - 64px);
+      border-top-left-radius: 0;
     }
   
     body.mode-chisiamo #overlay {
