@@ -158,15 +158,26 @@ function applyRoute(path) {
       return;
     }
     if (p === '/accedi') {
-      openFullPageModal('profile');
-      renderLoginForm();
-      syncUrlFromAction(ROUTES.accedi);
+      // Se l'utente e' gia' loggato (es. sessione OAuth appena ristabilita
+      // dopo il ritorno da Google/Facebook/GitHub), non ha senso forzare
+      // di nuovo il form di login: mostriamo il profilo, non l'accesso.
+      if (state.currentUser) {
+        openFullPageModal('profile');
+      } else {
+        openFullPageModal('profile');
+        renderLoginForm();
+        syncUrlFromAction(ROUTES.accedi);
+      }
       return;
     }
     if (p === '/registrati') {
-      openFullPageModal('profile');
-      showRegisterForm();
-      syncUrlFromAction(ROUTES.registrati);
+      if (state.currentUser) {
+        openFullPageModal('profile');
+      } else {
+        openFullPageModal('profile');
+        showRegisterForm();
+        syncUrlFromAction(ROUTES.registrati);
+      }
       return;
     }
     if (p === '/profilo') {
