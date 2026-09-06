@@ -3459,6 +3459,12 @@ hr {
        già un "flex: ..." scritto direttamente nell'HTML, e cambiare l'asse invece
        che i valori evita di doverli sovrascrivere uno per uno. */
        .form-row { flex-direction: column; }
+       /* Questa stessa regola .form-row si applica anche a Login/Registrazione/
+          Il Tuo Profilo (.auth-form .form-row), che condividono la classe. Una
+          volta impilati in colonna, i loro campi restavano larghi solo il 50%
+          (regola pensata per stare due affiancati) lasciando metà riga vuota
+          e i dati non centrati nel popup. Qui li riportiamo a piena larghezza. */
+       .auth-form .form-row input { width: 100%; }
       }
     
       @media (min-width: 561px) and (max-width: 768px) {

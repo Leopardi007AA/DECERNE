@@ -5876,6 +5876,10 @@ function closeFullPageModal() {
     document.body.style.overflow = '';
     releaseFocusOnClose(modal);
     setTimeout(() => {
+      // Se nel frattempo il popup e' stato riaperto (es. openProfileFromDrawer
+      // che passa da "/" a "/profilo" subito dopo questa chiusura), la classe
+      // is-visible e' gia' tornata: non nasconderlo e non risincronizzare l'URL.
+      if (modal.classList.contains('is-visible')) return;
       modal.style.display = "none";
       modal.classList.remove("auth-modal");
       // torna all'URL della vista corrente
