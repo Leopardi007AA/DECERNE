@@ -81,6 +81,7 @@ function normalizePath(pathname) {
 }
 
 let _routerSilent = false; // evita loop quando applichiamo una route dall'URL
+let _sessionReady = false; // true solo dopo che restoreUserSession() ha stabilito se siamo loggati o no
 
 function navigate(path, { replace = false, state = null } = {}) {
   const base = getBasePath();
@@ -205,6 +206,11 @@ function syncUrlFromAction(path) {
 }
 
 window.addEventListener('popstate', () => {
+  // Al ritorno da un login OAuth (Google/Facebook/GitHub), il browser puo'
+  // generare un popstate mentre restoreUserSession() sta ancora verificando
+  // la sessione: applicare la rotta in quel momento mostrerebbe il form di
+  // login anche se l'utente e' gia' loggato (il famoso "flash" di un secondo).
+  if (!_sessionReady) return;
   applyRoute(window.location.pathname);
 });
 
@@ -6426,6 +6432,7 @@ async function init() {
   }
 
   await restoreUserSession();
+  _sessionReady = true;
   window.__dbg('dopo restoreUserSession, currentUser=' + !!state.currentUser + ' path=' + window.location.pathname);
   fetchRecommendedOffers(); // Non blocca l'avvio: si popola appena pronta
   const tempPartner = sessionStorage.getItem(SESSION_PARTNER);
