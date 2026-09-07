@@ -5922,6 +5922,13 @@ async function validateRegistration() {
 
 function closeFullPageModal() {
   try {
+    // Se si chiude il modale mentre il tracciamento del carrello è attivo,
+    // va smontato subito: altrimenti GPS watch, mappa e percorso restano
+    // vivi in memoria e sporcano il prossimo tracciamento (ritardo, "segnale
+    // debole", linea del percorso che non si vede più).
+    if (typeof cartMap !== 'undefined' && cartMap) {
+      stopCartMapTracking();
+    }
     const modal = $("#fullPagePopup");
     modal.classList.remove('is-visible');
     document.body.style.overflow = '';
