@@ -2384,7 +2384,7 @@ async function buildStoreSearchCardElement(offerOrStore) {
           ${store.name || 'Supermercato'}
           ${isVerified ? `<span class="store-verified-blue" style="color:#0f62fe; font-weight:800; font-size:0.7rem;">✓ Negozio Verificato</span>` : ''}
         </div>
-        <div class="store-search-card-sub">${store.address || ''}${store.city ? `, ${store.city}` : ''}</div>
+        <div class="store-search-card-sub">${store.address || ''}</div>
       </div>
       <span class="store-search-card-cta">Vedi profilo →</span>
     `;
@@ -2413,7 +2413,7 @@ async function buildStoreSearchCardElement(offerOrStore) {
         ${store.name || 'Supermercato'}
         ${isVerified ? `<span class="store-verified-blue" style="color:#0f62fe; font-weight:800; font-size:0.7rem;">✓ Negozio Verificato</span>` : ''}
       </div>
-      <div class="store-search-card-sub">${store.address || ''}${store.city ? `, ${store.city}` : ''}</div>
+      <div class="store-search-card-sub">${store.address || ''}</div>
     </div>
     <span class="store-search-card-cta">Vedi profilo →</span>
   `;
@@ -4384,25 +4384,59 @@ function computeVisitOrder(startLat, startLng, stores) {
   return ordered;
 }
 
-async function fetchMultiStopRoute(points) {
-  try {
-    const coordsStr = points.map(p => `${p.lng},${p.lat}`).join(';');
-    const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=true`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.routes && data.routes[0]) {
-      const r = data.routes[0];
-      return {
-        coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
-        totalDistanceKm: r.distance / 1000,
-        totalDurationMin: r.duration / 60,
-        legs: r.legs.map(l => ({ distanceKm: l.distance / 1000, durationMin: l.duration / 60 })),
-        maneuvers: buildManeuverList(r.legs)
-      };
-    }
-  } catch (e) {
-    console.warn("Routing multi-tappa fallito:", e);
+// Cache in memoria: se si riapre il tracciamento con le stesse tappe entro
+// pochi minuti, riusiamo l'ultimo percorso invece di richiedere di nuovo
+// OSRM — il server pubblico ha un rate limit e una richiesta troppo
+// ravvicinata alla precedente può fallire silenziosamente, facendo sparire
+// la linea blu pur lasciando le tappe disegnate.
+let lastRouteCache = { key: null, route: null, time: 0 };
+const ROUTE_CACHE_TTL_MS = 3 * 60 * 1000;
+
+function routeCacheKey(points) {
+  return points.map(p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|');
+}
+
+async function requestOsrmRoute(coordsStr) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=true`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.routes && data.routes[0]) {
+    const r = data.routes[0];
+    return {
+      coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
+      totalDistanceKm: r.distance / 1000,
+      totalDurationMin: r.duration / 60,
+      legs: r.legs.map(l => ({ distanceKm: l.distance / 1000, durationMin: l.duration / 60 })),
+      maneuvers: buildManeuverList(r.legs)
+    };
   }
+  return null;
+}
+
+async function fetchMultiStopRoute(points) {
+  const key = routeCacheKey(points);
+  if (lastRouteCache.key === key && (Date.now() - lastRouteCache.time) < ROUTE_CACHE_TTL_MS) {
+    return lastRouteCache.route;
+  }
+
+  const coordsStr = points.map(p => `${p.lng},${p.lat}`).join(';');
+
+  try {
+    const route = await requestOsrmRoute(coordsStr);
+    if (route) { lastRouteCache = { key, route, time: Date.now() }; return route; }
+  } catch (e) {
+    console.warn("Routing multi-tappa fallito (1° tentativo):", e);
+  }
+
+  await new Promise(resolve => setTimeout(resolve, 700));
+  try {
+    const route = await requestOsrmRoute(coordsStr);
+    if (route) { lastRouteCache = { key, route, time: Date.now() }; return route; }
+  } catch (e) {
+    console.warn("Routing multi-tappa fallito (2° tentativo):", e);
+  }
+
+  if (lastRouteCache.key === key && lastRouteCache.route) return lastRouteCache.route;
   return null;
 }
 
