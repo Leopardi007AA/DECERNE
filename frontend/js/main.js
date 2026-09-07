@@ -92,7 +92,6 @@ function navigate(path, { replace = false, state = null } = {}) {
 }
 
 function applyRoute(path) {
-  window.__dbg('applyRoute(' + path + ') currentUser=' + !!state.currentUser);
   _routerSilent = true;
   try {
     const p = normalizePath(path || window.location.pathname);
@@ -5846,7 +5845,6 @@ function releaseFocusOnClose(modalEl) {
 
 // NUOVA FUNZIONE openFullPageModal SEMPLIFICATA
 function openFullPageModal(type) {
-  window.__dbg('openFullPageModal(' + type + ') currentUser=' + !!state.currentUser);
   const modal = $("#fullPagePopup");
   if(!modal) return;
   
@@ -5923,14 +5921,12 @@ async function validateRegistration() {
 }
 
 function closeFullPageModal() {
-  window.__dbg('closeFullPageModal() chiamata, path=' + window.location.pathname);
   try {
     const modal = $("#fullPagePopup");
     modal.classList.remove('is-visible');
     document.body.style.overflow = '';
     releaseFocusOnClose(modal);
     setTimeout(() => {
-      window.__dbg('timeout di closeFullPageModal scattato, isVisible=' + modal.classList.contains('is-visible'));
       // Se nel frattempo il popup e' stato riaperto (es. openProfileFromDrawer
       // che passa da "/" a "/profilo" subito dopo questa chiusura), la classe
       // is-visible e' gia' tornata: non nasconderlo e non risincronizzare l'URL.
@@ -6382,15 +6378,6 @@ async function refreshPartnerSession(storeId) {
 }
 
 // ---------- Init ----------
-window.__dbg = function(msg) {
-  try {
-    const log = JSON.parse(localStorage.getItem('__decerne_dbg') || '[]');
-    log.push({ t: new Date().toISOString().slice(11, 23), msg: msg });
-    localStorage.setItem('__decerne_dbg', JSON.stringify(log));
-  } catch (e) {}
-};
-window.__dbg('=== init start, path=' + window.location.pathname + ' hash=' + (window.location.hash ? window.location.hash.slice(0, 30) + '...' : '(vuoto)'));
-
 async function init() {
   try {
     if (DEV_MODE) console.log("Sistema Decerne in fase di avvio...");
@@ -6433,7 +6420,6 @@ async function init() {
 
   await restoreUserSession();
   _sessionReady = true;
-  window.__dbg('dopo restoreUserSession, currentUser=' + !!state.currentUser + ' path=' + window.location.pathname);
   fetchRecommendedOffers(); // Non blocca l'avvio: si popola appena pronta
   const tempPartner = sessionStorage.getItem(SESSION_PARTNER);
   const permPartner = localStorage.getItem(PARTNER_AUTH_KEY);
@@ -6568,9 +6554,7 @@ searchInput.oninput = () => {
   
   // Routing iniziale (deep link / refresh)
   const initialPath = normalizePath(window.location.pathname);
-  window.__dbg('initialPath=' + initialPath + ' (pathname reale=' + window.location.pathname + ')');
   if (initialPath !== '/' && initialPath !== '') {
-    window.__dbg('chiamo applyRoute(' + initialPath + ')');
     applyRoute(initialPath);
   } else {
     setMode(state.mode);
