@@ -3401,8 +3401,7 @@ hr {
        quindi qualsiasi tabella troppo larga deve scorrere col dito invece di
        essere tagliata dal contenitore: prima questa regola scattava solo
        sotto i 600px, lasciando un buco tra 601 e 900px. */
-    .offer-table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
-    .offer-table.team-table-compact { display: table; white-space: normal; overflow-x: visible; }
+       .offer-table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
 
     .partner-sidebar-handle {
       display: flex;
@@ -3515,25 +3514,14 @@ hr {
         .tab-header { flex-wrap: wrap; row-gap: 10px; }
         .offer-table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
     
-        /* Sezione Team: qui si può rimpicciolire invece di far scorrere, quindi
-           questa tabella vince sulla regola generale qui sopra e resta a griglia
-           con testo più piccolo invece che a scroll orizzontale. */
-        .offer-table.team-table-compact {
-          display: table;
-          white-space: normal;
-          overflow-x: visible;
-          table-layout: fixed;
-        }
+        /* Sezione Team: ora scorre in orizzontale come tutte le altre tabelle
+           (regola generale qui sopra la copre già), qui restano solo font e
+           spaziatura ridotti per stare più comoda su schermo stretto. */
         .team-table-compact th,
         .team-table-compact td {
-          padding: 8px 6px;
+          padding: 8px 10px;
           font-size: 0.76rem;
         }
-        .team-table-compact th:nth-child(1),
-        .team-table-compact td:nth-child(1) { width: 42%; }
-        .team-table-compact th:nth-child(4),
-        .team-table-compact td:nth-child(4) { width: 18%; }
-        .team-table-compact td:first-child strong { word-break: break-all; }
         .team-table-compact .badge-plan { font-size: 0.65rem; padding: 3px 7px; }
         .team-table-compact .btn.danger { padding: 4px 6px; font-size: 0.7rem; }
     
