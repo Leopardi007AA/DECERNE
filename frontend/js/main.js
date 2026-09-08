@@ -7017,17 +7017,15 @@ const getPlanButton = (planName, priceText) => {
     return `<button class="btn full-width" onclick="activatePlan('${planName}')">Passa a ${planName}</button>`;
   }
 
-  // 2bis. Modalità Annuale (non loggato): niente prova gratuita per nessun piano, si registra
-  // subito con l'abbonamento annuale attivo (prima valeva solo per Starter, per questo Standard
-  // e Professional finivano comunque nel trial mensile)
-  if (isAnnualView) {
+  // 2bis. Prova gratuita SOLO per Starter mensile. Ogni altra combinazione piano/ciclo
+  // (Starter annuale, Standard/Professional/Enterprise sia mensile che annuale) si attiva
+  // subito come abbonamento a pagamento, senza periodo di prova.
+  if (planName !== 'Starter' || isAnnualView) {
     return `<button class="btn ${planName === 'Standard' ? '' : 'outline'} full-width" onclick="startPlanDirect('${planName}')">Scegli ${planName}</button>`;
   }
 
-  // 3. Caso default: Non loggato, modalità Mensile (usa il trial)
-  return `<button class="btn ${planName === 'Standard' ? '' : 'outline'} full-width" onclick="startTrial('${planName}')">
-            ${planName === 'Starter' ? 'Prova gratuita' : 'Scegli ' + planName}
-          </button>`;
+  // 3. Caso default: Starter, modalità Mensile -> unico caso con prova gratuita
+  return `<button class="btn outline full-width" onclick="startTrial('${planName}')">Prova gratuita</button>`;
 };
 
 const isAnnual = isAnnualView;
@@ -7135,6 +7133,37 @@ window.setBillingCycle = function(cycle) {
   renderStoreView();
 };
 
+const STARTER_TRIAL_GUARD_ENDPOINT = "https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/starter-trial-guard";
+
+// Verifica se questo IP (e in futuro l'account Google) ha già usufruito della prova
+// gratuita di Starter. In caso di dubbio (rete assente, funzione irraggiungibile) non
+// blocchiamo la registrazione: meglio un abuso raro che perdere un cliente legittimo.
+async function checkStarterTrialEligibility() {
+  try {
+    const res = await fetch(STARTER_TRIAL_GUARD_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "check" })
+    });
+    const data = await res.json();
+    return data?.eligible !== false;
+  } catch (e) {
+    console.warn("Errore verifica prova gratuita Starter:", e);
+    return true;
+  }
+}
+
+// Registra l'uso della prova gratuita Starter appena il negozio è stato creato.
+// Non blocca mai la registrazione già avvenuta: se fallisce resta solo un warning
+// in console (stesso approccio già usato per subscription_events).
+function claimStarterTrial(storeId) {
+  fetch(STARTER_TRIAL_GUARD_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: "claim", store_id: storeId })
+  }).catch((e) => console.warn("Errore registrazione prova gratuita Starter:", e));
+}
+
 /**
  * Attiva un periodo di prova (Trial) per un determinato piano.
  * Gestisce il re-indirizzamento all'onboarding se il partner non è loggato,
@@ -7171,8 +7200,8 @@ window.startTrial = async function(planName) {
 
 /**
  * Come startTrial, ma per scelte che NON devono passare dal periodo di prova
- * (oggi: solo Starter Annuale). Porta comunque alla stessa identica schermata
- * di registrazione — cambia solo cosa viene scritto su Supabase alla fine.
+ * (ogni piano/ciclo tranne Starter mensile). Porta comunque alla stessa identica
+ * schermata di registrazione — cambia solo cosa viene scritto su Supabase alla fine.
  */
 window.startPlanDirect = function(planName) {
   const partner = getCurrentPartner();
@@ -7183,7 +7212,9 @@ window.startPlanDirect = function(planName) {
   }
 
   storeData.subscription.plan = planName;
-  storeData.billingCycleAtSignup = 'annual'; // letto in handleOnboardingSubmit (step 4)
+  // Legge il ciclo scelto in pagina: prima era sempre 'annual' perché la funzione
+  // serviva solo per l'annuale, ora copre anche Standard/Professional/Enterprise mensile.
+  storeData.billingCycleAtSignup = storeData.billingCycle || 'monthly'; // letto in handleOnboardingSubmit (step 4)
   storeData.step = 'onboarding';
   renderStoreView();
 };
@@ -7367,6 +7398,16 @@ async function handleOnboardingSubmit(step) {
     if (btn) btn.disabled = true;
 
     if (step === 1) {
+      const planChoiceStep1 = storeData.subscription?.plan || 'Starter';
+      const isTrialPathStep1 = planChoiceStep1 === 'Starter' && !storeData.billingCycleAtSignup;
+      if (isTrialPathStep1) {
+        const eligible = await checkStarterTrialEligibility();
+        if (!eligible) {
+          if (btn) btn.disabled = false;
+          return toast.error("Hai già usufruito della prova gratuita di Starter con questo dispositivo o account. Scegli un piano a pagamento per continuare.");
+        }
+      }
+
       const emailClean = clean($("#obEmail").value).trim().toLowerCase();
       const nameVal = clean($("#obName").value);
       const refVal = clean($("#obRef").value);
@@ -7490,15 +7531,22 @@ async function handleOnboardingSubmit(step) {
       const emailClean = storeData.tempReg.email;
       const planChoice = storeData.subscription?.plan || 'Starter';
 
-      // FIX: se si arriva qui da "Scegli Starter" in modalità Annuale (startPlanDirect),
-      // niente prova gratuita: il negozio nasce già attivo con rinnovo a 1 anno.
-      const isDirectAnnual = storeData.billingCycleAtSignup === 'annual';
+      // Attivazione diretta (a pagamento, senza prova) per qualunque scelta arrivata da
+      // startPlanDirect: Starter annuale, oppure Standard/Professional/Enterprise mensile
+      // o annuale. L'unico caso che resta con la prova gratuita è Starter mensile.
+      const directCycle = storeData.billingCycleAtSignup; // 'monthly' | 'annual' | null (= trial)
+      const isDirectActivation = !!directCycle;
+      const isTrialPath = !isDirectActivation; // qui planChoice è sempre 'Starter' se true
       const todayISO = new Date().toISOString().split("T")[0];
-      let annualRenewalISO = null;
-      if (isDirectAnnual) {
+      let directRenewalISO = null;
+      if (isDirectActivation) {
         const renewalDate = new Date();
-        renewalDate.setFullYear(renewalDate.getFullYear() + 1);
-        annualRenewalISO = renewalDate.toISOString().split("T")[0];
+        if (directCycle === 'annual') {
+          renewalDate.setFullYear(renewalDate.getFullYear() + 1);
+        } else {
+          renewalDate.setMonth(renewalDate.getMonth() + 1);
+        }
+        directRenewalISO = renewalDate.toISOString().split("T")[0];
       }
 
       // La sessione è già attiva dallo step 3 (verifyOtp): possiamo scrivere direttamente su DB
@@ -7526,6 +7574,12 @@ async function handleOnboardingSubmit(step) {
         .select()
         .single();
       if (storeError) throw new Error("Errore creazione negozio: " + storeError.message);
+
+// Registra l'uso della prova gratuita (solo Starter mensile), per impedire di
+      // riattivarla dallo stesso IP/account. Non blocca la registrazione se fallisce.
+      if (isTrialPath) {
+        claimStarterTrial(storeRow.id);
+      }
 
       const { data: locationRow } = await storeAuthClient
         .from('store_locations')
@@ -7558,10 +7612,10 @@ async function handleOnboardingSubmit(step) {
         apiKey: storeRow.api_key || "",
         locations: [{ id: locationRow.id, name: "Sede Principale", address: fullAddress, city: storeData.tempReg.city, cap: storeData.tempReg.cap, isPrimary: true, latitude: initialCoords?.lat ?? null, longitude: initialCoords?.lng ?? null }],
         plan: storeRow.plan,
-        subscription: isDirectAnnual ? {
+        subscription: isDirectActivation ? {
           plan: storeRow.plan,
           status: 'active',
-          renewalDate: annualRenewalISO,
+          renewalDate: directRenewalISO,
           daysLeft: 9999
         } : {
           plan: storeRow.plan,
