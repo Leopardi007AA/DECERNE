@@ -3556,8 +3556,7 @@ hr {
        tutta la larghezza disponibile. */
     body.dashboard-active { background-color: #fff; }
     body.dashboard-active .container { padding-left: 8px; padding-right: 8px; }
-    body.dashboard-active .card,
-    body.dashboard-active .card-saas {
+    body.dashboard-active .card {
       background: transparent;
       border-left: none;
       border-right: none;
@@ -3565,10 +3564,6 @@ hr {
       box-shadow: none;
       padding-left: 4px;
       padding-right: 4px;
-    }
-    body.dashboard-active .card-saas:hover {
-      box-shadow: none;
-      transform: none;
     }
     /* Le card statistica mantengono la loro forma organica anche su schermo
        piccolo: qui sopra restavano piatte, senza contorno né ombra, come
