@@ -1433,10 +1433,44 @@ select.location-field-input {
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 14px;
+}
+
+/* --- Popup "Aggiungi Sede" (stile Decerne, sostituisce i prompt() del browser) --- */
+.location-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.location-modal-box {
+  background: #fff;
+  width: 100%;
+  max-width: 420px;
+  padding: 26px;
+  border-radius: var(--panel-radius-b, 16px 30px 14px 26px);
+  box-shadow: var(--shadow-xl);
+  animation: slideUp 0.3s ease-out;
+}
+
+.location-modal-title {
+  margin: 0 0 18px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.location-modal-title svg {
+  width: 20px;
+  height: 20px;
+  color: var(--primary);
 }
 
 /* --- Switch Mensile/Annuale (pagina piani Area Partner) --- */

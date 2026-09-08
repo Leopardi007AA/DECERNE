@@ -9334,17 +9334,64 @@ ${plan === 'Enterprise' ? `
   `;
 }
 
-window.openAddLocationModal = async () => {
+window.openAddLocationModal = () => {
   if (!checkPermission('Professional')) return;
 
-  const name = prompt("Nome della sede (es: Filiale Sud):");
-  if (!name) return;
-  const addr = prompt("Via e numero civico (es: Via Roma 10):");
-  if (!addr) return;
-  const city = prompt("Città della sede (es: Rieti):");
-  if (!city) return;
-  const cap = prompt("CAP della sede (es: 02100):") || "";
+  const overlay = document.createElement("div");
+  overlay.className = "location-modal-overlay";
 
+  const box = document.createElement("div");
+  box.className = "location-modal-box";
+  box.innerHTML = `
+    <h3 class="location-modal-title">${PANEL_ICONS.pin} Aggiungi Sede</h3>
+    <div class="input-group" style="margin-bottom: 14px;">
+      <label>Nome sede</label>
+      <input type="text" id="newLocName" class="location-field-input" placeholder="Es. Filiale Sud">
+    </div>
+    <div class="input-group" style="margin-bottom: 14px;">
+      <label>Indirizzo</label>
+      <input type="text" id="newLocAddr" class="location-field-input" placeholder="Via e numero civico">
+    </div>
+    <div class="form-row" style="gap: 14px; margin-bottom: 18px;">
+      <div class="input-group" style="flex: 2;">
+        <label>Città</label>
+        <input type="text" id="newLocCity" class="location-field-input" placeholder="Città">
+      </div>
+      <div class="input-group" style="flex: 1;">
+        <label>CAP</label>
+        <input type="text" id="newLocCap" class="location-field-input" placeholder="00000">
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button id="newLocCancel" class="btn outline" style="flex: 1;">Annulla</button>
+      <button id="newLocConfirm" class="btn" style="flex: 1;">Aggiungi Sede</button>
+    </div>
+  `;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  document.getElementById('newLocName').focus();
+
+  const close = () => overlay.remove();
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  box.querySelector('#newLocCancel').onclick = close;
+
+  box.querySelector('#newLocConfirm').onclick = async () => {
+    const name = clean(document.getElementById('newLocName').value || "");
+    const addr = clean(document.getElementById('newLocAddr').value || "");
+    const city = clean(document.getElementById('newLocCity').value || "");
+    const cap = clean(document.getElementById('newLocCap').value || "");
+
+    if (!name || !addr || !city) {
+      return toast.error("Nome, indirizzo e città sono obbligatori.");
+    }
+
+    close();
+    await createStoreLocation(name, addr, city, cap);
+  };
+};
+
+async function createStoreLocation(name, addr, city, cap) {
   const partner = getCurrentPartner();
   const fullAddress = `${addr.trim()}, ${cap.trim()} ${city.trim()}`.trim();
 
@@ -9380,7 +9427,7 @@ window.openAddLocationModal = async () => {
 
   toast.success("Sede aggiunta!");
   renderStoreView();
-};
+}
 
 window.removeLocation = (index) => {
   const partner = getCurrentPartner();
