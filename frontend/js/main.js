@@ -10099,6 +10099,8 @@ function renderTeamTab() {
 
   const listCard = document.createElement("div");
   listCard.className = "card-saas";
+  listCard.style.width = "100%";
+  listCard.style.boxSizing = "border-box";
   listCard.style.minWidth = "0";
   listCard.style.overflowX = "auto";
   const h3List = document.createElement("h3");
@@ -10173,6 +10175,8 @@ function renderTeamTab() {
   // --- COLONNA DESTRA: FORM ---
   const formCard = document.createElement("div");
   formCard.className = "card-saas";
+  formCard.style.width = "100%";
+  formCard.style.boxSizing = "border-box";
   formCard.style.background = "#f8fafc";
   const h3Form = document.createElement("h3");
   h3Form.style.marginTop = "0";
