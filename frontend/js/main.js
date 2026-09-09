@@ -8326,7 +8326,7 @@ function displayProductInModal(product) {
         <div class="detail-image-container" style="position: relative; width: 100%; background: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
           <img src="${getSafeImageUrl(product.img)}" 
                style="width: 100%; height: 100%; object-fit: cover; display: block;" 
-               alt="${product.product}">
+               alt="${escapeHtml(product.product)}">
           
           ${discPerc > 0 ? `
             <span class="perc-badge" style="position: absolute; top: 20px; left: 20px; background: #ff3b30; color: white; padding: 10px 18px; border-radius: 12px; font-size: 1.3rem; font-weight: 900; box-shadow: 0 4px 12px rgba(255,59,48,0.3);">
@@ -8336,13 +8336,13 @@ function displayProductInModal(product) {
 
         <!-- Colonna Info -->
         <div style="padding: 10px;">
-          <span class="badge-plan plan-standard" style="background:#f1f5f9; color:#475569; padding:5px 12px; border-radius:6px; font-size:0.75rem; font-weight:700; text-transform:uppercase;">${product.category}</span>
+          <span class="badge-plan plan-standard" style="background:#f1f5f9; color:#475569; padding:5px 12px; border-radius:6px; font-size:0.75rem; font-weight:700; text-transform:uppercase;">${escapeHtml(product.category || '')}</span>
           
-          <h1 style="margin: 15px 0 10px 0; color: #1e293b; font-size: 2.2rem; line-height: 1.2;">${product.product}</h1>
+          <h1 style="margin: 15px 0 10px 0; color: #1e293b; font-size: 2.2rem; line-height: 1.2;">${escapeHtml(product.product)}</h1>
           
           <p style="color: #64748b; font-size: 1rem; margin-bottom: 25px; line-height: 1.5;">
-            <span style="display:inline-flex; vertical-align:middle;">${PANEL_ICONS.store}</span> Punto vendita: <strong class="store-name-link" style="color:#0f62fe; cursor:pointer; text-decoration:underline;" onclick="showStoreInfoPopup(window.__currentOfferStoreInfo)">${product.storeName}</strong>${verifiedBadge}<br>
-            <span style="display:inline-flex; vertical-align:middle;">${PANEL_ICONS.pin}</span> <span style="font-size: 0.9rem;">${product.storeAddress}</span>
+            <span style="display:inline-flex; vertical-align:middle;">${PANEL_ICONS.store}</span> Punto vendita: <strong class="store-name-link" style="color:#0f62fe; cursor:pointer; text-decoration:underline;" onclick="showStoreInfoPopup(window.__currentOfferStoreInfo)">${escapeHtml(product.storeName || '')}</strong>${verifiedBadge}<br>
+            <span style="display:inline-flex; vertical-align:middle;">${PANEL_ICONS.pin}</span> <span style="font-size: 0.9rem;">${escapeHtml(product.storeAddress || '')}</span>
           </p>
           
           <div style="background: #f0f6ff; padding: 25px; border-radius: 16px; margin-bottom: 25px; border: 1px solid #dbeafe;">
@@ -8368,7 +8368,7 @@ function displayProductInModal(product) {
 
           <div style="margin-bottom: 30px;">
             <h4 style="color: #1e293b; margin-bottom: 8px; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.5px;">Descrizione</h4>
-            <p style="line-height: 1.6; color: #475569; font-size: 1.05rem;">${product.description || 'Nessuna descrizione aggiuntiva fornita dal punto vendita.'}</p>
+            <p style="line-height: 1.6; color: #475569; font-size: 1.05rem;">${escapeHtml(product.description || '') || 'Nessuna descrizione aggiuntiva fornita dal punto vendita.'}</p>
           </div>
           
           <button class="btn full-width detail-btn-cart" onclick="saveToShoppingList('${product.id}')" style="height: 60px; font-size: 1.2rem; border-radius: 14px; background: #0f62fe; box-shadow: 0 4px 14px rgba(15,98,254,0.3); transition: transform 0.2s; display:flex; align-items:center; justify-content:center; gap:10px;">
