@@ -6426,6 +6426,11 @@ async function init() {
   }
 
   await restoreUserSession();
+  // FIX "Resta collegato": prima di interrogare Supabase per ricaricare i dati
+  // del negozio, bisogna aspettare che storeAuthClient abbia finito di ripristinare
+  // la sessione salvata nel browser — altrimenti la query parte senza autenticazione,
+  // RLS non trova nulla, e il codice sotto cancella per errore il login salvato.
+  await storeAuthClient.auth.getSession();
   _sessionReady = true;
   fetchRecommendedOffers(); // Non blocca l'avvio: si popola appena pronta
   const tempPartner = sessionStorage.getItem(SESSION_PARTNER);
