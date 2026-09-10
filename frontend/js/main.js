@@ -83,6 +83,11 @@ function normalizePath(pathname) {
 let _routerSilent = false; // evita loop quando applichiamo una route dall'URL
 let _sessionReady = false; // true solo dopo che restoreUserSession() ha stabilito se siamo loggati o no
 
+// Vero solo se la pagina è stata aperta direttamente su un link prodotto (es.
+// link condiviso). Va calcolato subito, prima che qualsiasi altro codice possa
+// modificare l'URL — vedi il fix di init() più sotto.
+window.__isSharedProductLoad = normalizePath(window.location.pathname).startsWith('/prodotto/');
+
 function navigate(path, { replace = false, state = null } = {}) {
   const base = getBasePath();
   const full = (base + path).replace(/\/{2,}/g, '/') || '/';
@@ -5940,6 +5945,21 @@ function closeFullPageModal() {
       if (modal.classList.contains('is-visible')) return;
       modal.style.display = "none";
       modal.classList.remove("auth-modal");
+
+      // Popup prodotto da link condiviso: la guida parte da qui, non dal
+      // banner cookie, perché doveva aspettare anche la chiusura del popup.
+      if (window.__tourWaitsForModalClose) {
+        window.__tourWaitsForModalClose = false;
+        if (typeof window.__cookieChoiceMade === "function" && window.__cookieChoiceMade()) {
+          maybeStartTour();
+        } else {
+          // Popup chiuso senza scegliere (es. tap fuori, tasto indietro):
+          // il consenso va comunque chiesto, come ripiego mostriamo il banner.
+          $("#cookieBanner")?.classList.remove("hidden");
+          $("#cookieOverlay")?.classList.remove("hidden");
+        }
+      }
+
       // torna all'URL della vista corrente
       if (!_routerSilent) {
         if (state.mode === 'store') {
@@ -6559,17 +6579,24 @@ searchInput.oninput = () => {
   };
  }
 
-  checkLocationPermission();
-  checkSubscriptionsExpiry();
-  setMode(state.mode); // Forza il rendering della vista corretta
-  renderOffers();
-  
-  // Routing iniziale (deep link / refresh)
-  const initialPath = normalizePath(window.location.pathname);
-  if (initialPath !== '/' && initialPath !== '') {
-    applyRoute(initialPath);
-  } else {
-    setMode(state.mode);
+ checkLocationPermission();
+ checkSubscriptionsExpiry();
+
+ // Il path va letto PRIMA di chiamare setMode(): setMode('user') riscrive
+ // l'URL su "/" (syncUrlFromAction), quindi letto dopo un link diretto tipo
+ // /prodotto/<id> risulterebbe già perso.
+ const initialPath = normalizePath(window.location.pathname);
+
+ _routerSilent = true; // qui setMode serve solo per il rendering iniziale, non deve toccare l'URL
+ setMode(state.mode); // Forza il rendering della vista corretta
+ _routerSilent = false;
+ renderOffers();
+
+ // Routing iniziale (deep link / refresh)
+ if (initialPath !== '/' && initialPath !== '') {
+   applyRoute(initialPath);
+ } else {
+   setMode(state.mode);
   }
   // se non siamo su una route prodotto/modal, carica le offerte
   if (!initialPath.startsWith('/prodotto/')) {
@@ -8408,6 +8435,25 @@ function displayProductInModal(product) {
       cartBtn.onclick = () => window.__tourSimulateAddToCart();
     }
   }
+  // Primo accesso da link condiviso, cookie non ancora accettati: la scelta
+  // va mostrata dentro a questo stesso popup invece del banner in basso.
+  if (window.__isSharedProductLoad && typeof window.__cookieChoiceMade === "function" && !window.__cookieChoiceMade()) {
+    window.__tourWaitsForModalClose = true;
+    const cookieBlock = document.createElement("div");
+    cookieBlock.className = "inline-cookie-consent";
+    cookieBlock.style.cssText = "margin-top:24px; padding:18px 20px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;";
+    cookieBlock.innerHTML = `
+      <p style="margin:0 0 12px 0; font-size:0.9rem; color:#475569; line-height:1.5;">
+        Usiamo solo i cookie tecnici necessari a far funzionare il sito (login, posizione se la condividi). Puoi leggere i dettagli nella <a href="legale.html#cookie" target="_blank" rel="noopener">Cookie Policy</a>.
+      </p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="btn outline" style="flex:1; min-width:120px;" onclick="window.__resolveCookieChoice('reject')">Rifiuta</button>
+        <button type="button" class="btn outline" style="flex:1; min-width:120px;" onclick="window.__resolveCookieChoice('essential_only')">Accetta essenziali</button>
+        <button type="button" class="btn" style="flex:1; min-width:120px;" onclick="window.__resolveCookieChoice('accept_all')">Accetta tutti</button>
+      </div>`;
+    content.querySelector(".detail-container").appendChild(cookieBlock);
+  }
+
   requestAnimationFrame(() => {
     requestAnimationFrame(() => modal.classList.add('is-visible'));
   });
@@ -12062,10 +12108,27 @@ const pollId = setInterval(() => {
     logChoice(choice);
     $("#cookieBanner")?.classList.add("hidden");
     $("#cookieOverlay")?.classList.add("hidden");
-    maybeStartTour();
+    // Se il popup prodotto (link condiviso) è ancora aperto, la guida non
+    // parte adesso: aspetta la sua chiusura (vedi closeFullPageModal).
+    if (!window.__tourWaitsForModalClose) maybeStartTour();
   }
 
+  // Esposti per essere richiamati anche dalla scelta cookie "in linea" mostrata
+  // dentro al popup prodotto quando si arriva da un link condiviso (vedi
+  // displayProductInModal e closeFullPageModal).
+  window.__cookieChoiceMade = () => !!getStoredChoice();
+  window.__resolveCookieChoice = closeBanner;
+
   document.addEventListener("DOMContentLoaded", () => {
+    // Primo accesso da link condiviso: la scelta la mostra il popup prodotto
+    // stesso, non ha senso sovrapporci anche il banner in basso.
+    if (window.__isSharedProductLoad && !getStoredChoice()) {
+      $("#cookieAcceptBtn")?.addEventListener("click", () => closeBanner("accept_all"));
+      $("#cookieEssentialBtn")?.addEventListener("click", () => closeBanner("essential_only"));
+      $("#cookieRejectBtn")?.addEventListener("click", () => closeBanner("reject"));
+      $("#cookieBannerClose")?.addEventListener("click", () => closeBanner("dismissed"));
+      return;
+    }
     if (!getStoredChoice()) {
       $("#cookieBanner")?.classList.remove("hidden");
       $("#cookieOverlay")?.classList.remove("hidden");
