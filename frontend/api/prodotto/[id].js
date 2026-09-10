@@ -16,7 +16,10 @@ function escapeAttr(str) {
 
 module.exports = async (req, res) => {
   const { id } = req.query;
-  const indexPath = path.join(process.cwd(), 'index.html');
+  // Percorso relativo al file stesso (frontend/api/prodotto/[id].js), non a
+  // process.cwd() — nel bundle Vercel mantiene la struttura frontend/api/...,
+  // quindi process.cwd() punta alla root del repo, non a frontend/.
+  const indexPath = path.join(__dirname, '..', '..', 'index.html');
   let html = fs.readFileSync(indexPath, 'utf8');
 
   try {
