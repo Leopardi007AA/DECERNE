@@ -7693,6 +7693,7 @@ const PANEL_ICONS = {
   map: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M9 3 3 5v16l6-2 6 2 6-2V3l-6 2-6-2Z"/><path d="M9 3v16M15 5v16"/></svg>`,
   phone: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.4 2.1L8.1 9.6a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.4c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.9 2Z"/></svg>`,
   info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r="0.6" fill="currentColor" stroke="none"/></svg>`,
+  share: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5 15.4 6.5M8.6 13.5 15.4 17.5"/></svg>`,
  };
 
 // ============================================================
@@ -8317,6 +8318,12 @@ function displayProductInModal(product) {
     hours: product.storeHours,
     plan: product.plan
   };
+  // Dati minimi per il pulsante "Condividi" del popup
+  window.__currentOfferForShare = {
+    id: product.id,
+    title: product.product,
+    img: getSafeImageUrl(product.img)
+  };
 
   content.innerHTML = `
     <div class="detail-container" style="max-width: 900px; margin: 0 auto; text-align: left;">
@@ -8378,6 +8385,10 @@ function displayProductInModal(product) {
           <button class="btn outline full-width" onclick="openStoreInGoogleMaps('${(product.storeAddress || product.storeName || '').replace(/'/g, "\\'")}')" style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
             ${PANEL_ICONS.map} Vedi su Google Maps
           </button>
+
+          <button class="btn outline full-width" onclick="shareOffer()" style="height: 50px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
+            ${PANEL_ICONS.share} Condividi
+          </button>
         </div>
 
       </div>
@@ -8401,6 +8412,32 @@ function displayProductInModal(product) {
     requestAnimationFrame(() => modal.classList.add('is-visible'));
   });
 }
+
+// Condivide il link diretto al popup di un'offerta (usa la Web Share API se
+// disponibile, es. su mobile, altrimenti copia il link negli appunti).
+window.shareOffer = async () => {
+  const offer = window.__currentOfferForShare;
+  if (!offer) return;
+
+  const shareUrl = `${window.location.origin}${ROUTES.prodotto(offer.id)}`;
+  const shareText = `${offer.title} — su DECERNE`;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: offer.title, text: shareText, url: shareUrl });
+    } catch (e) {
+      if (e.name !== 'AbortError') console.warn('Errore condivisione:', e);
+    }
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    toast.success('Link copiato! Incollalo dove vuoi condividerlo.');
+  } catch (e) {
+    toast.error('Impossibile copiare il link.');
+  }
+};
 
 // Popup con le informazioni pubbliche del negozio (aperto cliccando sul nome nel dettaglio offerta)
 window.showStoreInfoPopup = (store) => {
