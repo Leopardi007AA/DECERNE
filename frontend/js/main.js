@@ -210,6 +210,21 @@ function syncUrlFromAction(path) {
   navigate(path, { replace: false });
 }
 
+// Aggiorna la barra degli indirizzi SENZA far ripartire il router. Serve per
+// le mappe "solo esplora" (openBrowseStoresMap, openSharedListMapView): usano
+// lo stesso URL /carrello/mappa di openCartMapView, ma se passassero da
+// syncUrlFromAction() il router richiamerebbe applyRoute(), che per quella
+// rotta lancia SEMPRE openCartMapView() — sovrascrivendo la mappa "esplora"
+// appena disegnata con "la lista è vuota" (letta dal carrello vero, non da
+// quello che stiamo mostrando qui).
+function pushUrlSilently(path) {
+  const current = normalizePath(window.location.pathname);
+  if (current === path) return;
+  const base = getBasePath();
+  const full = (base + path).replace(/\/{2,}/g, '/') || '/';
+  history.pushState({ path }, '', full);
+}
+
 window.addEventListener('popstate', () => {
   // Al ritorno da un login OAuth (Google/Facebook/GitHub), il browser puo'
   // generare un popstate mentre restoreUserSession() sta ancora verificando
@@ -1995,41 +2010,37 @@ async function fetchRecommendedOffers() {
 
   try {
     const userCap = getCleanUserCap();
-    let recommended = [];
 
-    if (userCap) {
-      // Un CAP di ricerca è impostato: le consigliate devono essere offerte
-      // vere di quel CAP. La RPC qui sotto è personalizzata sul profilo
-      // dell'utente e non sa nulla del CAP cercato — quindi la aggiriamo
-      // e interroghiamo le offerte di quel CAP direttamente.
-      recommended = await fetchOffersByCap(userCap);
-    } else {
-      const { data, error } = await supabaseClient.rpc('get_recommended_offers', { p_limit: 4 });
-      if (error) {
-        console.warn("Errore caricamento offerte consigliate:", error);
-        section.classList.add("hidden");
-        return;
-      }
-      recommended = (data || []).map(r => ({
-        id: r.id,
-        product: r.product,
-        price: r.price,
-        originalPrice: r.original_price,
-        category: r.category,
-        startDate: r.start_date,
-        endDate: r.end_date,
-        description: r.description,
-        img: r.img_url,
-        status: r.status,
-        storeName: r.store_name || "",
-        storeCity: r.store_city ? r.store_city.toLowerCase() : "",
-        storeCap: r.store_cap || "",
-        storeAddress: r.store_address || "",
-        plan: r.plan || "Starter",
-        cardRequirement: r.card_requirement || null,
-        limitedQuantity: r.limited_quantity || false
-      }));
+    // La RPC ora accetta p_cap: se impostato, filtra le offerte su quel CAP
+    // mantenendo comunque il punteggio per categoria/ricerca/piano/sconto
+    // (prima, col CAP impostato, si aggirava la RPC e si ordinava solo per
+    // sconto — perdendo la personalizzazione). Se p_cap è null (nessun CAP
+    // riconoscibile nel campo posizione), la RPC si comporta come prima.
+    const { data, error } = await supabaseClient.rpc('get_recommended_offers', { p_limit: 4, p_cap: userCap });
+    if (error) {
+      console.warn("Errore caricamento offerte consigliate:", error);
+      section.classList.add("hidden");
+      return;
     }
+    const recommended = (data || []).map(r => ({
+      id: r.id,
+      product: r.product,
+      price: r.price,
+      originalPrice: r.original_price,
+      category: r.category,
+      startDate: r.start_date,
+      endDate: r.end_date,
+      description: r.description,
+      img: r.img_url,
+      status: r.status,
+      storeName: r.store_name || "",
+      storeCity: r.store_city ? r.store_city.toLowerCase() : "",
+      storeCap: r.store_cap || "",
+      storeAddress: r.store_address || "",
+      plan: r.plan || "Starter",
+      cardRequirement: r.card_requirement || null,
+      limitedQuantity: r.limited_quantity || false
+    }));
 
     renderRecommendedOffers(recommended.slice(0, 4));
   } catch (e) {
@@ -4686,7 +4697,7 @@ async function addAllStoresLayer(map, excludeLocationIds = []) {
 // Mappa "solo esplora": aperta dal pulsante "Mappa negozi" quando il carrello
 // è vuoto. Nessun percorso, nessuna tappa numerata: solo tutti i punti vendita.
 async function openBrowseStoresMap() {
-  syncUrlFromAction(ROUTES.carrelloMappa);
+  pushUrlSilently(ROUTES.carrelloMappa);
   const content = $("#modalContent");
   content.innerHTML = `
     <div style="padding:16px;">
@@ -4722,7 +4733,7 @@ async function openBrowseStoresMap() {
 // solo i negozi di quei prodotti, senza GPS né percorso di guida — chi
 // guarda potrebbe trovarsi in tutt'altra città rispetto a quei negozi.
 async function openSharedListMapView(cart) {
-  syncUrlFromAction(ROUTES.carrelloMappa);
+  pushUrlSilently(ROUTES.carrelloMappa);
   const content = $("#modalContent");
   content.innerHTML = `
     <div style="padding:16px;">
