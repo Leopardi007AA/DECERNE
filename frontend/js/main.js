@@ -7697,9 +7697,10 @@ async function handleOnboardingSubmit(step) {
           phone: phone,
           plan: planChoice,
           internal_notes: referralNotes,
-          billing_cycle: isDirectAnnual ? 'annual' : 'monthly',
-          subscription_status: isDirectAnnual ? 'active' : 'trial',
-          renewal_date: annualRenewalISO,
+          billing_cycle: directCycle || 'monthly',
+          subscription_status: isDirectActivation ? 'active' : 'trial',
+          renewal_date: isDirectActivation ? directRenewalISO : null,
+
           business_type: storeData.tempReg.type,
           // FIX: prima chi si registrava direttamente su Professional/Enterprise
           // restava senza api_key finché non cliccava "Rigenera" a mano.
