@@ -86,7 +86,8 @@ let _sessionReady = false; // true solo dopo che restoreUserSession() ha stabili
 // Vero solo se la pagina è stata aperta direttamente su un link prodotto (es.
 // link condiviso). Va calcolato subito, prima che qualsiasi altro codice possa
 // modificare l'URL — vedi il fix di init() più sotto.
-window.__isSharedProductLoad = normalizePath(window.location.pathname).startsWith('/prodotto/');
+window.__isSharedProductLoad = normalizePath(window.location.pathname).startsWith('/prodotto/') ||
+  !!(normalizePath(window.location.pathname) === '/carrello' && new URLSearchParams(window.location.search).get('lista'));
 
 function navigate(path, { replace = false, state = null } = {}) {
   const base = getBasePath();
@@ -3919,38 +3920,111 @@ function calculateTotalClicks(offers) {
   return offers.reduce((acc, curr) => acc + (curr.clicks || 0), 0);
 }
 
-// 4. Rendering dinamico del carrello (Supabase)
-async function renderCartContent() {
-  const content = $("#modalContent");
-  content.innerHTML = `<div style="padding:50px; text-align:center; color:#64748b;">Caricamento lista...</div>`;
-
+// Condivide la lista della spesa attuale (serve login: senza non c'è niente da condividere).
+window.shareShoppingList = async () => {
   const userId = state.currentUser?.id;
   if (!userId) {
-    content.innerHTML = `<div style="padding:50px; color:#64748b;"><h3>Accedi per vedere la tua lista</h3><p>Effettua il login per salvare e ritrovare le offerte che ti interessano.</p></div>`;
+    toast.error('Devi essere loggato per condividere la lista della spesa.');
     return;
   }
 
   const { data: items, error } = await supabaseClient
     .from('shopping_list_items')
-    .select('offer_id, offers(id, store_id, location_id, product, price, img_url, status, end_date)')
+    .select('offer_id')
     .eq('user_id', userId);
 
   if (error) {
-    console.error("Errore caricamento lista spesa:", error);
-    content.innerHTML = `<div style="padding:50px; color:#64748b;">Errore nel caricamento della lista.</div>`;
+    console.error('Errore condivisione lista:', error);
+    toast.error('Impossibile condividere la lista in questo momento.');
+    return;
+  }
+  if (!items || items.length === 0) {
+    toast.error('La tua lista è vuota, non c\'è niente da condividere.');
     return;
   }
 
-  // Filtra le offerte non più attive (cestinate/scadute dal negozio)
-  const todayStr = new Date().toISOString().split('T')[0];
-  const cart = (items || []).map(i => i.offers).filter(o => o && o.status === 'active' && o.end_date >= todayStr);
+  const ids = items.map(i => i.offer_id).join(',');
+  const shareUrl = `${window.location.origin}${ROUTES.carrello}?lista=${encodeURIComponent(ids)}`;
+  const shareText = 'Dai un\'occhiata alla mia lista della spesa su DECERNE';
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'La mia lista della spesa', text: shareText, url: shareUrl });
+    } catch (e) {
+      if (e.name !== 'AbortError') console.warn('Errore condivisione:', e);
+    }
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    toast.success('Link copiato! Incollalo dove vuoi condividerlo.');
+  } catch (e) {
+    toast.error('Impossibile copiare il link.');
+  }
+};
+
+// 4. Rendering dinamico del carrello (Supabase)
+async function renderCartContent() {
+  const content = $("#modalContent");
+  content.innerHTML = `<div style="padding:50px; text-align:center; color:#64748b;">Caricamento lista...</div>`;
+
+  // Lista condivisa da un altro utente: presente solo se si arriva da un
+  // link tipo /carrello?lista=id1,id2,... — sparisce non appena si esce da
+  // qui e si riapre il carrello normalmente (vedi shareShoppingList).
+  const sharedIds = new URLSearchParams(window.location.search).get('lista');
+
+  const userId = state.currentUser?.id;
+  if (!userId) {
+    content.innerHTML = sharedIds
+      ? `<div style="padding:50px; color:#64748b;"><h3>Accedi per vedere questa lista</h3><p>Effettua il login per vedere la lista della spesa che ti è stata condivisa.</p></div>`
+      : `<div style="padding:50px; color:#64748b;"><h3>Accedi per vedere la tua lista</h3><p>Effettua il login per salvare e ritrovare le offerte che ti interessano.</p></div>`;
+    return;
+  }
+
+  let cart;
+  if (sharedIds) {
+    const ids = sharedIds.split(',').filter(Boolean);
+    const { data: sharedOffers, error: sharedError } = await supabaseClient
+      .from('offers')
+      .select('id, store_id, location_id, product, price, img_url, status, end_date')
+      .in('id', ids);
+
+    if (sharedError) {
+      console.error("Errore caricamento lista condivisa:", sharedError);
+      content.innerHTML = `<div style="padding:50px; color:#64748b;">Errore nel caricamento della lista condivisa.</div>`;
+      return;
+    }
+    const todayStr = new Date().toISOString().split('T')[0];
+    cart = (sharedOffers || []).filter(o => o.status === 'active' && o.end_date >= todayStr);
+  } else {
+    const { data: items, error } = await supabaseClient
+      .from('shopping_list_items')
+      .select('offer_id, offers(id, store_id, location_id, product, price, img_url, status, end_date)')
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error("Errore caricamento lista spesa:", error);
+      content.innerHTML = `<div style="padding:50px; color:#64748b;">Errore nel caricamento della lista.</div>`;
+      return;
+    }
+
+    // Filtra le offerte non più attive (cestinate/scadute dal negozio)
+    const todayStr = new Date().toISOString().split('T')[0];
+    cart = (items || []).map(i => i.offers).filter(o => o && o.status === 'active' && o.end_date >= todayStr);
+  }
 
   const smartListHeader = `
     <div class="cart-toolbar">
+      <span></span>
       <button class="btn cart-smart-btn" onclick="openSmartShoppingListModal()">
         ${PANEL_ICONS.basket} Lista della spesa
       </button>
+      <button class="btn outline cart-share-btn" onclick="shareShoppingList()">
+        ${PANEL_ICONS.share} Condividi
+      </button>
     </div>
+    ${sharedIds ? `<div class="cart-shared-banner">Stai vedendo una lista condivisa da un altro utente. Esci e torna al carrello per rivedere la tua.</div>` : ''}
   `;
 
   if (cart.length === 0) {
@@ -3958,8 +4032,8 @@ async function renderCartContent() {
       ${smartListHeader}
       <div class="cart-empty-state">
         <div class="round-ico">${PANEL_ICONS.basket}</div>
-        <h3>La tua lista è vuota</h3>
-        <p>Aggiungi le offerte che ti interessano per trovarle facilmente in negozio.</p>
+        <h3>${sharedIds ? 'Questa lista è vuota' : 'La tua lista è vuota'}</h3>
+        <p>${sharedIds ? 'Le offerte condivise non sono più disponibili.' : 'Aggiungi le offerte che ti interessano per trovarle facilmente in negozio.'}</p>
         <button class="btn cart-map-btn" onclick="openBrowseStoresMap()">${PANEL_ICONS.pin} Mappa negozi</button>
       </div>
     `;
@@ -3980,11 +4054,11 @@ async function renderCartContent() {
             <div class="cart-row-product">${o.product}</div>
             <div class="cart-row-price">${formatPrice(o.price)}</div>
           </div>
-          <button class="btn danger cart-remove-btn" onclick="event.stopPropagation(); removeFromCart('${o.id}')">Rimuovi</button>
+          ${sharedIds ? '' : `<button class="btn danger cart-remove-btn" onclick="event.stopPropagation(); removeFromCart('${o.id}')">Rimuovi</button>`}
         </div>
       </div>
     `).join('')}
-      <button class="btn cart-map-btn" onclick="openCartMapView()">${PANEL_ICONS.pin} Segui nella mappa fino ai negozi</button>
+      ${sharedIds ? '' : `<button class="btn cart-map-btn" onclick="openCartMapView()">${PANEL_ICONS.pin} Segui nella mappa fino ai negozi</button>`}
     </div>
   `;
 }

@@ -3731,24 +3731,48 @@ hr {
   /* ============================================================
    RESTYLE CARRELLO — stesso linguaggio visivo del Pannello Partner
    ============================================================ */
-.cart-toolbar {
-  display: flex;
-  justify-content: center;
-  padding: 28px 0; /* stessa distanza sopra (header) e sotto (offerte) */
-}
-
-.cart-smart-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border-radius: var(--radius-pill);
-  padding: 12px 24px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  box-shadow: 0 4px 14px rgba(15, 98, 254, 0.3);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-}
-.cart-smart-btn:hover { box-shadow: 0 6px 18px rgba(15, 98, 254, 0.38); transform: translateY(-1px); }
-.cart-smart-btn svg { flex-shrink: 0; }
+   .cart-toolbar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 28px 20px; /* stessa distanza sopra (header) e sotto (offerte) */
+  }
+  
+  .cart-smart-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: var(--radius-pill);
+    padding: 12px 24px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    box-shadow: 0 4px 14px rgba(15, 98, 254, 0.3);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    grid-column: 2;
+  }
+  .cart-smart-btn:hover { box-shadow: 0 6px 18px rgba(15, 98, 254, 0.38); transform: translateY(-1px); }
+  .cart-smart-btn svg { flex-shrink: 0; }
+  
+  .cart-share-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: var(--radius-pill);
+    padding: 12px 20px;
+    grid-column: 3;
+    justify-self: end;
+  }
+  
+  .cart-shared-banner {
+    margin: 0 20px 20px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: #fff7e6;
+    border: 1px solid #ffe0a3;
+    color: #7a5200;
+    font-size: 0.85rem;
+    text-align: center;
+  }
 
 .cart-list {
   display: flex;
