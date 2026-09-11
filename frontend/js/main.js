@@ -3997,6 +3997,7 @@ async function renderCartContent() {
     }
     const todayStr = new Date().toISOString().split('T')[0];
     cart = (sharedOffers || []).filter(o => o.status === 'active' && o.end_date >= todayStr);
+    window.__sharedListCart = cart; // serve al bottone mappa qui sotto, che non può ricevere un array via onclick
   } else {
     const { data: items, error } = await supabaseClient
       .from('shopping_list_items')
@@ -4058,7 +4059,9 @@ async function renderCartContent() {
         </div>
       </div>
     `).join('')}
-      ${sharedIds ? '' : `<button class="btn cart-map-btn" onclick="openCartMapView()">${PANEL_ICONS.pin} Segui nella mappa fino ai negozi</button>`}
+      ${sharedIds
+        ? `<button class="btn cart-map-btn" onclick="openSharedListMapView(window.__sharedListCart)">${PANEL_ICONS.pin} Vedi i negozi sulla mappa</button>`
+        : `<button class="btn cart-map-btn" onclick="openCartMapView()">${PANEL_ICONS.pin} Segui nella mappa fino ai negozi</button>`}
     </div>
   `;
 }
@@ -4710,6 +4713,48 @@ async function openBrowseStoresMap() {
   const locations = await addAllStoresLayer(cartMap);
   if (locations.length) {
     const bounds = [[center.lat, center.lng], ...locations.map(l => [l.latitude, l.longitude])];
+    cartMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+  }
+  setTimeout(() => cartMap.invalidateSize(), 100);
+}
+
+// Mappa "solo esplora" per una lista CONDIVISA da un altro utente: mostra
+// solo i negozi di quei prodotti, senza GPS né percorso di guida — chi
+// guarda potrebbe trovarsi in tutt'altra città rispetto a quei negozi.
+async function openSharedListMapView(cart) {
+  syncUrlFromAction(ROUTES.carrelloMappa);
+  const content = $("#modalContent");
+  content.innerHTML = `
+    <div style="padding:16px;">
+      <button class="btn outline" style="margin-bottom:12px;" onclick="renderCartContent()">← Torna alla lista</button>
+      <div id="cartMapContainer" style="width:100%; height:65vh; border-radius:12px; overflow:hidden;"></div>
+    </div>
+  `;
+
+  const storeIds = [...new Set((cart || []).map(o => o.location_id).filter(Boolean))];
+  const storesById = await fetchPublicLocationsMap(storeIds);
+  const stores = storeIds.map(id => storesById[id]).filter(s => s && s.latitude != null && s.longitude != null);
+
+  const itemsByStore = {};
+  (cart || []).forEach(o => {
+    if (!itemsByStore[o.location_id]) itemsByStore[o.location_id] = [];
+    itemsByStore[o.location_id].push(o);
+  });
+
+  cartMap = L.map('cartMapContainer').setView([41.9028, 12.4964], 6); // fallback: vista Italia intera
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(cartMap);
+
+  const bounds = [];
+  stores.forEach((store, idx) => {
+    const productList = (itemsByStore[store.id] || []).map(p => `• ${p.product} (${formatPrice(p.price)})`).join('<br>');
+    const marker = L.marker([store.latitude, store.longitude], { icon: makeNumberedIcon(idx + 1, false) }).addTo(cartMap);
+    marker.bindPopup(`<strong>${store.name}</strong><br>${productList}`);
+    bounds.push([store.latitude, store.longitude]);
+  });
+
+  if (bounds.length) {
     cartMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
   }
   setTimeout(() => cartMap.invalidateSize(), 100);
