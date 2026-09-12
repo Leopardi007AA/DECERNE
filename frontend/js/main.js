@@ -357,9 +357,22 @@ function checkPermission(requiredPlan, showAlert = true) {
 // Costanti di validazione
 const VALIDATION_RULES = {
   email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-  minPassword: 8,
+  minPassword: 10,
+  passwordPolicy: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9\s]).+$/,
   maxProductName: 100
 };
+
+// Controlla una password secondo la policy attuale (lunghezza minima + varietà di caratteri).
+// Ritorna il messaggio d'errore da mostrare, oppure null se la password va bene.
+function getPasswordError(pass) {
+  if (!pass || pass.length < VALIDATION_RULES.minPassword) {
+    return `La password deve essere di almeno ${VALIDATION_RULES.minPassword} caratteri.`;
+  }
+  if (!VALIDATION_RULES.passwordPolicy.test(pass)) {
+    return "La password deve contenere almeno una maiuscola, una minuscola, un numero e un carattere speciale.";
+  }
+  return null;
+}
 
 /**
  * Mostra un errore in un contenitore specifico o tramite toast
@@ -5670,7 +5683,7 @@ function renderResetPasswordForm() {
       <h3>Imposta la nuova password</h3>
       <div id="resetError" class="error-msg hidden"></div>
       <form id="resetForm" class="auth-form">
-        <input type="password" id="resetPass" placeholder="Nuova password (min. 8)" autocomplete="new-password" required>
+        <input type="password" id="resetPass" placeholder="Nuova password (min. 10, con maiuscola, numero e simbolo)" autocomplete="new-password" required>
         <input type="password" id="resetPassConfirm" placeholder="Conferma nuova password" autocomplete="new-password" required>
         <button type="submit" class="btn">Salva nuova password</button>
       </form>
@@ -5682,8 +5695,9 @@ function renderResetPasswordForm() {
     const pass = $("#resetPass").value;
     const confirm = $("#resetPassConfirm").value;
     const err = $("#resetError");
-    if (pass.length < 8) {
-      err.innerText = "La password deve essere di almeno 8 caratteri.";
+    const resetPassError = getPasswordError(pass);
+    if (resetPassError) {
+      err.innerText = resetPassError;
       err.classList.remove("hidden");
       return;
     }
@@ -5721,7 +5735,7 @@ function showRegisterForm() {
           <input type="text" id="regCognome" placeholder="Cognome" required>
         </div>
         <input type="email" id="regEmail" placeholder="Email" autocomplete="email" required>
-        <input type="password" id="regPass" placeholder="Password (min. 8)" autocomplete="new-password" required>
+        <input type="password" id="regPass" placeholder="Password (min. 10, con maiuscola, numero e simbolo)" autocomplete="new-password" required>
         <input type="password" id="regPassConfirm" placeholder="Conferma Password" autocomplete="new-password" required>
                 <div class="form-row">
           <input type="text" id="regCap" placeholder="CAP" maxlength="5" required>
@@ -6007,7 +6021,8 @@ async function validateRegistration() {
 
   // Validazioni base
   if (!VALIDATION_RULES.email.test(email)) return toast.error("Inserisci un'email valida.");
-  if (pass.length < VALIDATION_RULES.minPassword) return toast.error("La password deve essere di almeno 8 caratteri.");
+  const regPassError = getPasswordError(pass);
+  if (regPassError) return toast.error(regPassError);
   if (pass !== passConf) return toast.error("Le password non coincidono.");
   if (!privacyAccepted) return toast.error("Devi accettare l'informativa sulla privacy per registrarti.");
 
@@ -6967,7 +6982,7 @@ function renderStoreResetNewPasswordForm() {
         <h3>Imposta la nuova password</h3>
         <div id="storeResetNewPassError" class="error-msg hidden"></div>
         <form id="storeResetNewPassForm" class="auth-form">
-          <input type="password" id="storeResetNewPass" placeholder="Nuova password (min. 8)" autocomplete="new-password" required>
+          <input type="password" id="storeResetNewPass" placeholder="Nuova password (min. 10, con maiuscola, numero e simbolo)" autocomplete="new-password" required>
           <input type="password" id="storeResetNewPassConfirm" placeholder="Conferma nuova password" autocomplete="new-password" required>
           <button type="submit" class="btn full-width">Salva nuova password</button>
         </form>
@@ -6981,8 +6996,9 @@ function renderStoreResetNewPasswordForm() {
     const confirm = $("#storeResetNewPassConfirm").value;
     const err = $("#storeResetNewPassError");
     err.classList.add("hidden");
-    if (pass.length < 8) {
-      err.innerText = "La password deve essere di almeno 8 caratteri.";
+    const storeResetPassError = getPasswordError(pass);
+    if (storeResetPassError) {
+      err.innerText = storeResetPassError;
       err.classList.remove("hidden");
       return;
     }
@@ -7063,7 +7079,7 @@ function renderTeamSetPasswordForm(email) {
         <p style="color:#64748b; margin-bottom:15px; font-size:0.9rem;">Email verificata. Imposta una password personale per accedere al Pannello Partner (nessuna email di conferma).</p>
         <div id="teamNewPassError" class="error-msg hidden"></div>
         <form id="teamNewPassForm" class="auth-form">
-          <input type="password" id="teamNewPass" placeholder="Nuova password (min. 8)" autocomplete="new-password" required>
+          <input type="password" id="teamNewPass" placeholder="Nuova password (min. 10, con maiuscola, numero e simbolo)" autocomplete="new-password" required>
           <input type="password" id="teamNewPassConfirm" placeholder="Conferma password" autocomplete="new-password" required>
           <button type="submit" class="btn full-width">Salva e accedi</button>
         </form>
@@ -7077,8 +7093,9 @@ function renderTeamSetPasswordForm(email) {
     const confirm = $("#teamNewPassConfirm").value;
     const err = $("#teamNewPassError");
     err.classList.add("hidden");
-    if (pass.length < 8) {
-      err.innerText = "La password deve essere di almeno 8 caratteri.";
+    const teamPassError = getPasswordError(pass);
+    if (teamPassError) {
+      err.innerText = teamPassError;
       err.classList.remove("hidden");
       return;
     }
@@ -7433,7 +7450,7 @@ function renderOnboarding(container) {
             </p>
           ` : `
             <div class="form-row">
-              <input type="password" id="obPass" placeholder="Password" autocomplete="new-password" required>
+              <input type="password" id="obPass" placeholder="Password (min. 10, con maiuscola, numero e simbolo)" autocomplete="new-password" required>
               <input type="password" id="obPassConfirm" placeholder="Conferma Password" autocomplete="new-password" required>
             </div>
           `}
@@ -7578,7 +7595,12 @@ async function handleOnboardingSubmit(step) {
 
       const pass = document.getElementById("obPass")?.value;
       const confirm = document.getElementById("obPassConfirm")?.value;
-      if (!pass || pass !== confirm) {
+      const obPassError = getPasswordError(pass);
+      if (obPassError) {
+        if (btn) btn.disabled = false;
+        return toast.error(obPassError);
+      }
+      if (pass !== confirm) {
         if (btn) btn.disabled = false;
         return toast.error("Le password non coincidono!");
       }
