@@ -1991,6 +1991,10 @@ body.drawer-open:not(.mode-chisiamo) .navbar {
   z-index: 1550; /* Sopra il drawer (1500), solo mentre il drawer è aperto sulle pagine standard. Su Chi Siamo (.mode-chisiamo) resta sotto #chisiamo-view (1400) */
 }
 
+body.auth-modal-open .navbar {
+  z-index: 1650; /* Sopra il popup profilo/login (1600): senza questo, il backdrop scurito intercetta i click sulle icone navbar (ricerca/profilo/carrello/menu) invece di farli arrivare a destinazione */
+}
+
 /* DRAWER (Menu Laterale) */
 #drawer {
   position: fixed;

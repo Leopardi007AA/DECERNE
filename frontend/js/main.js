@@ -5960,6 +5960,7 @@ function openFullPageModal(type) {
   if(!modal) return;
   
   modal.classList.toggle("auth-modal", type === 'profile');
+  document.body.classList.toggle("auth-modal-open", type === 'profile');
   modal.style.display = "flex";
   document.body.style.overflow = 'hidden';
   requestAnimationFrame(() => {
@@ -6051,6 +6052,7 @@ function closeFullPageModal() {
       if (modal.classList.contains('is-visible')) return;
       modal.style.display = "none";
       modal.classList.remove("auth-modal");
+      document.body.classList.remove("auth-modal-open");
 
       // Popup da link condiviso (link prodotto): la guida può partire solo
       // da qui in poi, dopo la sua chiusura — anche se i cookie erano già
@@ -7700,7 +7702,6 @@ async function handleOnboardingSubmit(step) {
           billing_cycle: directCycle || 'monthly',
           subscription_status: isDirectActivation ? 'active' : 'trial',
           renewal_date: isDirectActivation ? directRenewalISO : null,
-
           business_type: storeData.tempReg.type,
           // FIX: prima chi si registrava direttamente su Professional/Enterprise
           // restava senza api_key finché non cliccava "Rigenera" a mano.
