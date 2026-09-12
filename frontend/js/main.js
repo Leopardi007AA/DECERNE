@@ -6418,7 +6418,7 @@ window.showOfferPreview = () => {
   container.innerHTML = `
     <div class="offer-row" style="width: 100%; max-width: 600px;">
       <div class="product-image-container">
-        <img src="${imageSrc}" class="product-img" alt="${offerData?.product || 'Prodotto'}">
+        <img src="${imageSrc}" class="product-img" alt="${nome}">
         ${percSconto > 0 ? `<span class="perc-badge">-${percSconto}%</span>` : ''}
       </div>
       <div class="product-info">
@@ -6431,7 +6431,7 @@ window.showOfferPreview = () => {
           </div>
         </div>
         <div class="product-actions">
-          <button class="btn" onclick="event.stopPropagation(); saveToShoppingList(offerData?.id || '')">Aggiungi</button>
+          <button class="btn" onclick="event.stopPropagation(); saveToShoppingList($('#offerId').value || '')">Aggiungi</button>
         </div>
       </div>
     </div>
