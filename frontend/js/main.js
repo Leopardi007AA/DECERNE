@@ -6002,6 +6002,7 @@ function openFullPageModal(type) {
     renderSearchModal();
     syncUrlFromAction(ROUTES.cerca);
   } else if (type === 'cart') {
+    $("#modalTitle").innerText = "Carrello";
     renderCartContent();
     syncUrlFromAction(ROUTES.carrello);
   }
