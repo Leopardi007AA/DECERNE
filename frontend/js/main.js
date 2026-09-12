@@ -152,15 +152,23 @@ function applyRoute(path) {
       return;
     }
     if (p === '/carrello/lista') {
-      openFullPageModal('cart');
-      // dopo render cart
-      setTimeout(() => { if (typeof openSmartShoppingListModal === 'function') openSmartShoppingListModal(); }, 50);
+      const cartPopup = $("#fullPagePopup");
+      const cartAlreadyOpen = cartPopup && cartPopup.style.display === 'flex';
+      if (!cartAlreadyOpen) {
+        openFullPageModal('cart');
+        // dopo render cart
+        setTimeout(() => { if (typeof openSmartShoppingListModal === 'function') openSmartShoppingListModal(); }, 50);
+      }
       syncUrlFromAction(ROUTES.carrelloLista);
       return;
     }
     if (p === '/carrello/mappa') {
-      openFullPageModal('cart');
-      setTimeout(() => { if (typeof openCartMapView === 'function') openCartMapView(); }, 50);
+      const cartPopup = $("#fullPagePopup");
+      const cartAlreadyOpen = cartPopup && cartPopup.style.display === 'flex';
+      if (!cartAlreadyOpen) {
+        openFullPageModal('cart');
+        setTimeout(() => { if (typeof openCartMapView === 'function') openCartMapView(); }, 50);
+      }
       syncUrlFromAction(ROUTES.carrelloMappa);
       return;
     }
