@@ -7216,12 +7216,12 @@ const isAnnual = isAnnualView;
             <div class="price-sub">poi €19,99 / mese</div>
             `}
           </div>
-          <p class="plan-desc">Ideale per piccoli supermercati e negozi locali.</p>
+          <p class="plan-desc">Il punto di partenza per un singolo negozio che vuole farsi vedere online senza costi fissi da sostenere subito.</p>
           <ul class="features">
-            <li>Fino a 10 offerte attive</li>
-            <li>Dettagli completi prodotto</li>
-            <li>Presenza sulla mappa</li>
-            <li>Statistiche base</li>
+            <li>Fino a 10 offerte attive contemporaneamente</li>
+            <li>Scheda prodotto completa, con prezzo e sconto ben visibili</li>
+            <li>Il negozio compare sulla mappa per chi cerca nella zona</li>
+            <li>Statistiche di base su visualizzazioni e click</li>
           </ul>
           ${getPlanButton('Starter')}
         </div>
@@ -7233,12 +7233,13 @@ const isAnnual = isAnnualView;
           <div class="price-block">
             <div class="price">${isAnnual ? '€499,99 <span>/ anno</span>' : '€49,99 <span>/ mese</span>'}</div>
           </div>
-          <p class="plan-desc">Per supermercati strutturati con più traffico.</p>
+          <p class="plan-desc">Per chi ha superato la fase di lancio e vuole più peso nei risultati di ricerca.</p>
           <ul class="features">
             <li><strong>Offerte illimitate</strong></li>
-            <li>Priorità nei risultati</li>
-            <li>Evidenziazione grafica</li>
-            <li>Statistiche avanzate (CTR)</li>
+            <li>Le offerte vengono mostrate prima rispetto al piano Starter</li>
+            <li>Card evidenziata graficamente rispetto alle altre</li>
+            <li>Puoi programmare in anticipo quando un'offerta va online</li>
+            <li>Statistiche avanzate, incluso il CTR per offerta</li>
           </ul>
           ${getPlanButton('Standard')}
         </div>
@@ -7249,12 +7250,13 @@ const isAnnual = isAnnualView;
           <div class="price-block">
             <div class="price">${isAnnual ? '€1.499,99 <span>/ anno</span>' : '€149,99 <span>/ mese</span>'}</div>
           </div>
-          <p class="plan-desc">Per catene e supermercati ad alto volume.</p>
+          <p class="plan-desc">Per catene con più punti vendita che devono gestire tutto da un solo posto.</p>
           <ul class="features">
-            <li>Offerte in posizione "Featured"</li>
-            <li>Gestione multi-negozio</li>
-            <li>Badge "Supermercato verificato"</li>
-            <li>Supporto prioritario</li>
+            <li>Offerte in posizione "Featured", tra le prime che vede il cliente</li>
+            <li>Un pannello unico per gestire più punti vendita</li>
+            <li>Badge "Supermercato verificato" sul profilo pubblico</li>
+            <li>Accesso alle API per collegare i propri sistemi</li>
+            <li>Supporto con priorità sulle richieste</li>
           </ul>
           ${getPlanButton('Professional')}
         </div>
@@ -7265,12 +7267,13 @@ const isAnnual = isAnnualView;
           <div class="price-block">
             <div class="price">Custom</div>
           </div>
-          <p class="plan-desc">Per grandi catene o accordi su larga scala.</p>
+          <p class="plan-desc">Per grandi catene con esigenze specifiche, definite insieme prima di partire.</p>
           <ul class="features">
-            <li>Integrazione sistemi interni</li>
-            <li>Accesso dati aggregati</li>
-            <li>SLA dedicato</li>
-            <li>Account manager dedicato</li>
+            <li>Tutto quello incluso nel piano Professional</li>
+            <li>Gestione team con ruoli diversi per i collaboratori</li>
+            <li>Integrazione diretta con il gestionale del negozio</li>
+            <li>Export dei dati in CSV quando serve</li>
+            <li>Account manager dedicato e SLA concordato via contratto</li>
           </ul>
           <button class="btn outline full-width">Contattaci</button>
         </div>
