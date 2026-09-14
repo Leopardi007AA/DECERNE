@@ -1522,7 +1522,7 @@ function renderStoreDashboard() {
   }
 }
 
-// 4. Funzione di Refresh Idempotente: garantisce che la UI sia ricostruita correttamente
+// Funzione di Refresh Idempotente: garantisce che la UI sia ricostruita correttamente
 function refreshUI() {
   syncShoppingList(); // Pulisce il carrello se le offerte sono cambiate
   
@@ -1778,7 +1778,7 @@ async function refreshMyProducts() {
   if (state.mode === 'store') renderStoreView();
 }
 
-// 2. Funzione per verificare i limiti del piano prima di creare un'offerta
+// Funzione per verificare i limiti del piano prima di creare un'offerta
 function canCreateOffer(plan, currentCount) {
   // Rimuovi ogni vincolo per i piani premium
   if (plan === 'Standard' || plan === 'Professional') {
@@ -2311,7 +2311,7 @@ function applyOfferRevealAnimation(grid) {
 
     
 
-// 1. Cerca il negozio direttamente (anche se non ha offerte attive)
+// Cerca il negozio direttamente (anche se non ha offerte attive)
 let matchedStore = null;
 let storeCardEl = null;
 
@@ -3147,7 +3147,7 @@ $("#offerForm").onsubmit = async (e) => {
     const allowed = await checkRateLimit(partner.id);
     if (!allowed) return;
 
-    // 1. Recupero dati dai campi
+    // Recupero dati dai campi
     const existingId = $("#offerId").value;
     const oldOffer = existingId ? (getMyOffers().find(o => o.id === existingId) || {}) : null;
     const nome = $("#offNome").value.trim();
@@ -3157,7 +3157,7 @@ $("#offerForm").onsubmit = async (e) => {
     const dataFine = $("#offEndDate").value;
     const imgUrl = $("#offImg").value.trim();
 
-    // 2. Validazione rapida
+    // Validazione rapida
     if (prezzoSconto >= prezzoOrig) {
       return toast.error("Il prezzo scontato deve essere inferiore a quello originale.");
     }
@@ -3269,7 +3269,7 @@ $("#offerForm").onsubmit = async (e) => {
           ? `Pubblicazione programmata per il ${new Date(scheduledPublishAtISO).toLocaleString()}.`
           : (existingId ? "Offerta aggiornata!" : "Nuova offerta pubblicata!")));
     
-    // 4. Chiusura e Refresh UI
+    // Chiusura e Refresh UI
     closeOfferModal();
     await refreshMyOffers(); // Rinfresca la dashboard del partner con i dati veri
     renderOffers();          // Rinfresca la griglia pubblica se visibile
@@ -3645,7 +3645,6 @@ function updateLocationUI(text) {
   if (locInput) locInput.value = text;
 }
 
-// MODIFICA: updateProfile per rinfrescare i risultati
 async function updateProfile(updatedData) {
   try {
     const userId = state.currentUser?.id;
@@ -3895,7 +3894,7 @@ async function refreshCartBadge() {
   badge.classList.toggle("hidden", !count);
 }
 
-// 2. Funzione per aggiungere alla lista (Supabase)
+// Aggiunge un prodotto alla lista della spesa (Supabase)
 window.saveToShoppingList = async (id) => {
   const userId = state.currentUser?.id;
   if (!userId) {
@@ -3943,7 +3942,7 @@ function renderSimpleChart(offers) {
     }).join('');
 }
 
-// Utility per calcolare i dati (da implementare nel JS)
+// Utility per calcolare le statistiche aggregate delle offerte
 function calculateTotalViews(offers) {
     return offers.reduce((acc, curr) => acc + (curr.views || 0), 0);
 }
@@ -3996,7 +3995,7 @@ window.shareShoppingList = async () => {
   }
 };
 
-// 4. Rendering dinamico del carrello (Supabase)
+// Rendering dinamico del carrello (Supabase)
 async function renderCartContent() {
   const content = $("#modalContent");
   content.innerHTML = `<div style="padding:50px; text-align:center; color:#64748b;">Caricamento lista...</div>`;
@@ -5976,7 +5975,6 @@ function releaseFocusOnClose(modalEl) {
   _lastFocusedBeforeModal = null;
 }
 
-// NUOVA FUNZIONE openFullPageModal SEMPLIFICATA
 function openFullPageModal(type) {
   const modal = $("#fullPagePopup");
   if(!modal) return;
@@ -6261,7 +6259,6 @@ function setupDrawerDrag() {
   drawer.addEventListener('pointercancel', endDrag);
 }
 
-// Nel tuo init() o a fine file, imposta i listener così:
 function setupEventListeners() {
   setupDrawerDrag();
   setupManualLocationInput();
@@ -6459,7 +6456,7 @@ window.closePreview = () => {
   } catch (e) { console.error(e); }
 };
 
-// Listener per il pulsante anteprima (da mettere dentro setupEventListeners)
+// Ri-collega il listener del pulsante Anteprima dopo un innerHTML di ri-render del form
 const originalSetup = setupEventListeners;
 setupEventListeners = function() {
   originalSetup();
@@ -6602,10 +6599,9 @@ async function init() {
 
   if (state.currentStore) refreshMyOffers(); // Carica le offerte vere appena la sessione è pronta
 
-  // 3. Pulizia e Sincronizzazione Database
-  syncShoppingList();
+  syncShoppingList(); // Pulizia e sincronizzazione della lista della spesa
 
-  // 5. Configura Ricerca e Filtri della Homepage
+  // Configura ricerca e filtri della homepage
   const searchInput = document.getElementById("searchInput");
   const categorySelect = $("#categorySelect");
 
@@ -6630,18 +6626,14 @@ const debouncedSmartRender = debounce(() => {
   const query = (searchInput?.value || "").trim();
   const category = categorySelect?.value || "all";
   
-  // Recupera le offerte correnti in memoria (dallo state o dal DOM)
-  // Nota: se usi già un array globale di offerte, adattalo. 
-  // Altrimenti filtriamo quelle già renderizzate.
-  
-  // Metodo A: se hai un array state.allOffers o simile, usa quello
+  // Offerte correnti in memoria (cache globale o state)
   const allOffers = window._cachedOffers || state.allOffers || [];
   
   if (allOffers.length > 0) {
     const filtered = smartFilterOffers(allOffers, query, category === 'all' ? null : category);
     renderOffersGrid(filtered);
   } else {
-    // Fallback: se non hai l'array in memoria, ricarica con renderOffers()
+    // Nessun array in cache: ricarica dal server
     renderOffers();
   }
 }, 300);
@@ -6685,14 +6677,14 @@ searchInput.oninput = () => {
     };
   }
 
-  // 6. Aggiorna UI in base al login
+  // Aggiorna la UI del drawer in base al login
   updateDrawerUI();
   
   if (state.currentUser) {
     updateLocationUI(`${state.currentUser.cap || ''} ${state.currentUser.citta || ''}`.trim());
   }
 
-  // 7. Avvio Finale delle Viste
+  // Avvio finale delle viste
   if (state.currentStore) {
     storeData.step = 'dashboard';
     getMyOffers();
@@ -6752,7 +6744,7 @@ async function fetchAddress(lat, lon) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); 
 
-    // AGGIUNTO: User-Agent è obbligatorio per Nominatim
+    // User-Agent obbligatorio per Nominatim
     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`, { 
       signal: controller.signal,
       headers: { 'User-Agent': 'DecerneApp/1.0' } 
@@ -7162,31 +7154,31 @@ const isAnnualView = cycle === 'annual';
 const getPlanButton = (planName, priceText) => {
   const currentSub = partner?.subscription;
 
-  // 1. Caso: piano corrente ma scaduto -> deve potersi rinnovare anche da qui,
+  // Piano corrente ma scaduto -> deve potersi rinnovare anche da qui,
   // rispettando il ciclo (Mensile/Annuale) che il partner ha selezionato QUI
   // sulla pagina, non quello che aveva sul vecchio abbonamento.
   if (currentPlan === planName && currentSub?.status === 'expired') {
     return `<button class="btn full-width" onclick="activatePlan('${planName}', '${cycle}')">Rinnova ${planName}</button>`;
   }
 
-  // 2. Caso: Il partner è già su questo piano ed è ancora attivo -> non rinnovabile in anticipo
+  // Il partner è già su questo piano ed è ancora attivo -> non rinnovabile in anticipo
   if (currentPlan === planName) {
     return `<button class="btn full-width disabled" disabled title="Disponibile dal giorno di scadenza">Piano Attuale</button>`;
   }
 
-  // 3. Caso: Il partner è loggato e sta guardando un piano superiore al suo (upgrade diretto, no trial)
+  // Il partner è loggato e sta guardando un piano superiore al suo (upgrade diretto, no trial)
   if (partner && PLAN_LEVELS[currentPlan] < PLAN_LEVELS[planName]) {
     return `<button class="btn full-width" onclick="activatePlan('${planName}')">Passa a ${planName}</button>`;
   }
 
-  // 2bis. Prova gratuita SOLO per Starter mensile. Ogni altra combinazione piano/ciclo
+  // Prova gratuita SOLO per Starter mensile. Ogni altra combinazione piano/ciclo
   // (Starter annuale, Standard/Professional/Enterprise sia mensile che annuale) si attiva
   // subito come abbonamento a pagamento, senza periodo di prova.
   if (planName !== 'Starter' || isAnnualView) {
     return `<button class="btn ${planName === 'Standard' ? '' : 'outline'} full-width" onclick="startPlanDirect('${planName}')">Scegli ${planName}</button>`;
   }
 
-  // 3. Caso default: Starter, modalità Mensile -> unico caso con prova gratuita
+  // Caso default: Starter, modalità Mensile -> unico caso con prova gratuita
   return `<button class="btn outline full-width" onclick="startTrial('${planName}')">Prova gratuita</button>`;
 };
 
@@ -7384,7 +7376,7 @@ window.startPlanDirect = function(planName) {
   renderStoreView();
 };
 
-// Esempio ipotetico di funzione per forzare la scadenza (da usare per test or cron)
+// Funzione di debug per forzare manualmente la scadenza di un abbonamento (utile in test)
 function simulateTrialExpiry(partnerId) {
   const expiredSub = {
       plan: 'Starter',
@@ -7555,7 +7547,7 @@ async function resendOnboardingOtp() {
   else toast.success("Codice reinviato!");
 }
 
-// Nuova funzione per gestire la logica dei passaggi
+// Gestisce l'invio di ogni singolo passaggio dell'onboarding negozio
 async function handleOnboardingSubmit(step) {
   try {
     const form = document.getElementById("onboardingForm");
@@ -7969,7 +7961,6 @@ function closeKebabMenuOnOutsideClick(e) {
   document.removeEventListener('click', closeKebabMenuOnOutsideClick);
 }
 
-// MODIFICA: renderDashboard più sicura
 function renderDashboard(container) {
   const partner = getCurrentPartner();
   if (!partner) return;
@@ -8851,7 +8842,7 @@ function closeStoreProfile() {
 }
 window.closeStoreProfile = closeStoreProfile;
 
-// 1. Funzione per aggiornare la UI del Drawer in base al login
+// Aggiorna la UI del Drawer in base al login
 function updateDrawerUI() {
   const profileCard = $("#drawerProfileCard");
   const authButtons = $("#drawerAuthButtons");
@@ -8932,7 +8923,7 @@ function showToast(message, type) {
   else toast.success(message);
 }
 
-// Nuova funzione per le Conferme in stile Toast
+// Popup di conferma in stile toast (sostituisce confirm() del browser)
 function showConfirm(message, onConfirm, confirmColor = '#ff3b30') {
   const overlay = document.createElement("div");
   overlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9999; display:flex; align-items:flex-end; justify-content:center; padding-bottom:30px;";
@@ -9409,7 +9400,7 @@ window.switchToAnnual = async function() {
 
 // --- INTEGRAZIONE NELLE VISTE ---
 
-// 2. Tracciamento OPENS: Inseriscilo all'inizio di openProductDetail
+// Traccia l'apertura di un'offerta (per le statistiche del negozio e per Offerte Consigliate)
 const originalOpenProductDetail = window.openProductDetail;
 window.openProductDetail = async (id) => {
   supabaseClient.rpc('increment_offer_stat', { p_offer_id: id, p_field: 'opens' })
@@ -10848,7 +10839,7 @@ window.regeneratePartnerApiKey = async () => {
   }
 
   try {
-    // 1. Aggiornamento atomico sul database Supabase (Corretto con const)
+    // 1. Aggiornamento atomico sul database Supabase
     const { data: updatedStore, error } = await storeAuthClient
       .from('stores')
       .update({ api_key: newKey })
