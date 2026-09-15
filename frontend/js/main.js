@@ -4707,7 +4707,7 @@ async function addAllStoresLayer(map, excludeLocationIds = []) {
         id: loc.store_id,
         name: (loc.location_name && loc.location_name !== 'Sede Principale') ? `${loc.store_name} (${loc.location_name})` : loc.store_name,
         logo: loc.logo_url,
-        address: [loc.address, loc.cap, loc.city].filter(Boolean).join(', '),
+        address: loc.address || '',
         phone: loc.phone,
         hours: loc.hours
       });
