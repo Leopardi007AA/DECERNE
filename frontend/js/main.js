@@ -4489,6 +4489,9 @@ let cartRoutePolyline = null;
 let cartNavigationCompleted = false;
 let cartRecalcInFlight = false;
 let cartVoiceQueue = [];
+let cartLastHeading = null;
+let cartWrongDirectionCount = 0;
+let cartWrongDirectionAnnounced = false;
 
 function computeVisitOrder(startLat, startLng, stores) {
   const remaining = [...stores];
@@ -5356,6 +5359,28 @@ function distanceMeters(lat1, lon1, lat2, lon2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+// Differenza angolare minima tra due direzioni (0-180 gradi).
+function angleDiff(a, b) {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+// Direzione del tratto di percorso subito davanti alla posizione attuale.
+// Confrontata con la direzione reale di marcia, distingue chi è tornato
+// indietro sulla strada giusta (svolta mancata) da chi è solo un po'
+// fuori dal tracciato ma nel verso corretto.
+function expectedRouteHeading() {
+  if (!cartMultiRoute || !cartMultiRoute.coords || cartMultiRoute.coords.length < 2) return null;
+  const [lat1, lng1] = cartMultiRoute.coords[0];
+  for (let i = 1; i < cartMultiRoute.coords.length; i++) {
+    const [lat2, lng2] = cartMultiRoute.coords[i];
+    if (distanceMeters(lat1, lng1, lat2, lng2) > 15) {
+      return calculateBearing(lat1, lng1, lat2, lng2);
+    }
+  }
+  return null;
+}
+
 function speakVoiceMessage(text) {
   if (!cartVoiceEnabled || !('speechSynthesis' in window)) return;
   // Ogni messaggio va in coda invece di interrompere quello in corso:
@@ -5448,10 +5473,23 @@ function startLiveTracking() {
       const newLng = pos.coords.longitude;
 
       let heading = pos.coords.heading;
-      if ((heading === null || isNaN(heading)) && cartLastPos) {
-        heading = calculateBearing(cartLastPos.lat, cartLastPos.lng, newLat, newLng);
+      if (heading === null || isNaN(heading)) {
+        // Senza bussola nel dispositivo, la direzione si ricava dallo spostamento
+        // reale — ma solo se ci si è mossi abbastanza da fidarsi del risultato,
+        // altrimenti si tiene l'ultima direzione buona invece di far ballare
+        // l'icona auto per il rumore GPS da fermi o a passo d'uomo.
+        if (cartLastPos && distanceMeters(cartLastPos.lat, cartLastPos.lng, newLat, newLng) > 8) {
+          heading = calculateBearing(cartLastPos.lat, cartLastPos.lng, newLat, newLng);
+          cartLastHeading = heading;
+          cartLastPos = { lat: newLat, lng: newLng };
+        } else {
+          heading = cartLastHeading;
+          if (!cartLastPos) cartLastPos = { lat: newLat, lng: newLng };
+        }
+      } else {
+        cartLastHeading = heading;
+        cartLastPos = { lat: newLat, lng: newLng };
       }
-      cartLastPos = { lat: newLat, lng: newLng };
 
       if (cartUserMarker) {
         cartUserMarker.setLatLng([newLat, newLng]);
@@ -5466,16 +5504,40 @@ function startLiveTracking() {
 
       const distFromRoute = updateRouteProgress(newLat, newLng);
 
+      // Direzione sbagliata: diverso dal semplice "fuori percorso" perché guarda
+      // il verso di marcia, non solo la distanza dalla linea blu. Copre il caso
+      // di chi è ancora vicino al tracciato ma sta proseguendo oltre una svolta
+      // mancata, andando di fatto all'indietro sulla rotta prevista.
+      const routeHeading = expectedRouteHeading();
+      const wrongDirection = heading !== null && !isNaN(heading) && routeHeading !== null &&
+        angleDiff(heading, routeHeading) > 135;
+      if (wrongDirection) {
+        cartWrongDirectionCount++;
+      } else {
+        cartWrongDirectionCount = 0;
+        cartWrongDirectionAnnounced = false;
+      }
+      // Due letture consecutive prima di agire, per non scattare su un singolo
+      // campione di bearing rumoroso (es. da fermi a un incrocio).
+      const confirmedWrongDirection = cartWrongDirectionCount >= 2;
+
       const now = Date.now();
       const offRoute = cartMultiRoute && distFromRoute > 60;
-      const recalcWait = offRoute ? 0 : 20000;
+      const recalcWait = (offRoute || confirmedWrongDirection) ? 0 : 20000;
       if (cartVisitOrder.length && !cartRecalcInFlight && now - cartLastRouteRecalc > recalcWait) {
         cartLastRouteRecalc = now;
         cartRecalcInFlight = true;
         recalculateTrip(newLat, newLng).finally(() => { cartRecalcInFlight = false; });
       }
 
-      if (cartVoiceEnabled && cartManeuvers.length && cartNextManeuverIndex < cartManeuvers.length) {
+      if (cartVoiceEnabled && confirmedWrongDirection) {
+        // Un solo avviso per episodio: il ricalcolo è già partito sopra, non
+        // serve ripetere il messaggio a ogni aggiornamento GPS.
+        if (!cartWrongDirectionAnnounced) {
+          speakVoiceMessage("Sembra che tu stia andando in direzione opposta al percorso. Se puoi, fai un'inversione a U: sto ricalcolando la strada.");
+          cartWrongDirectionAnnounced = true;
+        }
+      } else if (cartVoiceEnabled && cartManeuvers.length && cartNextManeuverIndex < cartManeuvers.length) {
         const nextManeuver = cartManeuvers[cartNextManeuverIndex];
         const distToManeuver = distanceMeters(newLat, newLng, nextManeuver.lat, nextManeuver.lng);
         if (!nextManeuver.announcedFar && distToManeuver < 300) {
@@ -5547,6 +5609,9 @@ function stopCartMapTracking() {
   cartNavigationCompleted = false;
   cartRecalcInFlight = false;
   cartVoiceQueue = [];
+  cartLastHeading = null;
+  cartWrongDirectionCount = 0;
+  cartWrongDirectionAnnounced = false;
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   // Durante il tour, tornando indietro dalla mappa demo deve ricomparire
   // il carrello demo, non quello vero (per un visitatore anonimo sarebbe
