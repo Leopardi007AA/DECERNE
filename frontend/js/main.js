@@ -4488,6 +4488,7 @@ let cartWakeLock = null;
 let cartRoutePolyline = null;
 let cartNavigationCompleted = false;
 let cartRecalcInFlight = false;
+let cartVoiceQueue = [];
 
 function computeVisitOrder(startLat, startLng, stores) {
   const remaining = [...stores];
@@ -5357,10 +5358,20 @@ function distanceMeters(lat1, lon1, lat2, lon2) {
 
 function speakVoiceMessage(text) {
   if (!cartVoiceEnabled || !('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel(); // evita che due frasi si accavallino
+  // Ogni messaggio va in coda invece di interrompere quello in corso:
+  // così nessun annuncio taglia a metà quello precedente.
+  cartVoiceQueue.push(text);
+  processVoiceQueue();
+}
+
+function processVoiceQueue() {
+  if (window.speechSynthesis.speaking || cartVoiceQueue.length === 0) return;
+  const text = cartVoiceQueue.shift();
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'it-IT';
   utter.rate = 1;
+  utter.onend = processVoiceQueue;
+  utter.onerror = processVoiceQueue;
   window.speechSynthesis.speak(utter);
 }
 
@@ -5370,6 +5381,7 @@ function toggleCartVoice() {
   if (cartVoiceEnabled) {
     speakVoiceMessage("Assistente vocale attivato. Ti avviserò quando arrivi a ogni tappa.");
   } else if ('speechSynthesis' in window) {
+    cartVoiceQueue = [];
     window.speechSynthesis.cancel();
   }
 }
@@ -5488,7 +5500,8 @@ function startLiveTracking() {
             cartNavigationCompleted = true;
           } else {
             const upcoming = cartVisitOrder[cartNextStopIndex];
-            setTimeout(() => speakVoiceMessage(`Prossima tappa: ${upcoming.name}.`), 3500);
+            // Va in coda subito: parte da sola solo dopo che "Sei arrivato" è finito.
+            speakVoiceMessage(`Prossima tappa: ${upcoming.name}.`);
           }
         }
       }
@@ -5533,6 +5546,7 @@ function stopCartMapTracking() {
   cartRoutePolyline = null;
   cartNavigationCompleted = false;
   cartRecalcInFlight = false;
+  cartVoiceQueue = [];
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   // Durante il tour, tornando indietro dalla mappa demo deve ricomparire
   // il carrello demo, non quello vero (per un visitatore anonimo sarebbe
@@ -8875,18 +8889,32 @@ function updateDrawerUI() {
  * che nella sessione attiva (sessionStorage), garantendo la coerenza dei dati.
  */
 async function updatePartnerSubscription(partnerId, subscriptionObj) {
-  const { data: storeRow, error } = await storeAuthClient
-    .from('stores')
-    .update({
-      plan: subscriptionObj.plan,
-      subscription_status: subscriptionObj.status,
-      trial_started_at: subscriptionObj.startedAt || null,
-      renewal_date: subscriptionObj.renewalDate || null,
-      billing_cycle: subscriptionObj.billingCycle || 'monthly'
-    })
-    .eq('id', partnerId)
-    .select()
-    .single();
+  let storeRow, error;
+
+  if (subscriptionObj.status === 'active') {
+    // Attivazione di un piano a pagamento: piano/data di rinnovo/api_key sono
+    // decisi e scritti lato server dalla RPC, il client non li passa più.
+    ({ data: storeRow, error } = await storeAuthClient
+      .rpc('activate_store_subscription', {
+        p_store_id: partnerId,
+        p_plan: subscriptionObj.plan,
+        p_cycle: subscriptionObj.billingCycle || 'monthly'
+      }));
+  } else {
+    // Percorso trial/expired: resta un update diretto per ora (prossimo step).
+    ({ data: storeRow, error } = await storeAuthClient
+      .from('stores')
+      .update({
+        plan: subscriptionObj.plan,
+        subscription_status: subscriptionObj.status,
+        trial_started_at: subscriptionObj.startedAt || null,
+        renewal_date: subscriptionObj.renewalDate || null,
+        billing_cycle: subscriptionObj.billingCycle || 'monthly'
+      })
+      .eq('id', partnerId)
+      .select()
+      .single());
+  }
 
   if (error) {
     console.error("Errore aggiornamento abbonamento:", error);
@@ -9236,30 +9264,15 @@ window.activatePlan = async function(planName, forceCycle) {
   const cycleLabel = cycle === 'annual' ? '1 anno' : '1 mese';
 
   showConfirm(`Confermi l'attivazione del piano ${planName} (durata ${cycleLabel})?`, async () => {
-    const renewalDate = new Date();
-    if (cycle === 'annual') {
-      renewalDate.setFullYear(renewalDate.getFullYear() + 1);
-    } else {
-      renewalDate.setMonth(renewalDate.getMonth() + 1);
-    }
-
-    const updates = {
-      plan: planName,
-      subscription_status: 'active',
-      renewal_date: renewalDate.toISOString().split('T')[0],
-      billing_cycle: cycle
-    };
-
-    if ((planName === 'Professional' || planName === 'Enterprise') && !partner.apiKey) {
-      updates.api_key = generateRandomApiKey();
-    }
-
+    // Piano, stato, data di rinnovo e api_key vengono decisi e scritti lato server
+    // dalla funzione Postgres activate_store_subscription: il client passa solo
+    // cosa l'utente ha scelto, non i valori finali da salvare.
     const { data: storeRow, error } = await storeAuthClient
-      .from('stores')
-      .update(updates)
-      .eq('id', partner.id)
-      .select()
-      .single();
+      .rpc('activate_store_subscription', {
+        p_store_id: partner.id,
+        p_plan: planName,
+        p_cycle: cycle
+      });
 
       if (error) {
         console.error("Errore attivazione piano:", error);
