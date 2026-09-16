@@ -11386,7 +11386,8 @@ const maybeStartTour = (function () {
     {
       title: "Benvenuto su DECERNE",
       text: "Qui trovi le offerte reali dei supermercati vicino a te, caricate direttamente dai negozi. Ci vogliono pochi secondi per mostrarti come funziona.",
-      highlight: null
+      highlight: null,
+      blockRest: true
     },
     {
       title: "Imposta dove sei",
