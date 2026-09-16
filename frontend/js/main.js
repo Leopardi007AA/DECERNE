@@ -2043,25 +2043,44 @@ async function fetchRecommendedOffers() {
       section.classList.add("hidden");
       return;
     }
-    const recommended = (data || []).map(r => ({
-      id: r.id,
-      product: r.product,
-      price: r.price,
-      originalPrice: r.original_price,
-      category: r.category,
-      startDate: r.start_date,
-      endDate: r.end_date,
-      description: r.description,
-      img: r.img_url,
-      status: r.status,
-      storeName: r.store_name || "",
-      storeCity: r.store_city ? r.store_city.toLowerCase() : "",
-      storeCap: r.store_cap || "",
-      storeAddress: r.store_address || "",
-      plan: r.plan || "Starter",
-      cardRequirement: r.card_requirement || null,
-      limitedQuantity: r.limited_quantity || false
-    }));
+    const rows = data || [];
+
+    // La RPC restituisce il solo nome del negozio: per mostrare anche la
+    // filiale (come in "Offerte Vicine" e nel profilo negozio) risaliamo alla
+    // SEDE esatta dell'offerta, che applica già la regola
+    // "Negozio (Filiale)" per le sedi diverse da "Sede Principale".
+    const locationsById = await fetchPublicLocationsMap(rows.map(r => r.location_id));
+
+    const recommended = rows.map(r => {
+      const loc = locationsById[r.location_id] || {};
+
+      // Fallback: se la sede non è recuperabile ricomponiamo il nome dai campi
+      // della RPC, con la stessa identica regola di fetchPublicLocationsMap().
+      const fallbackName = (r.location_name && r.location_name !== 'Sede Principale')
+        ? `${r.store_name || ""} (${r.location_name})`
+        : (r.store_name || "");
+
+      return {
+        id: r.id,
+        product: r.product,
+        price: r.price,
+        originalPrice: r.original_price,
+        category: r.category,
+        startDate: r.start_date,
+        endDate: r.end_date,
+        description: r.description,
+        img: r.img_url,
+        status: r.status,
+        storeName: loc.name || fallbackName,
+        storeCity: (loc.city || r.store_city || "").toLowerCase(),
+        storeCap: loc.cap || r.store_cap || "",
+        storeAddress: loc.address || r.store_address || "",
+        storeId: loc.store_id || r.store_id || "",
+        plan: loc.plan || r.plan || "Starter",
+        cardRequirement: r.card_requirement || null,
+        limitedQuantity: r.limited_quantity || false
+      };
+    });
 
     renderRecommendedOffers(recommended.slice(0, 4));
   } catch (e) {
