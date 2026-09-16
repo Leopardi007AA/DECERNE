@@ -2045,14 +2045,34 @@ async function fetchRecommendedOffers() {
     }
     const rows = data || [];
 
-    // La RPC restituisce il solo nome del negozio: per mostrare anche la
-    // filiale (come in "Offerte Vicine" e nel profilo negozio) risaliamo alla
-    // SEDE esatta dell'offerta, che applica già la regola
-    // "Negozio (Filiale)" per le sedi diverse da "Sede Principale".
-    const locationsById = await fetchPublicLocationsMap(rows.map(r => r.location_id));
+    // La RPC get_recommended_offers non restituisce location_id: espone solo
+    // store_name/store_address/store_cap/store_city, presi dal negozio e non
+    // dalla sede esatta. Per recuperare la filiale dobbiamo prima risalire a
+    // location_id tramite la tabella "offers" (in chiaro per le offerte
+    // attive, stessa RLS pubblica usata da fetchOffersByCap), poi caricare le
+    // sedi con fetchPublicLocationsMap() come nelle altre sezioni.
+    const offerIds = rows.map(r => r.id).filter(Boolean);
+    let locationIdByOfferId = {};
+    if (offerIds.length > 0) {
+      const { data: offerLocRows, error: offerLocError } = await supabaseClient
+        .from('offers')
+        .select('id, location_id')
+        .in('id', offerIds);
+
+      if (offerLocError) {
+        console.warn("Errore risoluzione sede offerte consigliate:", offerLocError);
+      } else {
+        locationIdByOfferId = Object.fromEntries(
+          (offerLocRows || []).map(o => [o.id, o.location_id])
+        );
+      }
+    }
+
+    const locationsById = await fetchPublicLocationsMap(Object.values(locationIdByOfferId));
 
     const recommended = rows.map(r => {
-      const loc = locationsById[r.location_id] || {};
+
+      const loc = locationsById[locationIdByOfferId[r.id]] || {};
 
       // Fallback: se la sede non è recuperabile ricomponiamo il nome dai campi
       // della RPC, con la stessa identica regola di fetchPublicLocationsMap().
