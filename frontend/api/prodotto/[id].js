@@ -23,7 +23,7 @@ module.exports = async (req, res) => {
   let html = fs.readFileSync(indexPath, 'utf8');
 
   try {
-    const url = `${SUPABASE_URL}/rest/v1/offers?id=eq.${encodeURIComponent(id)}&status=eq.active&deleted_at=is.null&select=product,price,original_price,img_url`;
+    const url = `${SUPABASE_URL}/rest/v1/offers?id=eq.${encodeURIComponent(id)}&deleted_at=is.null&select=product,price,original_price,img_url,status,end_date`;
     const resp = await fetch(url, {
       headers: {
         apikey: SUPABASE_PUBLISHABLE_KEY,
@@ -34,12 +34,22 @@ module.exports = async (req, res) => {
     const offer = Array.isArray(rows) ? rows[0] : null;
 
     if (offer) {
-      const productTitle = `${offer.product} - DECERNE`;
+      const todayStr = new Date().toISOString().split('T')[0];
+      const isExpired = offer.status !== 'active' || (offer.end_date && offer.end_date < todayStr);
+
+      const productTitle = isExpired
+        ? `${offer.product} - Offerta scaduta - DECERNE`
+        : `${offer.product} - DECERNE`;
       const priceLabel = offer.original_price > offer.price
         ? `Solo €${offer.price} invece di €${offer.original_price}`
         : `€${offer.price}`;
-      const description = `${priceLabel} su DECERNE. Scopri l'offerta e trova il negozio più vicino a te.`;
-      const image = offer.img_url || DEFAULT_OG_IMAGE;
+      const description = isExpired
+        ? `Questa offerta su DECERNE non è più disponibile. Scopri le altre offerte vicino a te.`
+        : `${priceLabel} su DECERNE. Scopri l'offerta e trova il negozio più vicino a te.`;
+      // I crawler dei social non renderizzano un data: URI come og:image: se il
+      // negozio non ha caricato una foto reale, img_url è il placeholder SVG
+      // interno, quindi in quel caso usiamo l'immagine di default del sito.
+      const image = (offer.img_url && offer.img_url.startsWith('http')) ? offer.img_url : DEFAULT_OG_IMAGE;
       const canonicalUrl = `${SITE_ORIGIN}/prodotto/${id}`;
 
       html = html

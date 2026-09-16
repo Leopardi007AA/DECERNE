@@ -8535,6 +8535,11 @@ function displayProductInModal(product) {
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) 
     : 0;
 
+  // Un'offerta aperta da un link condiviso (o rimasta in un tab aperto) può
+  // nel frattempo essere scaduta o essere stata messa in pausa dal negozio.
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isExpired = product.status !== 'active' || (product.endDate && product.endDate < todayStr);
+
   // Logica Distintivo Blu per i Professional
   const verifiedBadge = (product.plan === 'Professional' || product.plan === 'Enterprise')
     ? `<span class="store-verified-blue" style="font-size:0.85rem; margin-left:8px; vertical-align:middle; color:#0f62fe; font-weight:800;">✓ Negozio Verificato</span>` 
@@ -8562,6 +8567,10 @@ function displayProductInModal(product) {
 
   content.innerHTML = `
     <div class="detail-container" style="max-width: 900px; margin: 0 auto; text-align: left;">
+      ${isExpired ? `
+      <div style="background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; padding:14px 18px; border-radius:12px; margin-bottom:20px; font-weight:600;">
+        Questa offerta non è più disponibile: è scaduta o è stata sospesa dal negozio.
+      </div>` : ''}
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 30px; align-items: start;">
         
         <!-- Contenitore Immagine: Grande, Pieno e Arrotondato -->
@@ -8613,8 +8622,8 @@ function displayProductInModal(product) {
             <p style="line-height: 1.6; color: #475569; font-size: 1.05rem;">${escapeHtml(product.description || '') || 'Nessuna descrizione aggiuntiva fornita dal punto vendita.'}</p>
           </div>
           
-          <button class="btn full-width detail-btn-cart" onclick="saveToShoppingList('${product.id}')" style="height: 60px; font-size: 1.2rem; border-radius: 14px; background: #0f62fe; box-shadow: 0 4px 14px rgba(15,98,254,0.3); transition: transform 0.2s; display:flex; align-items:center; justify-content:center; gap:10px;">
-            ${PANEL_ICONS.basket} Aggiungi alla lista spesa
+          <button class="btn full-width detail-btn-cart" ${isExpired ? 'disabled' : `onclick="saveToShoppingList('${product.id}')"`} style="height: 60px; font-size: 1.2rem; border-radius: 14px; background: ${isExpired ? '#94a3b8' : '#0f62fe'}; box-shadow: 0 4px 14px rgba(15,98,254,0.3); transition: transform 0.2s; display:flex; align-items:center; justify-content:center; gap:10px; ${isExpired ? 'cursor:not-allowed; opacity:0.7;' : ''}">
+            ${PANEL_ICONS.basket} ${isExpired ? 'Offerta non disponibile' : 'Aggiungi alla lista spesa'}
           </button>
 
           <button class="btn outline full-width" onclick="openStoreInGoogleMaps('${(product.storeAddress || product.storeName || '').replace(/'/g, "\\'")}')" style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
