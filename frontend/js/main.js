@@ -8175,9 +8175,10 @@ function renderDashboard(container) {
 
     container.innerHTML = `
     <div class="store-dashboard">
-      <button class="partner-sidebar-handle" id="partnerSidebarHandle" onclick="togglePartnerSidebar()" aria-label="Apri il menu del pannello partner" aria-expanded="false">
+      <button class="partner-sidebar-handle" id="partnerSidebarHandle" aria-label="Apri il menu del pannello partner" aria-expanded="false">
         <span class="partner-sidebar-handle-grip"></span>
       </button>
+      <div class="partner-sidebar-edge" id="partnerSidebarEdge"></div>
       <div class="partner-sidebar-overlay" id="partnerSidebarOverlay" onclick="closePartnerSidebar()"></div>
       <aside class="store-sidebar" id="partnerSidebar">
         <button class="partner-sidebar-close" onclick="closePartnerSidebar()" aria-label="Chiudi il menu">
@@ -8252,38 +8253,42 @@ window.openPartnerSidebar = openPartnerSidebar;
 window.closePartnerSidebar = closePartnerSidebar;
 window.togglePartnerSidebar = togglePartnerSidebar;
 
-// La maniglia si trascina con il dito: il pannello segue lo spostamento invece
-// di scattare aperto di colpo (stesso pattern a molla di setupDrawerDrag, ma in apertura).
+// La maniglia (e la fascia invisibile più larga sul bordo) si trascinano con il
+// dito: il pannello segue lo spostamento invece di scattare aperto di colpo
+// (stesso pattern a molla di setupDrawerDrag, ma in apertura).
 function setupPartnerSidebarDrag() {
   const handle = $("#partnerSidebarHandle");
+  const edge = $("#partnerSidebarEdge");
   const sidebar = $("#partnerSidebar");
   const overlay = $("#partnerSidebarOverlay");
-  if (!handle || !sidebar || !overlay) return;
+  if (!handle || !edge || !sidebar || !overlay) return;
   const DRAG_THRESHOLD = 10; // px — sotto questa soglia è un tap, non uno swipe
-  let startX = 0, startY = 0, startTransform = 0, sidebarWidth = 0, history = [], dragging = false, engaged = false, suppressClick = false, cancelSpring = null, pointerId = null;
+  let startX = 0, startY = 0, startTransform = 0, sidebarWidth = 0, history = [], dragging = false, engaged = false, suppressClick = false, cancelSpring = null, pointerId = null, captureEl = null;
 
-  handle.addEventListener('pointerdown', (e) => {
+  function beginDrag(e) {
+    if (sidebar.classList.contains('open')) return; // qui gestiamo solo l'apertura
     if (cancelSpring) cancelSpring();
     dragging = true;
     engaged = false;
     pointerId = e.pointerId;
+    captureEl = e.currentTarget;
     startX = e.clientX;
     startY = e.clientY;
     sidebarWidth = sidebar.getBoundingClientRect().width || 300;
     startTransform = -sidebarWidth; // parte chiuso, fuori schermo a sinistra
     history = [{ x: e.clientX, t: performance.now() }];
-  });
+  }
 
-  handle.addEventListener('pointermove', (e) => {
+  function onMove(e) {
     if (!dragging) return;
     const deltaX = e.clientX - startX;
     const deltaY = e.clientY - startY;
 
     if (!engaged) {
       if (Math.abs(deltaX) < DRAG_THRESHOLD && Math.abs(deltaY) < DRAG_THRESHOLD) return;
-      if (Math.abs(deltaY) > Math.abs(deltaX)) { dragging = false; return; } // scroll verticale, non swipe
+      if (deltaX < 0 || Math.abs(deltaY) > Math.abs(deltaX)) { dragging = false; return; } // verso sbagliato o scroll verticale
       engaged = true;
-      handle.setPointerCapture(pointerId);
+      captureEl.setPointerCapture(pointerId);
       sidebar.classList.add('dragging');
       overlay.classList.add('open');
       overlay.style.opacity = '0';
@@ -8297,14 +8302,13 @@ function setupPartnerSidebarDrag() {
     overlay.style.opacity = Math.min(1, Math.max(0, (next + sidebarWidth) / sidebarWidth));
     history.push({ x: e.clientX, t: performance.now() });
     if (history.length > 5) history.shift();
-  });
+  }
 
   function endDrag() {
     if (!dragging) return;
     dragging = false;
-    if (!engaged) return; // era solo un tap: il click su togglePartnerSidebar() parte regolare
+    if (!engaged) return; // era solo un tap: il click gestisce l'apertura normalmente
     suppressClick = true;
-    sidebar.classList.remove('dragging');
     const current = getDrawerTranslateX(sidebar);
 
     const first = history[0], last = history[history.length - 1];
@@ -8314,6 +8318,9 @@ function setupPartnerSidebarDrag() {
     const shouldOpen = projected > -sidebarWidth / 2 || velocity > 500;
     const target = shouldOpen ? 0 : -sidebarWidth;
 
+    // La classe 'dragging' resta finché l'animazione a molla non finisce:
+    // toglierla prima fa ripartire la transizione CSS in parallelo al JS,
+    // ed è quello che causava l'effetto "a scatti".
     cancelSpring = springTo(
       () => getDrawerTranslateX(sidebar),
       (v) => {
@@ -8324,6 +8331,7 @@ function setupPartnerSidebarDrag() {
       velocity,
       {
         onComplete: () => {
+          sidebar.classList.remove('dragging');
           sidebar.style.transform = '';
           overlay.style.opacity = '';
           overlay.classList.remove('open');
@@ -8334,13 +8342,18 @@ function setupPartnerSidebarDrag() {
     );
   }
 
-  handle.addEventListener('pointerup', endDrag);
-  handle.addEventListener('pointercancel', endDrag);
+  [handle, edge].forEach((el) => {
+    el.addEventListener('pointerdown', beginDrag);
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', endDrag);
+    el.addEventListener('pointercancel', endDrag);
+  });
 
-  // Un tap trascinato non deve generare anche il click che riapre/richiude
+  // Un tap che non diventa drag apre/chiude normalmente; un tap trascinato no.
   handle.addEventListener('click', (e) => {
-    if (suppressClick) { suppressClick = false; e.preventDefault(); e.stopPropagation(); }
-  }, true);
+    if (suppressClick) { suppressClick = false; e.preventDefault(); e.stopPropagation(); return; }
+    togglePartnerSidebar();
+  });
 }
 window.setupPartnerSidebarDrag = setupPartnerSidebarDrag;
 

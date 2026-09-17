@@ -3374,7 +3374,8 @@ hr {
   /* --- Pannello Partner: menu laterale a comparsa su schermi piccoli --- */
   .partner-sidebar-handle,
   .partner-sidebar-overlay,
-  .partner-sidebar-close {
+  .partner-sidebar-close,
+  .partner-sidebar-edge {
     display: none;
   }
 
@@ -3409,6 +3410,18 @@ hr {
       }
     .partner-sidebar-handle.is-hidden { opacity: 0; pointer-events: none; }
     .partner-sidebar-handle-grip { width: 3px; height: 28px; border-radius: 2px; background: rgba(255,255,255,0.85); }
+
+    .partner-sidebar-edge {
+      display: block;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 24px;
+      height: 100%;
+      z-index: 1150;
+      touch-action: none;
+      background: transparent;
+    }
 
     .partner-sidebar-overlay.open {
       display: block;
