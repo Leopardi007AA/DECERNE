@@ -8431,7 +8431,7 @@ function renderHomeTab() {
       </div>
       <div class="card-saas" style="border-left: 4px solid #10b981; background: #f0fdf4;">
         <h3 style="color: #166534; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.headset} Supporto Prioritario</h3>
-        <p style="font-size: 0.8rem; margin: 10px 0;">Email: <strong>support@decerne.it</strong><br>Risposta: <strong>&lt; 24h</strong></p>
+        <p style="font-size: 0.8rem; margin: 10px 0;">Email: <strong><a href="mailto:support@decerne.it" style="color:#166534;">support@decerne.it</a></strong><br>Risposta: <strong>&lt; 24h</strong></p>
       </div>
     </div>
   ` : "";
@@ -10344,7 +10344,7 @@ function renderGeneralDashboardTab() {
             <span class="round-ico" style="color:#1e40af;">${PANEL_ICONS.userCircle}</span>
             <h3 style="margin: 0; color: #1e40af; font-size: 1rem;">Account Manager Dedicato</h3>
           </div>
-          <p style="margin: 5px 0; font-size: 0.85rem; color: #1e293b;">Email: <strong>enterprise@decerne.it</strong></p>
+          <p style="margin: 5px 0; font-size: 0.85rem; color: #1e293b;">Email: <strong><a href="mailto:enterprise@decerne.it" style="color:#1e40af;">enterprise@decerne.it</a></strong></p>
           <div style="display: inline-block; margin-top: 8px; background: #dbeafe; color: #1e40af; padding: 3px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">SLA: Risposta entro 4 ore</div>
         </div>
       ` : ''}
