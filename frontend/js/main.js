@@ -4528,6 +4528,14 @@ let cartRoutePolyline = null;
 let cartNavigationCompleted = false;
 let cartRecalcInFlight = false;
 let cartVoiceQueue = [];
+let cartManeuverMinDist = Infinity;
+let cartOffRouteAnnounced = false;
+let cartLastSpeedPos = null;
+let cartLastSpeedTime = null;
+let cartLastKnownSpeedMs = null;
+let cartPaceFactor = 1;
+let cartLastPacePos = null;
+let cartLastPaceTime = null;
 let cartLastHeading = null;
 let cartWrongDirectionCount = 0;
 let cartWrongDirectionAnnounced = false;
@@ -4825,8 +4833,13 @@ function updateTripInfoBar() {
   bar.style.display = 'block';
   const stopsList = cartVisitOrder.map((s, i) => `${i + 1}. ${s.name}`).join(' → ');
 
-  // Tempo di arrivo riferito alla PRIMA tappa (non all'ultima). Se c'è una sola tappa, solo "Arrivo".
-  const firstLegMin = cartMultiRoute.legs?.[0]?.durationMin ?? cartMultiRoute.totalDurationMin;
+  // cartPaceFactor confronta il ritmo di guida reale con quello previsto da
+  // OSRM per la strada appena percorsa: se il conducente va più piano/veloce
+  // del previsto, l'arrivo stimato si allunga/accorcia di conseguenza,
+  // invece di restare fisso sulla sola velocità media della strada.
+  const adjustedTotalMin = cartMultiRoute.totalDurationMin / cartPaceFactor;
+  const firstLegMinRaw = cartMultiRoute.legs?.[0]?.durationMin ?? cartMultiRoute.totalDurationMin;
+  const firstLegMin = firstLegMinRaw / cartPaceFactor;
   const etaLabel = cartVisitOrder.length === 1
     ? `Arrivo: ${formatEta(firstLegMin)}`
     : `Arrivo alla prima tappa: ${formatEta(firstLegMin)}`;
@@ -4834,7 +4847,7 @@ function updateTripInfoBar() {
   bar.innerHTML = `
     <div style="font-size:0.8rem; color:#cbd5e1; margin-bottom:4px;">${stopsList}</div>
     <strong>Percorso completo</strong>: ${PANEL_ICONS.road} ${cartMultiRoute.totalDistanceKm.toFixed(1)} km &nbsp;·&nbsp;
-    ${PANEL_ICONS.clock} ${formatDuration(cartMultiRoute.totalDurationMin)} &nbsp;·&nbsp;
+    ${PANEL_ICONS.clock} ${formatDuration(adjustedTotalMin)} &nbsp;·&nbsp;
     ${etaLabel}
   `;
 }
@@ -4879,6 +4892,28 @@ async function recalculateTrip(currentLat, currentLng) {
   const remainingStops = cartVisitOrder.slice(cartNextStopIndex);
   if (!remainingStops.length) return;
 
+  // Aggiorna la stima del ritmo di guida confrontando la velocità reale
+  // tenuta dall'ultimo ricalcolo con quella "attesa" per quel tratto di
+  // strada (distanza/durata del leg secondo OSRM). Non usiamo la velocità
+  // istantanea per tutta l'ETA rimanente (un semaforo rosso o un tratto
+  // di autostrada falserebbero la stima): il fattore è mediato nel tempo
+  // (media mobile) e limitato a un intervallo ragionevole.
+  if (cartMultiRoute && cartLastPacePos && cartLastPaceTime) {
+    const elapsedH = (Date.now() - cartLastPaceTime) / 3600000;
+    const distKm = distanceMeters(cartLastPacePos.lat, cartLastPacePos.lng, currentLat, currentLng) / 1000;
+    const expectedLeg = cartMultiRoute.legs?.[0];
+    if (elapsedH > 0.0025 && distKm > 0.02 && expectedLeg?.durationMin > 0) {
+      const expectedSpeedKmh = expectedLeg.distanceKm / (expectedLeg.durationMin / 60);
+      const actualSpeedKmh = distKm / elapsedH;
+      if (expectedSpeedKmh > 0) {
+        const ratio = Math.min(2.5, Math.max(0.4, actualSpeedKmh / expectedSpeedKmh));
+        cartPaceFactor = cartPaceFactor * 0.7 + ratio * 0.3;
+      }
+    }
+  }
+  cartLastPacePos = { lat: currentLat, lng: currentLng };
+  cartLastPaceTime = Date.now();
+
   // Ricalcola anche l'ordine delle tappe non ancora visitate: da dove ti trovi ora
   // il tragitto più breve potrebbe non coincidere più con l'ordine di partenza.
   const reordered = computeVisitOrder(currentLat, currentLng, remainingStops);
@@ -4896,6 +4931,7 @@ async function recalculateTrip(currentLat, currentLng) {
     cartMultiRoute = multiRoute;
     cartManeuvers = newManeuvers;
     cartNextManeuverIndex = 0;
+    cartManeuverMinDist = Infinity;
     updateTripInfoBar();
     drawRoutePolyline(multiRoute.coords);
   }
@@ -5511,12 +5547,23 @@ function startLiveTracking() {
       const newLat = pos.coords.latitude;
       const newLng = pos.coords.longitude;
 
+      // Velocità reale: usiamo quella del GPS quando il dispositivo la
+      // fornisce (più affidabile), altrimenti la stimiamo dallo spostamento
+      // tra due letture. Serve sia per decidere con quanto anticipo dare le
+      // indicazioni (a velocità più alta serve più anticipo), sia per
+      // correggere la stima di arrivo più sotto.
+      let speedMs = (pos.coords.speed != null && !isNaN(pos.coords.speed) && pos.coords.speed >= 0) ? pos.coords.speed : null;
+      if (speedMs === null && cartLastSpeedPos && cartLastSpeedTime) {
+        const dt = (Date.now() - cartLastSpeedTime) / 1000;
+        if (dt > 0.5) speedMs = distanceMeters(cartLastSpeedPos.lat, cartLastSpeedPos.lng, newLat, newLng) / dt;
+      }
+      if (speedMs !== null && !isNaN(speedMs)) cartLastKnownSpeedMs = speedMs;
+      cartLastSpeedPos = { lat: newLat, lng: newLng };
+      cartLastSpeedTime = Date.now();
+      const currentSpeedMs = cartLastKnownSpeedMs != null ? cartLastKnownSpeedMs : 12; // ~43 km/h: stima prudente finché non abbiamo un dato reale
+
       let heading = pos.coords.heading;
       if (heading === null || isNaN(heading)) {
-        // Senza bussola nel dispositivo, la direzione si ricava dallo spostamento
-        // reale — ma solo se ci si è mossi abbastanza da fidarsi del risultato,
-        // altrimenti si tiene l'ultima direzione buona invece di far ballare
-        // l'icona auto per il rumore GPS da fermi o a passo d'uomo.
         if (cartLastPos && distanceMeters(cartLastPos.lat, cartLastPos.lng, newLat, newLng) > 8) {
           heading = calculateBearing(cartLastPos.lat, cartLastPos.lng, newLat, newLng);
           cartLastHeading = heading;
@@ -5539,14 +5586,10 @@ function startLiveTracking() {
       }
       if (cartMap && cartFollowMe) cartMap.panTo([newLat, newLng]);
 
-      if (cartNavigationCompleted) return; // ultima tappa raggiunta: niente più ricalcoli o annunci
+      if (cartNavigationCompleted) return;
 
       const distFromRoute = updateRouteProgress(newLat, newLng);
 
-      // Direzione sbagliata: diverso dal semplice "fuori percorso" perché guarda
-      // il verso di marcia, non solo la distanza dalla linea blu. Copre il caso
-      // di chi è ancora vicino al tracciato ma sta proseguendo oltre una svolta
-      // mancata, andando di fatto all'indietro sulla rotta prevista.
       const routeHeading = expectedRouteHeading();
       const wrongDirection = heading !== null && !isNaN(heading) && routeHeading !== null &&
         angleDiff(heading, routeHeading) > 135;
@@ -5556,12 +5599,11 @@ function startLiveTracking() {
         cartWrongDirectionCount = 0;
         cartWrongDirectionAnnounced = false;
       }
-      // Due letture consecutive prima di agire, per non scattare su un singolo
-      // campione di bearing rumoroso (es. da fermi a un incrocio).
       const confirmedWrongDirection = cartWrongDirectionCount >= 2;
 
       const now = Date.now();
       const offRoute = cartMultiRoute && distFromRoute > 60;
+      if (!offRoute) cartOffRouteAnnounced = false;
       const recalcWait = (offRoute || confirmedWrongDirection) ? 0 : 20000;
       if (cartVisitOrder.length && !cartRecalcInFlight && now - cartLastRouteRecalc > recalcWait) {
         cartLastRouteRecalc = now;
@@ -5570,23 +5612,53 @@ function startLiveTracking() {
       }
 
       if (cartVoiceEnabled && confirmedWrongDirection) {
-        // Un solo avviso per episodio: il ricalcolo è già partito sopra, non
-        // serve ripetere il messaggio a ogni aggiornamento GPS.
         if (!cartWrongDirectionAnnounced) {
           speakVoiceMessage("Sembra che tu stia andando in direzione opposta al percorso. Se puoi, fai un'inversione a U: sto ricalcolando la strada.");
           cartWrongDirectionAnnounced = true;
         }
-      } else if (cartVoiceEnabled && cartManeuvers.length && cartNextManeuverIndex < cartManeuvers.length) {
-        const nextManeuver = cartManeuvers[cartNextManeuverIndex];
-        const distToManeuver = distanceMeters(newLat, newLng, nextManeuver.lat, nextManeuver.lng);
-        if (!nextManeuver.announcedFar && distToManeuver < 300) {
-          const roundedDist = Math.max(50, Math.round(distToManeuver / 50) * 50);
-          speakVoiceMessage(`Tra ${roundedDist} metri, ${nextManeuver.text}.`);
-          nextManeuver.announcedFar = true;
+      } else if (cartVoiceEnabled && offRoute) {
+        // Fuori percorso ma non necessariamente in direzione opposta: le
+        // manovre già calcolate si riferiscono ancora alla strada vecchia,
+        // quindi non vanno annunciate finché il ricalcolo avviato sopra non
+        // le sostituisce — altrimenti si sentirebbe un'indicazione sbagliata.
+        if (!cartOffRouteAnnounced) {
+          speakVoiceMessage("Sei uscito dal percorso previsto, sto ricalcolando.");
+          cartOffRouteAnnounced = true;
         }
-        if (distToManeuver < 35) {
-          speakVoiceMessage(`${capitalizeFirst(nextManeuver.text)}.`);
-          cartNextManeuverIndex++;
+      } else if (cartVoiceEnabled && cartManeuvers.length && cartNextManeuverIndex < cartManeuvers.length) {
+        // L'anticipo con cui avvisare scala con la velocità: a passo d'uomo
+        // restano le soglie minime, ad alta velocità l'anticipo cresce fino
+        // a un tetto ragionevole.
+        const farAnnounceDist = Math.min(500, Math.max(200, currentSpeedMs * 12));
+        const nearAnnounceDist = Math.min(150, Math.max(45, currentSpeedMs * 5));
+
+        // Due manovre molto ravvicinate (es. due rotatorie una dopo l'altra):
+        // cartManeuverMinDist tiene il minimo storico verso la manovra
+        // corrente; se la distanza torna a crescere dopo essere stata
+        // vicina, la consideriamo comunque superata e si passa alla
+        // successiva (fino a 3 per ciclo, per recuperare più salti insieme).
+        let guard = 0;
+        while (cartVoiceEnabled && cartNextManeuverIndex < cartManeuvers.length && guard < 3) {
+          guard++;
+          const nextManeuver = cartManeuvers[cartNextManeuverIndex];
+          const distToManeuver = distanceMeters(newLat, newLng, nextManeuver.lat, nextManeuver.lng);
+          if (distToManeuver < cartManeuverMinDist) cartManeuverMinDist = distToManeuver;
+          const wasClose = cartManeuverMinDist <= farAnnounceDist;
+          const movingAway = distToManeuver > cartManeuverMinDist + 20;
+          const reached = distToManeuver < nearAnnounceDist || (wasClose && movingAway);
+
+          if (!nextManeuver.announcedFar && distToManeuver < farAnnounceDist && !reached) {
+            const roundedDist = Math.max(50, Math.round(distToManeuver / 50) * 50);
+            speakVoiceMessage(`Tra ${roundedDist} metri, ${nextManeuver.text}.`);
+            nextManeuver.announcedFar = true;
+          }
+          if (reached) {
+            speakVoiceMessage(`${capitalizeFirst(nextManeuver.text)}.`);
+            cartNextManeuverIndex++;
+            cartManeuverMinDist = Infinity;
+          } else {
+            break;
+          }
         }
       }
 
@@ -5601,7 +5673,6 @@ function startLiveTracking() {
             cartNavigationCompleted = true;
           } else {
             const upcoming = cartVisitOrder[cartNextStopIndex];
-            // Va in coda subito: parte da sola solo dopo che "Sei arrivato" è finito.
             speakVoiceMessage(`Prossima tappa: ${upcoming.name}.`);
           }
         }
@@ -5651,6 +5722,14 @@ function stopCartMapTracking() {
   cartLastHeading = null;
   cartWrongDirectionCount = 0;
   cartWrongDirectionAnnounced = false;
+  cartManeuverMinDist = Infinity;
+  cartOffRouteAnnounced = false;
+  cartLastSpeedPos = null;
+  cartLastSpeedTime = null;
+  cartLastKnownSpeedMs = null;
+  cartPaceFactor = 1;
+  cartLastPacePos = null;
+  cartLastPaceTime = null;
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   // Durante il tour, tornando indietro dalla mappa demo deve ricomparire
   // il carrello demo, non quello vero (per un visitatore anonimo sarebbe
