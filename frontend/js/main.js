@@ -8216,6 +8216,7 @@ function renderDashboard(container) {
     if (typeof tabResult === 'string') contentArea.innerHTML = tabResult;
     else { contentArea.innerHTML = ""; contentArea.appendChild(tabResult); }
   }
+  setupPartnerSidebarDrag();
 }
 
 // Menu laterale del Pannello Partner a comparsa su schermi piccoli (sotto i 900px):
@@ -8250,6 +8251,98 @@ function togglePartnerSidebar() {
 window.openPartnerSidebar = openPartnerSidebar;
 window.closePartnerSidebar = closePartnerSidebar;
 window.togglePartnerSidebar = togglePartnerSidebar;
+
+// La maniglia si trascina con il dito: il pannello segue lo spostamento invece
+// di scattare aperto di colpo (stesso pattern a molla di setupDrawerDrag, ma in apertura).
+function setupPartnerSidebarDrag() {
+  const handle = $("#partnerSidebarHandle");
+  const sidebar = $("#partnerSidebar");
+  const overlay = $("#partnerSidebarOverlay");
+  if (!handle || !sidebar || !overlay) return;
+  const DRAG_THRESHOLD = 10; // px — sotto questa soglia è un tap, non uno swipe
+  let startX = 0, startY = 0, startTransform = 0, sidebarWidth = 0, history = [], dragging = false, engaged = false, suppressClick = false, cancelSpring = null, pointerId = null;
+
+  handle.addEventListener('pointerdown', (e) => {
+    if (cancelSpring) cancelSpring();
+    dragging = true;
+    engaged = false;
+    pointerId = e.pointerId;
+    startX = e.clientX;
+    startY = e.clientY;
+    sidebarWidth = sidebar.getBoundingClientRect().width || 300;
+    startTransform = -sidebarWidth; // parte chiuso, fuori schermo a sinistra
+    history = [{ x: e.clientX, t: performance.now() }];
+  });
+
+  handle.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const deltaX = e.clientX - startX;
+    const deltaY = e.clientY - startY;
+
+    if (!engaged) {
+      if (Math.abs(deltaX) < DRAG_THRESHOLD && Math.abs(deltaY) < DRAG_THRESHOLD) return;
+      if (Math.abs(deltaY) > Math.abs(deltaX)) { dragging = false; return; } // scroll verticale, non swipe
+      engaged = true;
+      handle.setPointerCapture(pointerId);
+      sidebar.classList.add('dragging');
+      overlay.classList.add('open');
+      overlay.style.opacity = '0';
+      handle.classList.add('is-hidden');
+    }
+
+    let next = startTransform + deltaX;
+    if (next > 0) next *= 0.3; // rubber-band oltre l'apertura completa
+    if (next < -sidebarWidth) next = -sidebarWidth + (next + sidebarWidth) * 0.3; // rubber-band oltre la chiusura
+    sidebar.style.transform = `translateX(${next}px)`;
+    overlay.style.opacity = Math.min(1, Math.max(0, (next + sidebarWidth) / sidebarWidth));
+    history.push({ x: e.clientX, t: performance.now() });
+    if (history.length > 5) history.shift();
+  });
+
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    if (!engaged) return; // era solo un tap: il click su togglePartnerSidebar() parte regolare
+    suppressClick = true;
+    sidebar.classList.remove('dragging');
+    const current = getDrawerTranslateX(sidebar);
+
+    const first = history[0], last = history[history.length - 1];
+    const dt = (last.t - first.t) / 1000;
+    const velocity = dt > 0 ? (last.x - first.x) / dt : 0;
+    const projected = current + (velocity / 1000) * 0.998 / (1 - 0.998);
+    const shouldOpen = projected > -sidebarWidth / 2 || velocity > 500;
+    const target = shouldOpen ? 0 : -sidebarWidth;
+
+    cancelSpring = springTo(
+      () => getDrawerTranslateX(sidebar),
+      (v) => {
+        sidebar.style.transform = `translateX(${v}px)`;
+        overlay.style.opacity = Math.min(1, Math.max(0, (v + sidebarWidth) / sidebarWidth));
+      },
+      target,
+      velocity,
+      {
+        onComplete: () => {
+          sidebar.style.transform = '';
+          overlay.style.opacity = '';
+          overlay.classList.remove('open');
+          handle.classList.remove('is-hidden');
+          if (shouldOpen) openPartnerSidebar(); else closePartnerSidebar();
+        }
+      }
+    );
+  }
+
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+
+  // Un tap trascinato non deve generare anche il click che riapre/richiude
+  handle.addEventListener('click', (e) => {
+    if (suppressClick) { suppressClick = false; e.preventDefault(); e.stopPropagation(); }
+  }, true);
+}
+window.setupPartnerSidebarDrag = setupPartnerSidebarDrag;
 
 /**
  * Renderizza la Dashboard Home con statistiche a livelli, in base al piano attivo.
