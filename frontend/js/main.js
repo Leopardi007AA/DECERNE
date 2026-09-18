@@ -3731,6 +3731,29 @@ async function restoreUserSession() {
       return;
     }
 
+    // Login social ma account Decerne inesistente: Supabase lo crea comunque
+    // in automatico, quindi lo scopriamo confrontando created_at/last_sign_in_at
+    // (identici solo al primissimo accesso in assoluto) con l'intento salvato
+    // prima del redirect verso il provider.
+    const oauthIntent = sessionStorage.getItem('decerne_oauth_intent');
+    sessionStorage.removeItem('decerne_oauth_intent');
+    const provider = session.user.app_metadata?.provider;
+    const isFirstOauthSignIn = provider && provider !== 'email' &&
+      Math.abs(new Date(session.user.created_at) - new Date(session.user.last_sign_in_at)) < 3000;
+
+    if (oauthIntent === 'login' && isFirstOauthSignIn) {
+      await supabaseClient.auth.signOut();
+      state.currentUser = null;
+      openFullPageModal('profile');
+      showRegisterForm();
+      const err = $("#authError");
+      if (err) {
+        err.innerText = "Non abbiamo trovato un account collegato a questo servizio. Completa la registrazione qui sotto, oppure riprova subito con lo stesso servizio per creare l'account.";
+        err.classList.remove("hidden");
+      }
+      return;
+    }
+
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles').select('name, surname, city, cap').eq('id', session.user.id).single();
 
@@ -5760,15 +5783,17 @@ window.removeFromCart = async (id) => {
   renderCartContent();
 };
 
-async function signInWithProvider(provider) {
+async function signInWithProvider(provider, intent = 'register') {
   try {
     showLoading();
+    sessionStorage.setItem('decerne_oauth_intent', intent);
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider,
       options: { redirectTo: window.location.origin + window.location.pathname }
     });
     if (error) {
       hideLoading();
+      sessionStorage.removeItem('decerne_oauth_intent');
       toast.error("Impossibile accedere con " + provider + ". Riprova.");
     }
     // In caso di successo il browser viene reindirizzato al provider:
@@ -5801,15 +5826,15 @@ function renderLoginForm() {
         <a href="javascript:void(0)" onclick="renderForgotPasswordForm()" style="font-size:0.85rem; color:#64748b;">Password dimenticata?</a>
       </p>
       <div class="social-divider"><span>oppure</span></div>
-      <button type="button" class="btn-social btn-google" onclick="signInWithProvider('google')">
+      <button type="button" class="btn-social btn-google" onclick="signInWithProvider('google','login')">
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><g fill-rule="evenodd"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z" fill="#EA4335"/></g></svg>
         Continua con Google
       </button>
-      <button type="button" class="btn-social btn-facebook" onclick="signInWithProvider('facebook')">
+      <button type="button" class="btn-social btn-facebook" onclick="signInWithProvider('facebook','login')">
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
         Continua con Facebook
       </button>
-      <button type="button" class="btn-social btn-github" onclick="signInWithProvider('github')">
+      <button type="button" class="btn-social btn-github" onclick="signInWithProvider('github','login')">
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
          <path fill="#24292e" fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
         </svg>
