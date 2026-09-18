@@ -4009,3 +4009,68 @@ hr {
      z-index: 2215 !important;
    }
    
+
+/* Modal "Scrivi a Decerne" — fallback per mailto: che non fa nulla su desktop senza client configurato */
+.email-contact-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(var(--blur-sm));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  padding: 20px;
+}
+
+.email-contact-box {
+  position: relative;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  padding: 32px 28px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+}
+
+.email-contact-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #94a3b8;
+}
+
+.email-contact-close:hover {
+  color: var(--text);
+}
+
+.email-contact-box h3 {
+  margin: 0 0 12px;
+  font-size: var(--fs-lg);
+}
+
+.email-contact-address {
+  font-weight: 700;
+  font-size: var(--fs-md);
+  color: var(--primary);
+  word-break: break-all;
+  margin: 0 0 20px;
+}
+
+.email-contact-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.email-contact-actions .btn,
+.email-contact-actions .btn.outline {
+  width: 100%;
+  text-align: center;
+}

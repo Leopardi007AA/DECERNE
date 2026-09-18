@@ -7496,7 +7496,7 @@ const isAnnual = isAnnualView;
       <div class="store-footer-login" style="margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 30px;">
         <p style="color: #64748b; font-size: 1rem;">
           Hai bisogno di assistenza per scegliere il piano? 
-          <a href="mailto:contact@decerne.it" style="color: var(--primary); font-weight: 700; text-decoration: none; margin-left: 5px;">Parla con un esperto</a>
+          <a href="mailto:contact@decerne.it" onclick="openEmailContact('contact@decerne.it', 'Richiesta informazioni sui piani'); return false;" style="color: var(--primary); font-weight: 700; text-decoration: none; margin-left: 5px;">Parla con un esperto</a>
         </p>
       </div>
     </div>
@@ -8469,7 +8469,7 @@ function renderHomeTab() {
       </div>
       <div class="card-saas" style="border-left: 4px solid #10b981; background: #f0fdf4;">
         <h3 style="color: #166534; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.headset} Supporto Prioritario</h3>
-                <p style="font-size: 0.8rem; margin: 10px 0;">Email: <strong><a href="mailto:${plan === 'Enterprise' ? 'enterprise@decerne.it' : 'professional@decerne.it'}" style="color:#166534;">${plan === 'Enterprise' ? 'enterprise@decerne.it' : 'professional@decerne.it'}</a></strong><br>Risposta: <strong>&lt; 24h</strong></p>
+                <p style="font-size: 0.8rem; margin: 10px 0;">Email: <strong><a href="mailto:${plan === 'Enterprise' ? 'enterprise@decerne.it' : 'professional@decerne.it'}" onclick="openEmailContact('${plan === 'Enterprise' ? 'enterprise@decerne.it' : 'professional@decerne.it'}', 'Richiesta supporto prioritario'); return false;" style="color:#166534;">${plan === 'Enterprise' ? 'enterprise@decerne.it' : 'professional@decerne.it'}</a></strong><br>Risposta: <strong>&lt; 24h</strong></p>
       </div>
     </div>
   ` : "";
@@ -10383,7 +10383,7 @@ function renderGeneralDashboardTab() {
             <span class="round-ico" style="color:#1e40af;">${PANEL_ICONS.userCircle}</span>
             <h3 style="margin: 0; color: #1e40af; font-size: 1rem;">Account Manager Dedicato</h3>
           </div>
-          <p style="margin: 5px 0; font-size: 0.85rem; color: #1e293b;">Email: <strong><a href="mailto:${isEnterprise ? 'enterprise@decerne.it' : 'professional@decerne.it'}" style="color:#1e40af;">${isEnterprise ? 'enterprise@decerne.it' : 'professional@decerne.it'}</a></strong></p>
+          <p style="margin: 5px 0; font-size: 0.85rem; color: #1e293b;">Email: <strong><a href="mailto:${isEnterprise ? 'enterprise@decerne.it' : 'professional@decerne.it'}" onclick="openEmailContact('${isEnterprise ? 'enterprise@decerne.it' : 'professional@decerne.it'}', 'Richiesta assistenza Account Manager'); return false;" style="color:#1e40af;">${isEnterprise ? 'enterprise@decerne.it' : 'professional@decerne.it'}</a></strong></p>
           <div style="display: inline-block; margin-top: 8px; background: #dbeafe; color: #1e40af; padding: 3px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">SLA: Risposta entro 4 ore</div>
         </div>
       ` : ''}
@@ -12577,3 +12577,65 @@ const pollId = setInterval(() => {
     $("#cookieBannerClose")?.addEventListener("click", () => closeBanner("dismissed"));
   });
 })();
+
+
+function openEmailContact(email, subject = '') {
+  document.querySelector('.email-contact-overlay')?.remove();
+
+  const encodedSubject = encodeURIComponent(subject);
+  const mailtoHref = `mailto:${email}${subject ? '?subject=' + encodedSubject : ''}`;
+  const gmailHref = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}${subject ? '&su=' + encodedSubject : ''}`;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'email-contact-overlay';
+
+  const box = document.createElement('div');
+  box.className = 'email-contact-box';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'email-contact-close';
+  closeBtn.setAttribute('aria-label', 'Chiudi');
+  closeBtn.textContent = '×';
+  closeBtn.onclick = () => overlay.remove();
+
+  const title = document.createElement('h3');
+  title.textContent = 'Scrivi a Decerne';
+
+  const addr = document.createElement('p');
+  addr.className = 'email-contact-address';
+  addr.textContent = email; // SICURO
+
+  const actions = document.createElement('div');
+  actions.className = 'email-contact-actions';
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'btn';
+  copyBtn.textContent = 'Copia indirizzo';
+  copyBtn.onclick = () => {
+    navigator.clipboard.writeText(email);
+    toast.success('Indirizzo copiato!');
+  };
+
+  const gmailLink = document.createElement('a');
+  gmailLink.className = 'btn outline';
+  gmailLink.href = gmailHref;
+  gmailLink.target = '_blank';
+  gmailLink.rel = 'noopener';
+  gmailLink.textContent = 'Apri con Gmail';
+
+  const clientLink = document.createElement('a');
+  clientLink.className = 'btn outline';
+  clientLink.href = mailtoHref;
+  clientLink.textContent = 'Apri il tuo client di posta';
+
+  actions.append(copyBtn, gmailLink, clientLink);
+  box.append(closeBtn, title, addr, actions);
+  overlay.appendChild(box);
+
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.addEventListener('keydown', function escHandler(e) {
+    if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); }
+  });
+
+  document.body.appendChild(overlay);
+}
