@@ -7471,7 +7471,7 @@ const isAnnual = isAnnualView;
       <div class="store-footer-login" style="margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 30px;">
         <p style="color: #64748b; font-size: 1rem;">
           Hai bisogno di assistenza per scegliere il piano? 
-          <a href="#" style="color: var(--primary); font-weight: 700; text-decoration: none; margin-left: 5px;">Parla con un esperto</a>
+          <a href="mailto:contact@decerne.it" style="color: var(--primary); font-weight: 700; text-decoration: none; margin-left: 5px;">Parla con un esperto</a>
         </p>
       </div>
     </div>
@@ -8444,7 +8444,7 @@ function renderHomeTab() {
       </div>
       <div class="card-saas" style="border-left: 4px solid #10b981; background: #f0fdf4;">
         <h3 style="color: #166534; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.headset} Supporto Prioritario</h3>
-        <p style="font-size: 0.8rem; margin: 10px 0;">Email: <strong><a href="mailto:support@decerne.it" style="color:#166534;">support@decerne.it</a></strong><br>Risposta: <strong>&lt; 24h</strong></p>
+                <p style="font-size: 0.8rem; margin: 10px 0;">Email: <strong><a href="mailto:${plan === 'Enterprise' ? 'enterprise@decerne.it' : 'professional@decerne.it'}" style="color:#166534;">${plan === 'Enterprise' ? 'enterprise@decerne.it' : 'professional@decerne.it'}</a></strong><br>Risposta: <strong>&lt; 24h</strong></p>
       </div>
     </div>
   ` : "";
@@ -10295,6 +10295,7 @@ function renderGeneralDashboardTab() {
   const myOffers = getMyOffers();
   const locations = partner.locations || [];
   const isEnterprise = partner.plan === 'Enterprise';
+  const isProfessionalOrHigher = isEnterprise || partner.plan === 'Professional';
 
   const totalViews = myOffers.reduce((acc, o) => acc + (o.views || 0), 0);
   const totalClicks = myOffers.reduce((acc, o) => acc + (o.opens || 0), 0);
@@ -10351,13 +10352,13 @@ function renderGeneralDashboardTab() {
     </div>
 
     <div class="general-dash-grid">
-      ${isEnterprise ? `
+            ${isProfessionalOrHigher ? `
         <div class="card-saas accent-blue" style="background: #f0f7ff; grid-column: 1 / -1;">
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
             <span class="round-ico" style="color:#1e40af;">${PANEL_ICONS.userCircle}</span>
             <h3 style="margin: 0; color: #1e40af; font-size: 1rem;">Account Manager Dedicato</h3>
           </div>
-          <p style="margin: 5px 0; font-size: 0.85rem; color: #1e293b;">Email: <strong><a href="mailto:enterprise@decerne.it" style="color:#1e40af;">enterprise@decerne.it</a></strong></p>
+          <p style="margin: 5px 0; font-size: 0.85rem; color: #1e293b;">Email: <strong><a href="mailto:${isEnterprise ? 'enterprise@decerne.it' : 'professional@decerne.it'}" style="color:#1e40af;">${isEnterprise ? 'enterprise@decerne.it' : 'professional@decerne.it'}</a></strong></p>
           <div style="display: inline-block; margin-top: 8px; background: #dbeafe; color: #1e40af; padding: 3px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">SLA: Risposta entro 4 ore</div>
         </div>
       ` : ''}
