@@ -831,7 +831,7 @@ function App() {
       __html: "<div class=\"dc-footer-inner\">" +
         "<div class=\"dc-footer-brand\">DECERNE</div>" +
         "<p class=\"dc-footer-legal\">[RAGIONE SOCIALE] &middot; P.IVA [PARTITA IVA] &middot; Sede: [INDIRIZZO SEDE LEGALE]<br>" +
-        "PEC: <a href=\"mailto:[PEC]\">[PEC]</a> &middot; Assistenza: <a href=\"mailto:supporto@decerne.it\" onclick=\"openEmailContact('supporto@decerne.it', 'Richiesta assistenza dalla pagina Chi Siamo'); return false;\">supporto@decerne.it</a></p>\" +
+        "PEC: <a href=\"mailto:[PEC]\">[PEC]</a> &middot; Assistenza: <a href=\"mailto:supporto@decerne.it\" onclick=\"openEmailContact('supporto@decerne.it', 'Richiesta assistenza dalla pagina Chi Siamo'); return false;\">supporto@decerne.it</a></p>" +
         "<nav class=\"dc-footer-links\" aria-label=\"Link legali\">" +
         "<a href=\"legale.html#termini\">Termini</a>" +
         "<a href=\"legale.html#privacy\">Privacy</a>" +
