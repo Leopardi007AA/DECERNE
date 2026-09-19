@@ -10877,7 +10877,7 @@ function renderApiTab() {
     <div class="card-saas" style="margin-bottom: 25px;">
       <h3 style="margin-top:0; font-size: 1rem;">La tua API Key</h3>
       <div style="display: flex; gap: 10px; align-items: center; margin-top: 15px;">
-        <input type="text" id="apiKeyDisplay" value="${partner.apiKey || 'Genera una chiave...'}" readonly
+        <input type="text" id="apiKeyDisplay" value="${partner.apiKey || ''}" placeholder="Nessuna chiave: clicca Rigenera" readonly
                style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-family: monospace; background: #f8fafc; font-size: 0.9rem;">
         <div class="api-key-actions-inline" style="display: flex; gap: 10px;">
           <button class="btn outline" onclick="copyApiKeyToClipboard()">Copia</button>
@@ -10916,7 +10916,7 @@ function renderApiTab() {
               <span style="color: #e2e8f0; font-weight: bold;">/offers</span>
               <span style="color: #64748b; font-size: 0.7rem;">(piano Professional+)</span>
             </div>
-            <div style="color: #94a3b8; margin-left: 55px;">Recupera la lista delle tue offerte/annunci attivi.</div>
+            <div style="color: #94a3b8; margin-left: 55px;">Recupera le tue offerte/annunci non eliminati (aggiungi ?status=active per le sole attive).</div>
             <pre style="color: #94a3b8; margin: 8px 0 0 55px; white-space: pre-wrap;">curl "https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/offers" \
   -H "x-api-key: LA_TUA_API_KEY"</pre>
           </div>
@@ -10931,6 +10931,7 @@ function renderApiTab() {
               Crea o aggiorna prodotti (singolo oggetto oppure { "items": [...] }, max 500 per richiesta).
               Senza "original_price" (o uguale a "price") diventa un annuncio normale, senza sconto mostrato.
               Con "original_price" maggiore di "price" diventa un'offerta con badge sconto.
+              Se il prodotto esiste già come bozza o in pausa, i dati vengono aggiornati ma lo stato non cambia: la pubblicazione resta dal Pannello.
             </div>
             <pre style="color: #94a3b8; margin: 8px 0 0 55px; white-space: pre-wrap;">curl -X POST "https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/offers" \
   -H "x-api-key: LA_TUA_API_KEY" \
@@ -11002,20 +11003,29 @@ function renderApiTab() {
         <!-- VISUALIZZAZIONE LIMITATA: Professional o altri piani -->
         <div style="margin-top: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
           
-          <!-- L'unico endpoint visibile ai Professional -->
-          <div style="margin-bottom: 20px; opacity: 0.8;">
+          <!-- Endpoint incluso nel piano Professional -->
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.8rem; color: #1e3a8a;">
+            <strong>Base URL:</strong> https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/offers<br>
+            <strong>Autenticazione:</strong> header <code>x-api-key</code> con la chiave qui sopra (nessun altro header richiesto)
+          </div>
+          <div style="margin-bottom: 20px;">
             <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
               <span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">GET</span>
-              <span style="color: #1e293b; font-weight: bold;">/v1/offers</span>
+              <span style="color: #1e293b; font-weight: bold;">/offers</span>
+              <span style="color: #64748b; font-size: 0.7rem;">(piano Professional+)</span>
             </div>
-            <div style="color: #64748b; font-size: 0.85rem; margin-left: 55px;">Recupera la lista di tutte le tue offerte attive.</div>
+            <div style="color: #64748b; font-size: 0.85rem; margin-left: 55px;">Recupera le tue offerte e i tuoi annunci non eliminati, di tutte le sedi. Per averne solo alcuni aggiungi <code>?status=active</code> (valori ammessi: active, draft, paused, expired).</div>
+            <pre style="background: #1e293b; color: #cbd5e1; border-radius: 8px; padding: 12px; margin: 8px 0 0 55px; white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 0.75rem;">curl "https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/offers?status=active" -H "x-api-key: LA_TUA_API_KEY"</pre>
+            <div style="color: #64748b; margin: 6px 0 0 55px; font-size: 0.72rem;">
+              Risposta: <code>{ "data": [ ... ], "count": 12 }</code>. Ogni elemento contiene, tra gli altri, id, product, price, original_price, category, start_date, end_date, status, location_id. Limite: 120 richieste al minuto per chiave.
+            </div>
           </div>
 
           <!-- Lock per API avanzate -->
           <div style="text-align: center; padding: 20px; background: #fff; border-radius: 8px; border: 1px dashed #cbd5e1;">
             <div style="display:flex; justify-content:center; margin-bottom: 10px; color:#94a3b8;">${PANEL_ICONS.lock}</div>
-            <p style="color: #475569; font-size: 0.85rem; font-weight: 600; margin: 0;">Automazione avanzata (POST/DELETE)</p>
-            <p style="color: #64748b; font-size: 0.8rem; margin: 5px 0 15px 0;">Le API di scrittura e cancellazione massiva sono riservate ai partner Enterprise.</p>
+            <p style="color: #475569; font-size: 0.85rem; font-weight: 600; margin: 0;">Scrittura e sincronizzazione (POST, DELETE, inventory-sync)</p>
+            <p style="color: #64748b; font-size: 0.8rem; margin: 5px 0 15px 0;">Creare, aggiornare ed eliminare offerte da codice e sincronizzare il magazzino dal gestionale è riservato ai partner Enterprise.</p>
             <button class="btn outline" style="font-size: 0.75rem; padding: 6px 12px;" onclick="switchStoreTab('sub')">Upgrade a Enterprise</button>
           </div>
         </div>
@@ -11164,8 +11174,6 @@ window.regeneratePartnerApiKey = async () => {
 
   const partner = getCurrentPartner();
   if (!partner) return toast.error("Sessione non valida.");
-
-  const newKey = generateRandomApiKey();
   
   // Feedback visivo sul pulsante durante l'attesa di Supabase
   const btn = document.querySelector('button[onclick="regeneratePartnerApiKey()"]');
@@ -11176,22 +11184,22 @@ window.regeneratePartnerApiKey = async () => {
   }
 
   try {
-    // 1. Aggiornamento atomico sul database Supabase
-    const { data: updatedStore, error } = await storeAuthClient
-      .from('stores')
-      .update({ api_key: newKey })
-      .eq('id', partner.id)
-      .select()
-      .single();
+    // 1. La nuova chiave viene generata e salvata lato server dalla funzione Postgres
+    const { data: newKey, error } = await storeAuthClient
+      .rpc('regenerate_store_api_key', { p_store_id: partner.id });
 
-    if (error) {
-      console.error("Errore rigenerazione API Key:", error);
-      toast.error("Errore tecnico durante il salvataggio sul database.");
-      return;
-    }
+      if (error) {
+        console.error("Errore rigenerazione API Key:", error);
+        toast.error(
+          (error.message || '').includes('Non autorizzato')
+            ? "Solo il titolare o un amministratore può rigenerare la chiave."
+            : "Errore tecnico durante il salvataggio sul database."
+        );
+        return;
+      }
 
     // 2. Allineamento dello stato locale (Session & LocalStorage) per riflettere le modifiche
-    partner.apiKey = updatedStore.api_key;
+    partner.apiKey = newKey;
     const dataString = JSON.stringify(partner);
     sessionStorage.setItem(SESSION_PARTNER, dataString);
     
@@ -11220,6 +11228,7 @@ window.regeneratePartnerApiKey = async () => {
  */
 window.copyApiKeyToClipboard = () => {
   const copyText = document.getElementById("apiKeyDisplay");
+  if (!copyText || !copyText.value) return toast.error("Non c'è ancora nessuna chiave da copiare: usa Rigenera.");
   copyText.select();
   copyText.setSelectionRange(0, 99999); // Per mobile
   
