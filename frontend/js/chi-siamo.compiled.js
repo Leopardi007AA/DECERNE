@@ -831,7 +831,7 @@ function App() {
       __html: "<div class=\"dc-footer-inner\">" +
         "<div class=\"dc-footer-brand\">DECERNE</div>" +
         "<p class=\"dc-footer-legal\">[RAGIONE SOCIALE] &middot; P.IVA [PARTITA IVA] &middot; Sede: [INDIRIZZO SEDE LEGALE]<br>" +
-        "PEC: <a href=\"mailto:[PEC]\">[PEC]</a> &middot; Assistenza: <a href=\"mailto:supporto@decerne.it\">supporto@decerne.it</a></p>" +
+        "PEC: <a href=\"mailto:[PEC]\">[PEC]</a> &middot; Assistenza: <a href=\"mailto:supporto@decerne.it\" onclick=\"openEmailContact('supporto@decerne.it', 'Richiesta assistenza dalla pagina Chi Siamo'); return false;\">supporto@decerne.it</a></p>\" +
         "<nav class=\"dc-footer-links\" aria-label=\"Link legali\">" +
         "<a href=\"legale.html#termini\">Termini</a>" +
         "<a href=\"legale.html#privacy\">Privacy</a>" +
@@ -846,3 +846,66 @@ function App() {
 }
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(/*#__PURE__*/React.createElement(App, null));
+
+
+function openEmailContact(email, subject) {
+  document.querySelector('.dc-email-overlay')?.remove();
+  subject = subject || '';
+  const encodedSubject = encodeURIComponent(subject);
+  const mailtoHref = 'mailto:' + email + (subject ? '?subject=' + encodedSubject : '');
+  const gmailHref = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(email) + (subject ? '&su=' + encodedSubject : '');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'dc-email-overlay';
+
+  const box = document.createElement('div');
+  box.className = 'dc-email-box';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'dc-email-close';
+  closeBtn.setAttribute('aria-label', 'Chiudi');
+  closeBtn.textContent = '×';
+  closeBtn.onclick = () => overlay.remove();
+
+  const title = document.createElement('h3');
+  title.textContent = 'Scrivi a Decerne';
+
+  const addr = document.createElement('p');
+  addr.className = 'dc-email-address';
+  addr.textContent = email;
+
+  const actions = document.createElement('div');
+  actions.className = 'dc-email-actions';
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'dc-email-primary';
+  copyBtn.textContent = 'Copia indirizzo';
+  copyBtn.onclick = () => {
+    navigator.clipboard.writeText(email);
+    copyBtn.textContent = 'Copiato!';
+    setTimeout(() => { copyBtn.textContent = 'Copia indirizzo'; }, 1500);
+  };
+
+  const gmailLink = document.createElement('a');
+  gmailLink.className = 'dc-email-outline';
+  gmailLink.href = gmailHref;
+  gmailLink.target = '_blank';
+  gmailLink.rel = 'noopener';
+  gmailLink.textContent = 'Apri con Gmail';
+
+  const clientLink = document.createElement('a');
+  clientLink.className = 'dc-email-outline';
+  clientLink.href = mailtoHref;
+  clientLink.textContent = 'Apri il tuo client di posta';
+
+  actions.append(copyBtn, gmailLink, clientLink);
+  box.append(closeBtn, title, addr, actions);
+  overlay.appendChild(box);
+
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.addEventListener('keydown', function escHandler(e) {
+    if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); }
+  });
+
+  document.body.appendChild(overlay);
+}
