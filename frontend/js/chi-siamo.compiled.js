@@ -739,7 +739,18 @@ function App() {
   useEffect(() => {
     const onResize = () => setViewportWidth(window.innerWidth);
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    // L'iframe nasce nascosto (larghezza 0): il ResizeObserver riallinea la larghezza
+    // appena diventa visibile, anche se il browser non manda l'evento resize.
+    let ro = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(onResize);
+      ro.observe(document.documentElement);
+    }
+    onResize();
+    return () => {
+      window.removeEventListener("resize", onResize);
+      if (ro) ro.disconnect();
+    };
   }, []);
 
   const rawProgress = progress * (N - 1);
