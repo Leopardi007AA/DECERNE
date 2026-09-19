@@ -141,6 +141,29 @@ const ANGLE_STEP = 36;
 const VERTICAL_STEP = 105;
 const RADIUS = 340;
 const N = PASSI.length;
+const TILES_PER_SLIDE = TOTAL_TILES / N;
+const PANEL_SETTLE = 0.3;
+
+function getCylinderScale(w) {
+  return w <= 480 ? 0.48 : w <= 768 ? 0.6 : w <= 1024 ? 0.82 : 1;
+}
+
+// "Sosta" leggermente più a lungo quando si arriva esattamente su un pannello:
+// rallenta l'avanzamento vicino agli indici interi, lo accelera tra un pannello e l'altro.
+function warpProgress(p) {
+  const raw = p * (N - 1);
+  return raw - (PANEL_SETTLE / (2 * Math.PI)) * Math.sin(2 * Math.PI * raw);
+}
+
+// Tiene nel DOM solo le tessere vicine allo schermo (più un margine di sicurezza):
+// meno livelli 3D in memoria = niente tessere che si svuotano sui telefoni.
+function computeTileRange(warped) {
+  const scale = getCylinderScale(window.innerWidth);
+  const reach = (window.innerHeight * 0.65) / (scale * 0.78);
+  const half = Math.ceil(reach / VERTICAL_STEP) + 3;
+  const center = warped * TILES_PER_SLIDE;
+  return [Math.max(0, Math.floor(center) - half), Math.min(TOTAL_TILES - 1, Math.ceil(center) + half)];
+}
 const CYLINDER_TILES = Array.from({
   length: TOTAL_TILES
 }, (_, i) => {
@@ -593,9 +616,45 @@ const CYLINDER_TILES = Array.from({
     yPos: i * VERTICAL_STEP
   };
 });
+// Ogni tessera è statica: cambia solo il contenitore. React.memo evita di ridisegnarla.
+const CylinderTile = React.memo(function CylinderTile({
+  tile
+}) {
+  const rad = tile.angleDeg * Math.PI / 180;
+  const x = Math.sin(rad) * RADIUS;
+  const z = Math.cos(rad) * RADIUS;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "dc-cylinder-tile back",
+    "data-angle": tile.angleDeg,
+    style: {
+      transform: `translateY(${tile.yPos}px) translateX(${x}px) translateZ(${z}px) rotateY(${tile.angleDeg}deg)`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "tile-content"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "ct-emoji"
+  }, tile.emoji), /*#__PURE__*/React.createElement("div", {
+    className: "ct-mid"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "ct-kicker"
+  }, tile.kicker), /*#__PURE__*/React.createElement("div", {
+    className: "ct-name"
+  }, tile.name), tile.oldPrice && /*#__PURE__*/React.createElement("div", {
+    className: "ct-price-old"
+  }, "€", tile.oldPrice), tile.newPrice && /*#__PURE__*/React.createElement("div", {
+    className: "ct-price-new"
+  }, "€", tile.newPrice)), /*#__PURE__*/React.createElement("div", {
+    className: "ct-badge"
+  }, tile.badge)));
+});
 function App() {
   const trackRef = useRef(null);
   const rafRef = useRef(null);
+  const cylinderRef = useRef(null);
+  const warpedRef = useRef(0);
+  const rangeRef = useRef(null);
+  if (rangeRef.current === null) rangeRef.current = computeTileRange(0);
+  const [tileRange, setTileRange] = useState(() => rangeRef.current);
   const [progress, setProgress] = useState(0);
   const [stickyOpacity, setStickyOpacity] = useState(1);
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
@@ -610,6 +669,31 @@ function App() {
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
   }, []);
+  // Muove il cilindro direttamente sul DOM (nessun re-render di React a ogni frame)
+  // e assegna a ogni tessera la faccia giusta (chiara davanti, scura dietro).
+  const paintCylinder = useCallback(warped => {
+    const box = cylinderRef.current;
+    if (!box) return;
+    const rot = -warped * TILES_PER_SLIDE * ANGLE_STEP;
+    const y = -warped * TILES_PER_SLIDE * VERTICAL_STEP;
+    box.style.transform = `scale(${getCylinderScale(window.innerWidth)}) translate(-50%, -50%) translateY(${y}px) rotateY(${rot}deg)`;
+    const tiles = box.children;
+    for (let k = 0; k < tiles.length; k++) {
+      const el = tiles[k];
+      const a = (Number(el.dataset.angle) + rot) * Math.PI / 180;
+      const front = Math.cos(a) > -0.1;
+      if (el._isFront !== front) {
+        el._isFront = front;
+        el.classList.toggle('front', front);
+        el.classList.toggle('back', !front);
+      }
+    }
+  }, []);
+
+  // Le tessere appena montate ricevono subito la faccia giusta, prima del paint
+  React.useLayoutEffect(() => {
+    paintCylinder(warpedRef.current);
+  }, [tileRange, paintCylinder]);
   const handleScroll = useCallback(() => {
     if (rafRef.current) return;
     rafRef.current = requestAnimationFrame(() => {
@@ -619,7 +703,18 @@ function App() {
       const rect = el.getBoundingClientRect();
       const total = rect.height - window.innerHeight;
       const p = total > 0 ? Math.min(1, Math.max(0, -rect.top / total)) : 0;
-      setProgress(p);
+      const warped = warpProgress(p);
+      warpedRef.current = warped;
+      paintCylinder(warped);
+      const nextRange = computeTileRange(warped);
+      const curRange = rangeRef.current;
+      const rangeChanged = nextRange[0] !== curRange[0] || nextRange[1] !== curRange[1];
+      if (rangeChanged) rangeRef.current = nextRange;
+      // flushSync: pannello, indicatore e tessere nuove si aggiornano nello stesso frame del cilindro
+      ReactDOM.flushSync(() => {
+        setProgress(p);
+        if (rangeChanged) setTileRange(nextRange);
+      });
       // Oltre il fondo del track, .dc-sticky si sgancia e scorre via
       // normalmente: è nativo di position:sticky e non si elimina,
       // ma lo facciamo sparire in dissolvenza prima che si veda
@@ -647,22 +742,12 @@ function App() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Rimpicciolisce la spirale sugli schermi piccoli, così resta tutta visibile
-  const cylinderScale = viewportWidth <= 480 ? 0.48 : viewportWidth <= 768 ? 0.6 : viewportWidth <= 1024 ? 0.82 : 1;
   const rawProgress = progress * (N - 1);
-  // "Sosta" leggermente più a lungo quando si arriva esattamente su un pannello:
-  // rallenta l'avanzamento vicino agli indici interi, lo accelera tra un pannello e l'altro.
-  // Il percorso totale (0 -> N-1) resta identico, cambia solo la velocità percepita.
-  const PANEL_SETTLE = 0.3;
-  const warpedProgress = rawProgress - (PANEL_SETTLE / (2 * Math.PI)) * Math.sin(2 * Math.PI * rawProgress);
+  const warpedProgress = warpProgress(progress);
   const activeIndex = Math.min(N - 1, Math.round(rawProgress));
 
-  // 60 tessere / 10 slide = 6 tessere per slide
-  // Ogni slide avanza di 6 tessere = 6 * 36° = 216° di rotazione
-  const tilesPerSlide = TOTAL_TILES / N;
-  const rotationPerSlide = tilesPerSlide * ANGLE_STEP;
-  const cylinderRotation = -warpedProgress * rotationPerSlide;
-  const cylinderY = -warpedProgress * tilesPerSlide * VERTICAL_STEP;
+  // Tessere presenti nel DOM (finestra attorno allo schermo); il cilindro lo muove paintCylinder()
+  const visibleTiles = useMemo(() => CYLINDER_TILES.slice(tileRange[0], tileRange[1] + 1), [tileRange]);
   const scrollToTrack = () => {
     trackRef.current?.scrollIntoView({
       behavior: 'smooth'
@@ -752,43 +837,11 @@ function App() {
     className: "dc-grid-bg"
   }), /*#__PURE__*/React.createElement("div", {
     className: "dc-cylinder-container",
-    style: {
-      transform: `scale(${cylinderScale}) translate(-50%, -50%) translateY(${cylinderY}px) rotateY(${cylinderRotation}deg)`
-    }
-  }, CYLINDER_TILES.map(tile => {
-    const angleWorld = (tile.angleDeg + cylinderRotation) * Math.PI / 180;
-    const isFront = Math.cos(angleWorld) > -0.1;
-    const x = Math.sin(tile.angleDeg * Math.PI / 180) * RADIUS;
-    const z = Math.cos(tile.angleDeg * Math.PI / 180) * RADIUS;
-    return /*#__PURE__*/React.createElement("div", {
-      key: tile.id,
-      className: `dc-cylinder-tile ${isFront ? 'front' : 'back'}`,
-      style: {
-        transform: `
-                          translateY(${tile.yPos}px) 
-                          translateX(${x}px) 
-                          translateZ(${z}px) 
-                          rotateY(${tile.angleDeg}deg)
-                        `
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "tile-content"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "ct-emoji"
-    }, tile.emoji), /*#__PURE__*/React.createElement("div", {
-      className: "ct-mid"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "ct-kicker"
-    }, tile.kicker), /*#__PURE__*/React.createElement("div", {
-      className: "ct-name"
-    }, tile.name), tile.oldPrice && /*#__PURE__*/React.createElement("div", {
-      className: "ct-price-old"
-    }, "€", tile.oldPrice), tile.newPrice && /*#__PURE__*/React.createElement("div", {
-      className: "ct-price-new"
-    }, "€", tile.newPrice)), /*#__PURE__*/React.createElement("div", {
-      className: "ct-badge"
-    }, tile.badge)));
-  })), /*#__PURE__*/React.createElement("div", {
+    ref: cylinderRef
+  }, visibleTiles.map(tile => /*#__PURE__*/React.createElement(CylinderTile, {
+    key: tile.id,
+    tile: tile
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "dc-slide-panel"
   }, PASSI.map((step, i) => {
     const dist = warpedProgress - i;
@@ -810,7 +863,8 @@ function App() {
         transform,
         opacity,
         zIndex,
-        pointerEvents: isActive ? 'auto' : 'none'
+        pointerEvents: isActive ? 'auto' : 'none',
+        visibility: opacity > 0.01 ? 'visible' : 'hidden'
       }
     }, /*#__PURE__*/React.createElement("div", {
       className: "dc-slide-count"

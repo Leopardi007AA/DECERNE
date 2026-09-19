@@ -437,7 +437,6 @@
       display: flex;
       flex-direction: column;
       justify-content: center;
-      backdrop-filter: blur(20px);
       transform-origin: left center;
 
     }
@@ -623,9 +622,11 @@
         width: 88vw;
         z-index: 500;
       }
+      .dc-grid-bg { display: none; }
       .dc-slide-card {
         padding: 20px 22px;
         aspect-ratio: 16 / 11;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
       }
       .dc-slide-card h3 { font-size: 1.15rem; margin-bottom: 10px; }
       .dc-slide-card p { font-size: 0.85rem; line-height: 1.55; }
