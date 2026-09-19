@@ -4021,6 +4021,12 @@ hr {
   justify-content: center;
   z-index: var(--z-modal);
   padding: 20px;
+  opacity: 0;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.email-contact-overlay.is-visible {
+  opacity: 1;
 }
 
 .email-contact-box {
@@ -4032,6 +4038,12 @@ hr {
   max-width: 380px;
   width: 100%;
   text-align: center;
+  transform: translateY(12px) scale(0.98);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.email-contact-overlay.is-visible .email-contact-box {
+  transform: translateY(0) scale(1);
 }
 
 .email-contact-close {

@@ -12596,7 +12596,7 @@ function openEmailContact(email, subject = '') {
   closeBtn.className = 'email-contact-close';
   closeBtn.setAttribute('aria-label', 'Chiudi');
   closeBtn.textContent = '×';
-  closeBtn.onclick = () => overlay.remove();
+  closeBtn.onclick = () => closePopup();
 
   const title = document.createElement('h3');
   title.textContent = 'Scrivi a Decerne';
@@ -12632,10 +12632,28 @@ function openEmailContact(email, subject = '') {
   box.append(closeBtn, title, addr, actions);
   overlay.appendChild(box);
 
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.addEventListener('keydown', function escHandler(e) {
-    if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); }
-  });
+  const CLOSE_MS = 250; // stessa durata degli altri popup
+  let isClosing = false;
+
+  function onEsc(e) {
+    if (e.key === 'Escape') closePopup();
+  }
+
+  function closePopup() {
+    if (isClosing) return;
+    isClosing = true;
+    document.removeEventListener('keydown', onEsc);
+    overlay.classList.remove('is-visible');
+    setTimeout(() => overlay.remove(), CLOSE_MS);
+  }
+
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closePopup(); });
+  document.addEventListener('keydown', onEsc);
 
   document.body.appendChild(overlay);
+  // Doppio rAF: il browser deve prima disegnare lo stato iniziale (opacità 0),
+  // altrimenti la transizione non parte e il popup compare di scatto.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => overlay.classList.add('is-visible'));
+  });
 }
