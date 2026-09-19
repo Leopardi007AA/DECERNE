@@ -29,16 +29,22 @@
   table.legal-table th { background:#f1f5f9; }
   .todo-note { background:#fffbeb; border:1px dashed #f59e0b; color:#92400e; padding:10px 14px; border-radius:6px; font-size:0.82rem; margin:16px 0; }
   a.back-top { font-size:0.8rem; color:#94a3b8; text-decoration:none; }
-  .email-contact-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.55); display:flex; align-items:center; justify-content:center; z-index:9999; padding:20px; }
-  .email-contact-box { position:relative; background:#fff; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,0.25); padding:32px 28px; max-width:380px; width:100%; text-align:center; }
+  .email-contact-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.55); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; z-index:9999; padding:20px; opacity:0; transition:opacity 0.25s cubic-bezier(0.4,0,0.2,1); }
+  .email-contact-overlay.is-visible { opacity:1; }
+  .email-contact-box { position:relative; background:#fff; border-radius:16px; box-shadow:0 12px 30px rgba(0,0,0,0.2); padding:32px 28px; max-width:380px; width:100%; text-align:center; transform:translateY(12px) scale(0.98); transition:transform 0.25s cubic-bezier(0.4,0,0.2,1); }
+  .email-contact-overlay.is-visible .email-contact-box { transform:translateY(0) scale(1); }
   .email-contact-close { position:absolute; top:10px; right:14px; background:none; border:none; font-size:1.4rem; line-height:1; cursor:pointer; color:#94a3b8; }
   .email-contact-close:hover { color:var(--text); }
-  .email-contact-box h3 { margin:0 0 12px; font-size:1.1rem; }
-  .email-contact-address { font-weight:700; font-size:1rem; color:var(--primary); word-break:break-all; margin:0 0 20px; }
+  .email-contact-box h3 { margin:0 0 12px; font-size:1.3rem; }
+  .email-contact-address { font-weight:700; font-size:1.1rem; color:var(--primary); word-break:break-all; margin:0 0 20px; }
   .email-contact-actions { display:flex; flex-direction:column; gap:10px; }
-  .email-contact-actions button, .email-contact-actions a { width:100%; box-sizing:border-box; text-align:center; border-radius:999px; padding:11px 18px; font-weight:700; font-size:0.85rem; cursor:pointer; text-decoration:none; }
-  .email-contact-primary { background:var(--primary); color:#fff; border:none; }
-  .email-contact-outline { background:transparent; color:var(--primary-dark); border:1px solid var(--primary); }
+  .email-contact-actions .btn { background:var(--primary); color:#fff; padding:12px 20px; border:none; border-radius:12px; cursor:pointer; font-weight:600; transition:transform 0.15s ease, box-shadow 0.15s ease; width:100%; text-align:center; text-decoration:none; }
+  .email-contact-actions .btn:hover { transform:translateY(-1px); box-shadow:0 2px 8px rgba(15,23,42,0.08); }
+  .email-contact-actions .btn:active { transform:translateY(0); box-shadow:none; }
+  .email-contact-actions .btn.outline { background:transparent; border:2px solid var(--primary); color:var(--primary); transition:all 0.2s; }
+  .email-contact-actions .btn.outline:hover { background:#f8fafc; border-color:var(--primary-dark); }
+  .email-contact-overlay a:focus-visible, .email-contact-overlay button:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+  @media (prefers-reduced-motion: reduce) { .email-contact-overlay, .email-contact-box, .email-contact-actions .btn { transition-duration:0.001ms !important; } }
 </style>
 </head>
 <body>
@@ -186,7 +192,7 @@ function openEmailContact(email, subject) {
   closeBtn.className = 'email-contact-close';
   closeBtn.setAttribute('aria-label', 'Chiudi');
   closeBtn.textContent = '×';
-  closeBtn.onclick = () => overlay.remove();
+  closeBtn.onclick = () => closePopup();
 
   const title = document.createElement('h3');
   title.textContent = 'Scrivi a Decerne';
@@ -199,7 +205,7 @@ function openEmailContact(email, subject) {
   actions.className = 'email-contact-actions';
 
   const copyBtn = document.createElement('button');
-  copyBtn.className = 'email-contact-primary';
+  copyBtn.className = 'btn';
   copyBtn.textContent = 'Copia indirizzo';
   copyBtn.onclick = () => {
     navigator.clipboard.writeText(email);
@@ -208,14 +214,14 @@ function openEmailContact(email, subject) {
   };
 
   const gmailLink = document.createElement('a');
-  gmailLink.className = 'email-contact-outline';
+  gmailLink.className = 'btn outline';
   gmailLink.href = gmailHref;
   gmailLink.target = '_blank';
   gmailLink.rel = 'noopener';
   gmailLink.textContent = 'Apri con Gmail';
 
   const clientLink = document.createElement('a');
-  clientLink.className = 'email-contact-outline';
+  clientLink.className = 'btn outline';
   clientLink.href = mailtoHref;
   clientLink.textContent = 'Apri il tuo client di posta';
 
@@ -223,12 +229,30 @@ function openEmailContact(email, subject) {
   box.append(closeBtn, title, addr, actions);
   overlay.appendChild(box);
 
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.addEventListener('keydown', function escHandler(e) {
-    if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); }
-  });
+  const CLOSE_MS = 250; // stessa durata degli altri popup
+  let isClosing = false;
+
+  function onEsc(e) {
+    if (e.key === 'Escape') closePopup();
+  }
+
+  function closePopup() {
+    if (isClosing) return;
+    isClosing = true;
+    document.removeEventListener('keydown', onEsc);
+    overlay.classList.remove('is-visible');
+    setTimeout(() => overlay.remove(), CLOSE_MS);
+  }
+
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closePopup(); });
+  document.addEventListener('keydown', onEsc);
 
   document.body.appendChild(overlay);
+  // Doppio rAF: il browser deve prima disegnare lo stato iniziale (opacità 0),
+  // altrimenti la transizione non parte e il popup compare di scatto.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => overlay.classList.add('is-visible'));
+  });
 }
 </script>
 </body>
