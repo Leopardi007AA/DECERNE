@@ -11169,8 +11169,14 @@ function renderSyncedProductsTable() {
 /**
  * Rigenera una nuova chiave API per il partner e la salva nel DB Supabase.
  */
-window.regeneratePartnerApiKey = async () => {
-  if (!confirm("ATTENZIONE: Rigenerando la chiave, le tue integrazioni attuali smetteranno di funzionare finché non aggiornerai il tuo codice. Procedere?")) return;
+window.regeneratePartnerApiKey = () => {
+  showConfirm(
+    "Rigenerando la chiave, le integrazioni attuali smetteranno di funzionare finché non aggiornerai il tuo codice. Procedere?",
+    executeRegeneratePartnerApiKey
+  );
+};
+
+async function executeRegeneratePartnerApiKey() {
 
   const partner = getCurrentPartner();
   if (!partner) return toast.error("Sessione non valida.");
@@ -11270,9 +11276,14 @@ function getCsvMappingStorageKey(headers) {
 
 function guessMappingFromHeaders(headers) {
   const mapping = {};
-  CSV_TARGET_FIELDS.forEach(field => {
-    const match = headers.find(h => field.keywords.some(k => h.trim().toLowerCase().includes(k)));
-    if (match) mapping[field.key] = match;
+  const used = new Set();
+  // Prima i campi più specifici e senza riusare colonne già assegnate:
+  // così "Prezzo listino" non viene scambiato per "Prezzo finale".
+  const order = ['original_price', 'price', 'product', 'start_date', 'end_date', 'category', 'location', 'description', 'img_url'];
+  order.forEach(key => {
+    const field = CSV_TARGET_FIELDS.find(f => f.key === key);
+    const match = headers.find(h => !used.has(h) && field.keywords.some(k => h.trim().toLowerCase().includes(k)));
+    if (match) { mapping[key] = match; used.add(match); }
   });
   return mapping;
 }
@@ -11302,12 +11313,17 @@ window.handleCsvFileSelect = (event) => {
     return toast.error("Libreria CSV non disponibile: ricarica la pagina e riprova.");
   }
 
-  Papa.parse(file, {
+  const parseFile = (encoding) => Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
+    encoding,
     complete: (results) => {
       const headers = results.meta.fields || [];
       const rows = results.data || [];
+      // Export di Excel/gestionali in Windows-1252: le lettere accentate risultano "�", quindi rileggiamo il file
+      if (encoding === 'UTF-8' && JSON.stringify([headers, rows.slice(0, 50)]).includes('\uFFFD')) {
+        return parseFile('windows-1252');
+      }
       if (!headers.length || !rows.length) {
         return toast.error("Il file CSV è vuoto o non è leggibile.");
       }
@@ -11321,6 +11337,7 @@ window.handleCsvFileSelect = (event) => {
       toast.error("Errore nella lettura del file CSV.");
     }
   });
+  parseFile('UTF-8');
 };
 
 function openCsvMappingModal(headers, rows) {
@@ -11374,6 +11391,40 @@ function readCsvMappingFromForm() {
   return mapping;
 }
 
+// Legge un prezzo scritto all'italiana o all'inglese: "0,89", "1.299,50", "€ 0,89", "1,299.50"
+function parseCsvPrice(raw) {
+  const s0 = String(raw ?? '').replace(/[^\d.,-]/g, '');
+  if (!s0) return NaN;
+  const lastComma = s0.lastIndexOf(',');
+  const lastDot = s0.lastIndexOf('.');
+  let s = s0;
+  if (lastComma > -1 && lastDot > -1) {
+    // il separatore decimale è quello che compare per ultimo
+    s = lastComma > lastDot ? s0.replace(/\./g, '').replace(',', '.') : s0.replace(/,/g, '');
+  } else if (lastComma > -1) {
+    s = s0.replace(',', '.');
+  }
+  return parseFloat(s);
+}
+
+// Accetta AAAA-MM-GG oppure GG/MM/AAAA (anche con - o .). Ritorna AAAA-MM-GG, '' se vuota, null se non valida.
+function parseCsvDate(raw) {
+  const s = String(raw ?? '').trim();
+  if (!s) return '';
+  let y, m, d, match;
+  if ((match = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) {
+    [, y, m, d] = match;
+  } else if ((match = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/))) {
+    [, d, m, y] = match;
+  } else {
+    return null;
+  }
+  const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const check = new Date(iso + 'T00:00:00Z');
+  if (isNaN(check) || check.toISOString().slice(0, 10) !== iso) return null;
+  return iso;
+}
+
 // Normalizza e classifica una riga CSV con la STESSA logica dell'API partner:
 // senza sconto reale -> annuncio normale (original_price = price).
 function normalizeCsvRow(rawRow, mapping, storeId, locationsByName, defaultLocationId) {
@@ -11383,11 +11434,11 @@ function normalizeCsvRow(rawRow, mapping, storeId, locationsByName, defaultLocat
   const product = get('product');
   if (!product) errors.push("nome prodotto mancante");
 
-  const price = parseFloat(get('price').replace(',', '.'));
+  const price = parseCsvPrice(get('price'));
   if (!Number.isFinite(price) || price <= 0) errors.push("prezzo mancante o non valido");
 
   const originalRaw = get('original_price');
-  let originalPrice = originalRaw ? parseFloat(originalRaw.replace(',', '.')) : price;
+  let originalPrice = originalRaw ? parseCsvPrice(originalRaw) : price;
   if (!Number.isFinite(originalPrice) || originalPrice < price) originalPrice = price;
 
   let locationId = defaultLocationId;
@@ -11400,8 +11451,13 @@ function normalizeCsvRow(rawRow, mapping, storeId, locationsByName, defaultLocat
   if (!locationId) errors.push("sede non specificata e lo store ha più di una sede");
 
   const today = nowISODate();
-  const startDate = get('start_date') || today;
-  let endDate = get('end_date');
+  const startRaw = get('start_date');
+  const endRaw = get('end_date');
+  let startDate = parseCsvDate(startRaw);
+  let endDate = parseCsvDate(endRaw);
+  if (startDate === null) errors.push(`data inizio "${startRaw}" non valida (usa AAAA-MM-GG o GG/MM/AAAA)`);
+  if (endDate === null) errors.push(`data fine "${endRaw}" non valida (usa AAAA-MM-GG o GG/MM/AAAA)`);
+  startDate = startDate || today;
   if (!endDate) {
     const d = new Date();
     d.setDate(d.getDate() + 30);
@@ -11460,15 +11516,16 @@ window.confirmCsvImport = async (storageKey) => {
     // Offerte già attive dello store, per il filtro/dedup (aggiorna invece di duplicare)
     const { data: existingOffers } = await storeAuthClient
       .from('offers')
-      .select('id, product, location_id')
+      .select('id, product, location_id, status')
       .eq('store_id', partner.id)
       .is('deleted_at', null);
 
     const existingKey = (product, locationId) => `${product.trim().toLowerCase()}::${locationId}`;
-    const existingMap = new Map((existingOffers || []).map(o => [existingKey(o.product, o.location_id), o.id]));
+    const existingMap = new Map((existingOffers || []).map(o => [existingKey(o.product, o.location_id), { id: o.id, status: o.status }]));
 
     const results = { created: 0, updated: 0, offers: 0, annunci: 0, errors: [] };
     const toInsert = [];
+    const newByKey = new Map();
     const toUpdate = [];
 
     rows.forEach((rawRow, index) => {
@@ -11478,10 +11535,19 @@ window.confirmCsvImport = async (storageKey) => {
         return;
       }
       const { row, isOffer } = parsed;
-      const existingId = existingMap.get(existingKey(row.product, row.location_id));
-      if (existingId) toUpdate.push({ id: existingId, row, isOffer });
-      else toInsert.push({ row, isOffer });
+      const key = existingKey(row.product, row.location_id);
+      const existing = existingMap.get(key);
+      if (existing) {
+        // bozze e offerte in pausa: si aggiornano i dati ma non si pubblicano
+        if (existing.status === 'draft' || existing.status === 'paused') delete row.status;
+        toUpdate.push({ id: existing.id, row, isOffer });
+      } else {
+        // stessa riga ripetuta nel file: vale l'ultima, senza creare duplicati
+        newByKey.set(key, { row, isOffer });
+      }
     });
+
+    newByKey.forEach(v => toInsert.push(v));
 
     if (toInsert.length) {
       const { error } = await storeAuthClient.from('offers').insert(toInsert.map(i => i.row));
