@@ -10916,7 +10916,7 @@ function renderApiTab() {
               <span style="color: #e2e8f0; font-weight: bold;">/offers</span>
               <span style="color: #64748b; font-size: 0.7rem;">(piano Professional+)</span>
             </div>
-            <div style="color: #94a3b8; margin-left: 55px;">Recupera le tue offerte/annunci non eliminati (aggiungi ?status=active per le sole attive).</div>
+            <div style="color: #94a3b8; margin-left: 55px;">Recupera le tue offerte/annunci non eliminati (aggiungi ?status=active per le sole attive). L'elenco delle categorie valide per il campo "category" è su GET /offers/categories.</div>
             <pre style="color: #94a3b8; margin: 8px 0 0 55px; white-space: pre-wrap;">curl "https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/offers" \
   -H "x-api-key: LA_TUA_API_KEY"</pre>
           </div>
@@ -10947,9 +10947,10 @@ function renderApiTab() {
     "limited_quantity": false
   }'</pre>
             <div style="color: #64748b; margin: 6px 0 0 55px; font-size: 0.72rem;">
-              Campi obbligatori: "product", "price". "location_id" lo trovi nella tab Sedi (tasto "Copia" accanto a ogni punto vendita) e può essere omesso solo se hai una sola sede registrata.
+              Campi obbligatori: "product", "price", "category". "category" deve essere una delle categorie DECERNE (elenco completo con GET /offers/categories, ad esempio "Dispensa", "Ortofrutta" o "Altro"). "location_id" lo trovi nella tab Sedi (tasto "Copia" accanto a ogni punto vendita) e può essere omesso solo se hai una sola sede registrata.
               "unit_of_measure" ammette: pezzo, kg, hg, g, litro, confezione (default: pezzo). "card_requirement" ammette: required, not_required (default: non specificato).
               Se ometti le date, l'annuncio parte oggi e scade dopo 30 giorni. La pubblicazione programmata non è al momento disponibile via API: le offerte create da qui vanno subito attive.
+              Controlli: "price" e "original_price" sono numeri maggiori di 0 con al massimo 2 decimali ("original_price" non può essere inferiore a "price"); "limited_quantity" solo true o false; le date solo AAAA-MM-GG ("end_date" non nel passato); "img_url" un URL https. Una riga non valida viene scartata con i motivi e le altre vengono salvate.
             </div>
           </div>
 
@@ -10982,6 +10983,7 @@ function renderApiTab() {
     "items": [{
       "sku": "COD-GESTIONALE-001",
       "name": "Pasta De Cecco 500g",
+      "category": "Dispensa",
       "price": 0.99,
       "original_price": 1.49,
       "quantity": 12,
@@ -10990,7 +10992,7 @@ function renderApiTab() {
     }]
   }'</pre>
             <div style="color: #64748b; margin: 6px 0 0 55px; font-size: 0.72rem;">
-              Campi obbligatori per un prodotto nuovo: "sku", "name", "price". Per un aggiornamento basta "sku" e "quantity".
+              Campi obbligatori per un prodotto nuovo: "sku", "name", "price", "category" (elenco in GET /offers/categories). Per un aggiornamento basta "sku" e "quantity" (numero intero). Sui campi presenti valgono gli stessi controlli di /offers.
               "location_id" può essere omesso solo se hai una sola sede; con più sedi è obbligatorio, altrimenti il prodotto viene comunque salvato ma senza bozza d'offerta collegata.
               "external_event_id" è facoltativo: se lo mandi, rimandare lo stesso evento due volte non lo processa due volte.
             </div>
@@ -11042,7 +11044,7 @@ function renderApiTab() {
         <input type="file" id="csvImportInput" accept=".csv" style="display:none;" onchange="handleCsvFileSelect(event)">
         <button class="btn" style="margin-top: 10px;" onclick="document.getElementById('csvImportInput').click()">Carica file CSV</button>
         <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 12px;">
-          Massimo 500 righe per file. Una riga senza prezzo originale diventa un annuncio normale, senza badge sconto.
+          Massimo 500 righe per file. Una riga senza prezzo originale diventa un annuncio normale, senza badge sconto. La categoria è obbligatoria e deve essere una delle categorie DECERNE (per esempio "Dispensa" o "Altro"). Date in AAAA-MM-GG oppure GG/MM/AAAA.
         </p>
       </div>
     ` : ''}
@@ -11252,7 +11254,7 @@ const CSV_TARGET_FIELDS = [
   { key: 'product',        label: 'Nome prodotto',                                   required: true,  keywords: ['prodotto', 'product', 'articolo', 'nome'] },
   { key: 'price',           label: 'Prezzo finale',                                   required: true,  keywords: ['prezzo', 'price', 'importo'] },
   { key: 'original_price',  label: 'Prezzo originale (vuoto = annuncio senza sconto)', required: false, keywords: ['originale', 'listino', 'pieno', 'original'] },
-  { key: 'category',        label: 'Categoria',                                       required: false, keywords: ['categoria', 'category', 'reparto'] },
+  { key: 'category',        label: 'Categoria',                                       required: true,  keywords: ['categoria', 'category', 'reparto'] },
   { key: 'location',        label: 'Sede (nome punto vendita)',                       required: false, keywords: ['sede', 'negozio', 'punto vendita', 'store', 'location'] },
   { key: 'start_date',      label: 'Data inizio (AAAA-MM-GG)',                        required: false, keywords: ['inizio', 'start'] },
   { key: 'end_date',        label: 'Data fine (AAAA-MM-GG)',                          required: false, keywords: ['fine', 'scadenza', 'end'] },
@@ -11425,6 +11427,24 @@ function parseCsvDate(raw) {
   return iso;
 }
 
+// Controlla un prezzo già letto da parseCsvPrice: ritorna '' se va bene, altrimenti il motivo.
+function csvPriceProblem(n) {
+  if (!Number.isFinite(n) || n <= 0) return 'mancante o non valido';
+  if (n > 99999.99) return 'troppo alto (massimo 99999,99)';
+  if (Math.abs(n * 100 - Math.round(n * 100)) > 1e-6) return 'con più di 2 decimali';
+  return '';
+}
+
+// Categorie ufficiali: le stesse del menu "Categoria" del form offerta (#offCat).
+// Ritorna una mappa "nome in minuscolo" -> "nome ufficiale".
+function getOfficialCategoryMap() {
+  const map = new Map();
+  document.querySelectorAll('#offCat option').forEach(o => {
+    if (o.value) map.set(o.value.trim().toLowerCase(), o.value);
+  });
+  return map;
+}
+
 // Normalizza e classifica una riga CSV con la STESSA logica dell'API partner:
 // senza sconto reale -> annuncio normale (original_price = price).
 function normalizeCsvRow(rawRow, mapping, storeId, locationsByName, defaultLocationId) {
@@ -11433,13 +11453,20 @@ function normalizeCsvRow(rawRow, mapping, storeId, locationsByName, defaultLocat
 
   const product = get('product');
   if (!product) errors.push("nome prodotto mancante");
+  else if (product.length > 150) errors.push("nome prodotto troppo lungo (massimo 150 caratteri)");
 
   const price = parseCsvPrice(get('price'));
-  if (!Number.isFinite(price) || price <= 0) errors.push("prezzo mancante o non valido");
+  const priceProblem = csvPriceProblem(price);
+  if (priceProblem) errors.push(`prezzo finale ${priceProblem}`);
 
   const originalRaw = get('original_price');
-  let originalPrice = originalRaw ? parseCsvPrice(originalRaw) : price;
-  if (!Number.isFinite(originalPrice) || originalPrice < price) originalPrice = price;
+  let originalPrice = price;
+  if (originalRaw) {
+    originalPrice = parseCsvPrice(originalRaw);
+    const originalProblem = csvPriceProblem(originalPrice);
+    if (originalProblem) errors.push(`prezzo originale ${originalProblem}`);
+    else if (!priceProblem && originalPrice < price) errors.push("prezzo originale inferiore al prezzo finale");
+  }
 
   let locationId = defaultLocationId;
   const locationName = get('location');
@@ -11464,6 +11491,22 @@ function normalizeCsvRow(rawRow, mapping, storeId, locationsByName, defaultLocat
     endDate = d.toISOString().slice(0, 10);
   }
   if (new Date(endDate) < new Date(startDate)) errors.push("data fine precedente alla data inizio");
+  else if (endDate < today) errors.push("data fine già passata");
+
+  const categoryRaw = get('category');
+  const officialCategories = getOfficialCategoryMap();
+  let category = categoryRaw;
+  if (!categoryRaw) {
+    errors.push("categoria mancante (obbligatoria)");
+  } else if (officialCategories.size) {
+    category = officialCategories.get(categoryRaw.trim().toLowerCase());
+    if (!category) errors.push(`categoria "${categoryRaw}" non valida: usa una delle categorie DECERNE (es. "Dispensa" o "Altro")`);
+  }
+
+  const description = get('description');
+  if (description.length > 1000) errors.push("descrizione troppo lunga (massimo 1000 caratteri)");
+  const imgUrl = get('img_url');
+  if (imgUrl && !/^https:\/\/\S+$/i.test(imgUrl)) errors.push("URL immagine non valido (deve iniziare con https://)");
 
   if (errors.length) return { errors };
 
@@ -11478,11 +11521,8 @@ function normalizeCsvRow(rawRow, mapping, storeId, locationsByName, defaultLocat
     status: 'active',
     limited_quantity: false
   };
-  const category = get('category');
-  if (category) row.category = category;
-  const description = get('description');
+  row.category = category;
   if (description) row.description = description;
-  const imgUrl = get('img_url');
   if (imgUrl) row.img_url = imgUrl;
 
   return { row, isOffer: originalPrice > price };
@@ -11493,8 +11533,8 @@ window.confirmCsvImport = async (storageKey) => {
   const rows = root?._csvRows || [];
   const mapping = readCsvMappingFromForm();
 
-  if (!mapping.product || !mapping.price) {
-    return toast.error("Devi abbinare almeno 'Nome prodotto' e 'Prezzo finale'.");
+  if (!mapping.product || !mapping.price || !mapping.category) {
+    return toast.error("Devi abbinare almeno 'Nome prodotto', 'Prezzo finale' e 'Categoria'.");
   }
 
   const partner = getCurrentPartner();
