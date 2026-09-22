@@ -4549,6 +4549,7 @@ let cartLastPaceTime = null;
 let cartLastHeading = null;
 let cartWrongDirectionCount = 0;
 let cartWrongDirectionAnnounced = false;
+let cartOffRouteCount = 0;
 
 function computeVisitOrder(startLat, startLng, stores) {
   const remaining = [...stores];
@@ -4657,9 +4658,9 @@ function maneuverInstructionText(step, exitVia) {
     case 'turn':
     case 'end of road':
       return `${maneuverModifierText(m.modifier)}${via}`;
-    case 'new name':
-    case 'continue':
-      return `prosegui dritto${via}`;
+      case 'new name':
+        case 'continue':
+          return `${maneuverModifierText(m.modifier)}${via}`;
     case 'merge':
       return `immettiti a ${sideItalian(m.modifier)}${via}`;
     case 'fork':
@@ -4864,15 +4865,32 @@ function updateTripInfoBar() {
 
 // Distanza minima (in metri) tra il punto dato e il tracciato disegnato sulla mappa.
 // Usata per capire se l'utente ha sbagliato strada e serve un ricalcolo immediato.
+// Misura la distanza dal segmento più vicino, non dal solo vertice più vicino:
+// nelle curve i vertici del tracciato sono più radi, e la distanza dal vertice
+// da sola risulterebbe sovrastimata proprio mentre si sta svoltando.
 function distanceToRouteMeters(lat, lng) {
-  if (!cartMultiRoute || !cartMultiRoute.coords || !cartMultiRoute.coords.length) return 0;
+  if (!cartMultiRoute || !cartMultiRoute.coords || cartMultiRoute.coords.length < 2) return 0;
+  const coords = cartMultiRoute.coords;
   let min = Infinity;
-  for (let i = 0; i < cartMultiRoute.coords.length; i += 3) { // campiona ogni 3 punti, basta e costa meno
-    const [clat, clng] = cartMultiRoute.coords[i];
-    const d = distanceMeters(lat, lng, clat, clng);
+  for (let i = 0; i < coords.length - 1; i++) {
+    const d = distanceToSegmentMeters(lat, lng, coords[i][0], coords[i][1], coords[i + 1][0], coords[i + 1][1]);
     if (d < min) min = d;
   }
   return min;
+}
+
+// Distanza dal punto al segmento tra due coordinate, in metri: proietta il
+// punto sul segmento con un'approssimazione piana (adeguata per la breve
+// lunghezza di un singolo tratto di strada).
+function distanceToSegmentMeters(lat, lng, lat1, lng1, lat2, lng2) {
+  const mPerDegLat = 111320;
+  const mPerDegLng = 111320 * Math.cos(lat1 * Math.PI / 180);
+  const px = (lng - lng1) * mPerDegLng, py = (lat - lat1) * mPerDegLat;
+  const bx = (lng2 - lng1) * mPerDegLng, by = (lat2 - lat1) * mPerDegLat;
+  const lenSq = bx * bx + by * by;
+  const t = lenSq > 0 ? Math.max(0, Math.min(1, (px * bx + py * by) / lenSq)) : 0;
+  const dx = px - t * bx, dy = py - t * by;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 // Disegna o aggiorna il tracciato blu sulla mappa (senza questa funzione
@@ -5612,8 +5630,21 @@ function startLiveTracking() {
       const confirmedWrongDirection = cartWrongDirectionCount >= 2;
 
       const now = Date.now();
-      const offRoute = cartMultiRoute && distFromRoute > 60;
-      if (!offRoute) cartOffRouteAnnounced = false;
+      // La soglia si allarga con l'imprecisione del GPS dichiarata dal dispositivo:
+      // con un fix impreciso (tra palazzi alti, gallerie) una singola lettura può
+      // cadere oltre i 60m anche restando sulla strada giusta.
+      const offRouteThreshold = Math.max(60, (pos.coords.accuracy || 30) + 30);
+      const rawOffRoute = cartMultiRoute && distFromRoute > offRouteThreshold;
+      // Serve conferma su due letture consecutive: un singolo salto GPS non deve
+      // far scattare ricalcolo e annuncio da solo, altrimenti "sei uscito dal
+      // percorso" si sente troppo spesso.
+      if (rawOffRoute) {
+        cartOffRouteCount++;
+      } else {
+        cartOffRouteCount = 0;
+        cartOffRouteAnnounced = false;
+      }
+      const offRoute = cartOffRouteCount >= 2;
       const recalcWait = (offRoute || confirmedWrongDirection) ? 0 : 20000;
       if (cartVisitOrder.length && !cartRecalcInFlight && now - cartLastRouteRecalc > recalcWait) {
         cartLastRouteRecalc = now;
