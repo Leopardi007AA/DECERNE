@@ -2024,7 +2024,13 @@ async function fetchRecommendedOffers() {
     // (prima, col CAP impostato, si aggirava la RPC e si ordinava solo per
     // sconto — perdendo la personalizzazione). Se p_cap è null (nessun CAP
     // riconoscibile nel campo posizione), la RPC si comporta come prima.
-    const { data, error } = await supabaseClient.rpc('get_recommended_offers', { p_limit: 4, p_cap: userCap });
+    // Chiediamo un pool più ampio (RECOMMENDED_OFFERS_POOL_SIZE) rispetto ai 4
+    // che poi mostriamo: la RPC può restituire più offerte dello stesso
+    // prodotto (es. "Fichi" da due negozi diversi), e questi duplicati vanno
+    // scartati PRIMA di scegliere le 4 da mostrare (vedi dedup più sotto) — se
+    // chiedessimo solo 4 righe rischieremmo di finire con meno di 4 card utili.
+    const RECOMMENDED_OFFERS_POOL_SIZE = 20;
+    const { data, error } = await supabaseClient.rpc('get_recommended_offers', { p_limit: RECOMMENDED_OFFERS_POOL_SIZE, p_cap: userCap });
     if (error) {
       console.warn("Errore caricamento offerte consigliate:", error);
       section.classList.add("hidden");
@@ -2089,7 +2095,20 @@ async function fetchRecommendedOffers() {
       };
     });
 
-    renderRecommendedOffers(recommended.slice(0, 4));
+    // Dedup per prodotto: la RPC ordina già per punteggio, quindi manteniamo
+    // solo la prima occorrenza (= quella con punteggio più alto) di ogni
+    // prodotto e scartiamo le successive con lo stesso nome esatto. Nomi
+    // diversi (es. "Fichi" vs "Fichi Bio") sono considerati prodotti diversi
+    // e restano entrambi ammessi.
+    const seenProducts = new Set();
+    const dedupedRecommended = recommended.filter(offer => {
+      const key = (offer.product || "").trim().toLowerCase();
+      if (seenProducts.has(key)) return false;
+      seenProducts.add(key);
+      return true;
+    });
+
+    renderRecommendedOffers(dedupedRecommended.slice(0, 4));
   } catch (e) {
     console.warn("Errore imprevisto nelle offerte consigliate:", e);
     section.classList.add("hidden");
