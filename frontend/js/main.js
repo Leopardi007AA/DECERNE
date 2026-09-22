@@ -1857,19 +1857,6 @@ function uid(prefix = "id") {
   return prefix + "_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
 }
 
-/**
- * Genera una stringa casuale alfanumerica per la chiave API.
- */
-function generateRandomApiKey(length = 32) {
-  const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  const randomValues = new Uint32Array(length);
-  crypto.getRandomValues(randomValues); // generatore crittograficamente sicuro, non Math.random()
-  let result = "";
-  for (let i = 0; i < length; i++) {
-    result += charset.charAt(randomValues[i] % charset.length);
-  }
-  return "dec_live_" + result;
-}
 
 function defaultStoreData() {
   return {
@@ -7945,25 +7932,32 @@ async function handleOnboardingSubmit(step) {
           cap: storeData.tempReg.cap,
           logo_url: logoUrl,
           phone: phone,
-          plan: planChoice,
           internal_notes: referralNotes,
-          billing_cycle: directCycle || 'monthly',
-          subscription_status: isDirectActivation ? 'active' : 'trial',
-          renewal_date: isDirectActivation ? directRenewalISO : null,
-          business_type: storeData.tempReg.type,
-          // FIX: prima chi si registrava direttamente su Professional/Enterprise
-          // restava senza api_key finché non cliccava "Rigenera" a mano.
-          api_key: (planChoice === 'Professional' || planChoice === 'Enterprise') ? generateRandomApiKey() : null
+          business_type: storeData.tempReg.type
+          // plan, subscription_status, billing_cycle, renewal_date e api_key non si scrivono più
+          // qui: il database forza sempre Starter/trial in inserimento, per sicurezza.
+          // Il piano scelto (se a pagamento) viene attivato subito dopo con activate_store_subscription.
         })
         .select()
         .single();
-      if (storeError) throw new Error("Errore creazione negozio: " + storeError.message);
+        if (storeError) throw new Error("Errore creazione negozio: " + storeError.message);
 
-// Registra l'uso della prova gratuita (solo Starter mensile), per impedire di
-      // riattivarla dallo stesso IP/account. Non blocca la registrazione se fallisce.
-      if (isTrialPath) {
-        claimStarterTrial(storeRow.id);
-      }
+        // Il negozio nasce sempre Starter/trial (lo impone il database). Se il partner ha scelto
+        // un piano a pagamento in fase di registrazione, lo attiviamo subito dopo con la stessa
+        // funzione usata per gli upgrade: un solo punto che decide piano, stato e chiave API.
+        if (isDirectActivation) {
+          const { data: activatedRow, error: activateError } = await storeAuthClient
+            .rpc('activate_store_subscription', { p_store_id: storeRow.id, p_plan: planChoice, p_cycle: directCycle || 'monthly' })
+            .single();
+          if (activateError) throw new Error("Errore attivazione abbonamento: " + activateError.message);
+          Object.assign(storeRow, activatedRow);
+        }
+  
+  // Registra l'uso della prova gratuita (solo Starter mensile), per impedire di
+        // riattivarla dallo stesso IP/account. Non blocca la registrazione se fallisce.
+        if (isTrialPath) {
+          claimStarterTrial(storeRow.id);
+        }
 
       const { data: locationRow } = await storeAuthClient
         .from('store_locations')
