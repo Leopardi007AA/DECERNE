@@ -687,9 +687,28 @@ body.tour-blocking .container {
      schermi piccoli il popup del prodotto (2200 durante la guida) resta
      sotto la card della guida (2202) e viene tagliato in basso. Qui il
      popup sale sopra la guida solo durante questi due step. */
-  body.tour-step-detail #fullPagePopup.full-page-modal {
-    z-index: 2205 !important;
-  }
+     body.tour-step-detail #fullPagePopup.full-page-modal {
+      z-index: 2205 !important;
+    }
+  
+    /* Fix: quando un pulsante del menu Pannello Partner è evidenziato dalla
+       guida, l'intera sidebar deve uscire sopra il velo scuro (altrimenti,
+       su schermi piccoli, la sidebar è un pannello fixed che l'overlay
+       coprirebbe per intero, pulsante evidenziato compreso). */
+    .store-sidebar.tour-highlight-parent {
+      z-index: 2205 !important;
+    }
+    /* Il resto del menu (voci non evidenziate, chiudi, Esci) resta oscurato
+       e non cliccabile, così l'attenzione va solo sul pulsante del passo
+       corrente. */
+    .store-sidebar.tour-highlight-parent .store-nav-btn:not(.tour-highlight),
+    .store-sidebar.tour-highlight-parent .sidebar-footer,
+    .store-sidebar.tour-highlight-parent .partner-sidebar-close {
+      opacity: 0.35;
+      filter: grayscale(60%);
+      pointer-events: none;
+      transition: opacity 0.2s ease, filter 0.2s ease;
+    }
 
 /* --- NUOVO LAYOUT A RIGA --- */
 .offers-list-container {

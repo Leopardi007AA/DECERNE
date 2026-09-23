@@ -8276,23 +8276,23 @@ function renderDashboard(container) {
         </button>
         <div class="sidebar-title">PANNELLO PARTNER</div>
         ${collaboratorBadgeHTML}
-        <button class="store-nav-btn ${storeData.activeTab === 'home' ? 'active' : ''}" onclick="switchStoreTab('home')">${PANEL_ICONS.home} Panoramica</button>
-        <button class="store-nav-btn ${storeData.activeTab === 'offers' ? 'active' : ''}" onclick="switchStoreTab('offers')">${PANEL_ICONS.tag} Le mie Offerte</button>
-        ${!isManager ? `<button class="store-nav-btn ${storeData.activeTab === 'locations' ? 'active' : ''}" onclick="switchStoreTab('locations')">${PANEL_ICONS.pin} Gestione Sedi</button>` : ''}
-        <button class="store-nav-btn ${storeData.activeTab === 'trash' ? 'active' : ''}" onclick="switchStoreTab('trash')">${PANEL_ICONS.trash} Cestino</button>
+        <button id="partnerNavHome" class="store-nav-btn ${storeData.activeTab === 'home' ? 'active' : ''}" onclick="switchStoreTab('home')">${PANEL_ICONS.home} Panoramica</button>
+        <button id="partnerNavOffers" class="store-nav-btn ${storeData.activeTab === 'offers' ? 'active' : ''}" onclick="switchStoreTab('offers')">${PANEL_ICONS.tag} Le mie Offerte</button>
+        ${!isManager ? `<button id="partnerNavLocations" class="store-nav-btn ${storeData.activeTab === 'locations' ? 'active' : ''}" onclick="switchStoreTab('locations')">${PANEL_ICONS.pin} Gestione Sedi</button>` : ''}
+        <button id="partnerNavTrash" class="store-nav-btn ${storeData.activeTab === 'trash' ? 'active' : ''}" onclick="switchStoreTab('trash')">${PANEL_ICONS.trash} Cestino</button>
         ${(() => {
           const p = getCurrentPartner();
           const plan = p?.plan || 'Starter';
           const isPro = plan === 'Professional' || plan === 'Enterprise';
           const isEnt = plan === 'Enterprise';
           return `
-            ${isEnt && !isManager ? `<button class="store-nav-btn ${storeData.activeTab === 'general' ? 'active' : ''}" onclick="switchStoreTab('general')">${PANEL_ICONS.chart} Dashboard Generale</button>` : ''}
-            ${isPro ? `<button class="store-nav-btn ${storeData.activeTab === 'api' ? 'active' : ''}" onclick="switchStoreTab('api')">${PANEL_ICONS.plug} Integrazione API</button>` : ''}
-            ${isEnt && !isManager ? `<button class="store-nav-btn ${storeData.activeTab === 'team' ? 'active' : ''}" onclick="switchStoreTab('team')">${PANEL_ICONS.users} Team</button>` : ''}
+            ${isEnt && !isManager ? `<button id="partnerNavGeneral" class="store-nav-btn ${storeData.activeTab === 'general' ? 'active' : ''}" onclick="switchStoreTab('general')">${PANEL_ICONS.chart} Dashboard Generale</button>` : ''}
+            ${isPro ? `<button id="partnerNavApi" class="store-nav-btn ${storeData.activeTab === 'api' ? 'active' : ''}" onclick="switchStoreTab('api')">${PANEL_ICONS.plug} Integrazione API</button>` : ''}
+            ${isEnt && !isManager ? `<button id="partnerNavTeam" class="store-nav-btn ${storeData.activeTab === 'team' ? 'active' : ''}" onclick="switchStoreTab('team')">${PANEL_ICONS.users} Team</button>` : ''}
           `;
         })()}
-        ${!isManager ? `<button class="store-nav-btn ${storeData.activeTab === 'sub' ? 'active' : ''}" onclick="switchStoreTab('sub')">${PANEL_ICONS.card} Abbonamento</button>` : ''}
-        ${!isManager ? `<button class="store-nav-btn ${storeData.activeTab === 'profile' ? 'active' : ''}" onclick="switchStoreTab('profile')">${PANEL_ICONS.settings} Impostazioni</button>` : ''}
+        ${!isManager ? `<button id="partnerNavSub" class="store-nav-btn ${storeData.activeTab === 'sub' ? 'active' : ''}" onclick="switchStoreTab('sub')">${PANEL_ICONS.card} Abbonamento</button>` : ''}
+        ${!isManager ? `<button id="partnerNavProfile" class="store-nav-btn ${storeData.activeTab === 'profile' ? 'active' : ''}" onclick="switchStoreTab('profile')">${PANEL_ICONS.settings} Impostazioni</button>` : ''}
         <div class="sidebar-footer">
           <button class="store-nav-btn" onclick="logoutPartner()" style="color: #ef4444; width: 100%; text-align: left;">${PANEL_ICONS.logout} Esci</button>
         </div>
@@ -8308,6 +8308,7 @@ function renderDashboard(container) {
     else { contentArea.innerHTML = ""; contentArea.appendChild(tabResult); }
   }
   setupPartnerSidebarDrag();
+  maybeStartPartnerGuide();
 }
 
 // Menu laterale del Pannello Partner a comparsa su schermi piccoli (sotto i 900px):
@@ -12697,6 +12698,211 @@ const pollId = setInterval(() => {
     if (!inUserMode) return;
 
     setTimeout(startTour, 400);
+  };
+})();
+
+// ============ GUIDA PANNELLO PARTNER (PRIMO ACCESSO DOPO L'ABBONAMENTO) ============
+// Si mostra una sola volta per negozio (o per ruolo, per i collaboratori),
+// alla prima apertura della Dashboard sulla tab Panoramica. Non si ripresenta
+// ai rinnovi: quel momento capita sempre DOPO che il partner è già entrato
+// almeno una volta nel pannello, quindi il flag "vista" è già salvato.
+const maybeStartPartnerGuide = (function () {
+  let steps = [];
+  let current = 0;
+  let sidebarOpenedByGuide = false;
+  let prevBodyOverflow = "";
+
+  function storageKeyFor(partner) {
+    const isManager = partner.isCollaborator && partner.collaboratorRole === 'Manager';
+    return `decerne_partner_guide_seen_${partner.id}_${isManager ? 'manager' : 'full'}`;
+  }
+
+  function buildSteps(partner) {
+    const isManager = partner.isCollaborator && partner.collaboratorRole === 'Manager';
+    const plan = partner.plan || 'Starter';
+    const isPro = plan === 'Professional' || plan === 'Enterprise';
+    const isEnt = plan === 'Enterprise';
+
+    const list = [
+      {
+        title: "Benvenuto nel tuo Pannello Partner",
+        text: "Da qui gestisci il tuo negozio su DECERNE: offerte, sedi, abbonamento e tutto il resto. Facciamo un giro veloce del menu a sinistra.",
+        highlight: null
+      },
+      {
+        title: "Panoramica",
+        text: "La schermata che vedi appena entri: stato dell'abbonamento, offerte attive e qualche numero a colpo d'occhio sul tuo negozio.",
+        highlight: "#partnerNavHome"
+      },
+      {
+        title: "Le mie Offerte",
+        text: "Qui crei, modifichi e pubblichi le offerte che i clienti vedono nell'app: è la sezione su cui lavorerai più spesso.",
+        highlight: "#partnerNavOffers"
+      }
+    ];
+
+    if (!isManager) {
+      list.push({
+        title: "Gestione Sedi",
+        text: "Se il tuo negozio ha più punti vendita, qui aggiungi e modifichi i loro indirizzi: ogni offerta si può poi assegnare alla sede giusta.",
+        highlight: "#partnerNavLocations"
+      });
+    }
+
+    list.push({
+      title: "Cestino",
+      text: "Le offerte che elimini restano qui per un po': puoi recuperarle se cambi idea, invece di doverle ricreare da capo.",
+      highlight: "#partnerNavTrash"
+    });
+
+    if (isEnt && !isManager) {
+      list.push({
+        title: "Dashboard Generale",
+        text: "Una vista d'insieme su tutte le sedi del tuo negozio, con i dati aggregati per confrontarle tra loro. Disponibile solo con il piano Enterprise.",
+        highlight: "#partnerNavGeneral"
+      });
+    }
+
+    if (isPro) {
+      list.push({
+        title: "Integrazione API",
+        text: "La chiave API per collegare il tuo gestionale e sincronizzare automaticamente le offerte, senza inserirle a mano. Dal piano Professional in su.",
+        highlight: "#partnerNavApi"
+      });
+    }
+
+    if (isEnt && !isManager) {
+      list.push({
+        title: "Team",
+        text: "Qui inviti i collaboratori che lavorano con te e decidi cosa possono fare nel pannello. Disponibile solo con il piano Enterprise.",
+        highlight: "#partnerNavTeam"
+      });
+    }
+
+    if (!isManager) {
+      list.push({
+        title: "Abbonamento",
+        text: "Qui controlli il piano attivo, la data del prossimo rinnovo e puoi passare a un piano diverso quando vuoi.",
+        highlight: "#partnerNavSub"
+      });
+      list.push({
+        title: "Impostazioni",
+        text: "Logo, contatti, orari e le altre informazioni del tuo negozio: qui le tieni sempre aggiornate.",
+        highlight: "#partnerNavProfile"
+      });
+    }
+
+    list.push({
+      title: "Tutto pronto",
+      text: "Ora conosci tutte le sezioni del pannello. Buon lavoro con il tuo negozio su DECERNE!",
+      highlight: null
+    });
+
+    return list;
+  }
+
+  function clearHighlight() {
+    document.querySelectorAll(".tour-highlight").forEach(el => el.classList.remove("tour-highlight"));
+    document.querySelectorAll(".tour-highlight-parent").forEach(el => el.classList.remove("tour-highlight-parent"));
+  }
+
+  function closeSidebarIfOpenedByGuide() {
+    if (sidebarOpenedByGuide) {
+      document.getElementById("partnerSidebar")?.classList.remove("open");
+      sidebarOpenedByGuide = false;
+    }
+  }
+
+  function renderStep() {
+    clearHighlight();
+    const step = steps[current];
+    if (!step) return closeGuide();
+
+    if (step.highlight) {
+      // Su schermi piccoli il menu è a comparsa: va aperto per la durata
+      // della guida, altrimenti il pulsante da evidenziare resta fuori
+      // dallo schermo.
+      if (window.innerWidth < 900) {
+        const sidebar = document.getElementById("partnerSidebar");
+        if (sidebar && !sidebar.classList.contains("open")) {
+          sidebar.classList.add("open");
+          sidebarOpenedByGuide = true;
+        }
+      }
+      const el = document.querySelector(step.highlight);
+      if (el) {
+        el.classList.add("tour-highlight");
+        el.closest(".store-sidebar")?.classList.add("tour-highlight-parent");
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    } else {
+      closeSidebarIfOpenedByGuide();
+    }
+
+    document.getElementById("partnerGuideOverlay")?.classList.add("blocking");
+    const titleEl = document.getElementById("partnerGuideTitle");
+    const textEl = document.getElementById("partnerGuideText");
+    if (titleEl) titleEl.textContent = step.title;
+    if (textEl) textEl.textContent = step.text;
+
+    const dotsEl = document.getElementById("partnerGuideDots");
+    if (dotsEl) {
+      dotsEl.innerHTML = steps.map((_, i) => `<span class="${i === current ? "active" : ""}"></span>`).join("");
+    }
+
+    const nextBtn = document.getElementById("partnerGuideNextBtn");
+    if (nextBtn) nextBtn.textContent = current === steps.length - 1 ? "Ho capito" : "Avanti";
+  }
+
+  function nextStep() {
+    if (current === steps.length - 1) return closeGuide();
+    current++;
+    renderStep();
+  }
+
+  function closeGuide() {
+    clearHighlight();
+    closeSidebarIfOpenedByGuide();
+    document.body.style.overflow = prevBodyOverflow;
+    document.getElementById("partnerGuideOverlay")?.classList.add("hidden");
+    document.getElementById("partnerGuideCard")?.classList.add("hidden");
+    const partner = getCurrentPartner();
+    if (partner) {
+      try { localStorage.setItem(storageKeyFor(partner), "1"); } catch (e) {}
+    }
+  }
+
+  function startGuide() {
+    current = 0;
+    sidebarOpenedByGuide = false;
+    prevBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.getElementById("partnerGuideOverlay")?.classList.remove("hidden");
+    document.getElementById("partnerGuideCard")?.classList.remove("hidden");
+    renderStep();
+  }
+
+  document.addEventListener("click", (e) => {
+    if (!e.target) return;
+    if (e.target.id === "partnerGuideSkipBtn") closeGuide();
+    else if (e.target.id === "partnerGuideNextBtn") nextStep();
+  });
+
+  return function () {
+    const partner = getCurrentPartner();
+    if (!partner) return;
+    if (!document.getElementById("partnerGuideOverlay") || !document.getElementById("partnerGuideCard")) return;
+    // Solo alla prima tab (Panoramica) della Dashboard: è dove atterra
+    // sempre chi si registra o attiva un piano per la prima volta.
+    if (storeData.step !== 'dashboard' || storeData.activeTab !== 'home') return;
+
+    let alreadySeen = false;
+    try { alreadySeen = !!localStorage.getItem(storageKeyFor(partner)); } catch (e) {}
+    if (alreadySeen) return;
+
+    steps = buildSteps(partner);
+    if (!steps.length) return;
+    setTimeout(startGuide, 400);
   };
 })();
 
