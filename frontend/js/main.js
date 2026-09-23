@@ -3039,6 +3039,26 @@ window.addNewLocationField = () => {
   container.appendChild(div);
 };
 
+// Allinea il menu "Categoria" del form a quelle presenti sul database (offer_categories),
+// così basta aggiungerne una lì senza dover più toccare anche l'HTML. Se la lettura fallisce
+// (rete assente, ecc.) restano le opzioni scritte staticamente nel file HTML.
+async function populateOfferCategorySelect() {
+  try {
+    const select = $("#offCat");
+    if (!select) return;
+    const { data, error } = await supabaseClient
+      .from('offer_categories')
+      .select('name')
+      .order('sort_order', { ascending: true });
+    if (error || !data || !data.length) return;
+    const current = select.value;
+    select.innerHTML = data.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+    if (current && data.some(c => c.name === current)) select.value = current;
+  } catch (e) {
+    console.warn("Elenco categorie non aggiornato dal database:", e);
+  }
+}
+
 // --- GESTIONE MODALE OFFERTE (NUOVA/EDIT) ---
 window.openOfferModal = (offer = null) => {
   try {
@@ -6794,6 +6814,7 @@ async function init() {
     if (DEV_MODE) console.log("Sistema Decerne in fase di avvio...");
   
     setupEventListeners();
+    populateOfferCategorySelect(); // non blocca l'avvio: se fallisce, restano le opzioni statiche del file HTML
   
     // Navigazione di base (Utente/Area Partner/Chi Siamo): collegata SUBITO,
     // prima di qualunque chiamata a Supabase — se una di quelle fallisce più
@@ -9268,18 +9289,14 @@ async function updatePartnerSubscription(partnerId, subscriptionObj) {
         p_cycle: subscriptionObj.billingCycle || 'monthly'
       }));
   } else {
-    // Percorso trial/expired: resta un update diretto per ora (prossimo step).
+    // Percorso trial/expired: piano/stato/date sono decisi e scritti lato server
+    // dalla RPC (che impedisce anche di riattivare più volte la prova Starter).
     ({ data: storeRow, error } = await storeAuthClient
-      .from('stores')
-      .update({
-        plan: subscriptionObj.plan,
-        subscription_status: subscriptionObj.status,
-        trial_started_at: subscriptionObj.startedAt || null,
-        renewal_date: subscriptionObj.renewalDate || null,
-        billing_cycle: subscriptionObj.billingCycle || 'monthly'
+      .rpc('set_own_store_trial_or_expired', {
+        p_store_id: partnerId,
+        p_status: subscriptionObj.status,
+        p_plan: subscriptionObj.plan
       })
-      .eq('id', partnerId)
-      .select()
       .single());
   }
 
@@ -9726,16 +9743,10 @@ window.switchToAnnual = async function() {
   showConfirm(
     `Passare il piano ${partner.plan} a fatturazione annuale? I ${remainingDays} giorni rimanenti del mese in corso si sommano al nuovo anno: la prossima scadenza sara' il ${newRenewalDate.toLocaleDateString()} (tra ${totalDaysFromToday} giorni).`,
     async () => {
-      const updates = {
-        billing_cycle: 'annual',
-        renewal_date: newRenewalDate.toISOString().split('T')[0]
-      };
-
+      // La nuova data di rinnovo (giorni residui del mese + un anno) la ricalcola
+      // il database con lo stesso conto fatto qui sopra solo per il messaggio di conferma.
       const { data: storeRow, error } = await storeAuthClient
-        .from('stores')
-        .update(updates)
-        .eq('id', partner.id)
-        .select()
+        .rpc('switch_own_store_to_annual', { p_store_id: partner.id })
         .single();
 
       if (error) {
