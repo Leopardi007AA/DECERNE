@@ -691,24 +691,47 @@ body.tour-blocking .container {
       z-index: 2205 !important;
     }
   
-    /* Fix: quando un pulsante del menu Pannello Partner è evidenziato dalla
-       guida, l'intera sidebar deve uscire sopra il velo scuro (altrimenti,
-       su schermi piccoli, la sidebar è un pannello fixed che l'overlay
-       coprirebbe per intero, pulsante evidenziato compreso). */
-    .store-sidebar.tour-highlight-parent {
-      z-index: 2205 !important;
-    }
-    /* Il resto del menu (voci non evidenziate, chiudi, Esci) resta oscurato
-       e non cliccabile, così l'attenzione va solo sul pulsante del passo
-       corrente. */
-    .store-sidebar.tour-highlight-parent .store-nav-btn:not(.tour-highlight),
-    .store-sidebar.tour-highlight-parent .sidebar-footer,
-    .store-sidebar.tour-highlight-parent .partner-sidebar-close {
-      opacity: 0.35;
-      filter: grayscale(60%);
-      pointer-events: none;
-      transition: opacity 0.2s ease, filter 0.2s ease;
-    }
+    /* Guida Pannello Partner: si illumina solo la voce del menu che si sta
+       spiegando e l'intera sezione che apre, non il pannello di sinistra. */
+       .guide-lit-option {
+        position: relative;
+        z-index: 2210;
+        outline: 3px solid var(--primary);
+        outline-offset: 4px;
+      }
+      .guide-lit-option:not(.active) { background: #fff; color: var(--primary); }
+      .guide-lit-section {
+        position: relative;
+        z-index: 2210;
+        background: #fff;
+        border-radius: 20px;
+        outline: 3px solid var(--primary);
+        outline-offset: -3px;
+        /* spazio in fondo: si può scorrere fin sopra la card della guida */
+        padding-bottom: 280px;
+      }
+      #partnerGuideCard { z-index: 2220; }
+  
+      @media (max-width: 900px) {
+        /* Il cassetto non si apre: resta solo la voce, senza pannello, in
+           alto al centro sopra la barra scura. */
+        .store-sidebar.guide-focus {
+          transform: translateX(-50%) !important;
+          transition: none !important;
+          top: 0;
+          left: 50%;
+          height: auto;
+          width: max-content;
+          max-width: calc(100vw - 24px);
+          padding: 10px 0;
+          overflow: visible;
+          background: transparent;
+          box-shadow: none;
+          z-index: 2215;
+        }
+        .store-sidebar.guide-focus > :not(.guide-lit-option) { display: none !important; }
+        .store-sidebar.guide-focus .guide-lit-option { width: auto; margin: 0; }
+      }
 
 /* --- NUOVO LAYOUT A RIGA --- */
 .offers-list-container {

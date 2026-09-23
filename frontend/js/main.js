@@ -12709,8 +12709,20 @@ const pollId = setInterval(() => {
 const maybeStartPartnerGuide = (function () {
   let steps = [];
   let current = 0;
-  let sidebarOpenedByGuide = false;
-  let prevBodyOverflow = "";
+  let active = false;
+
+  // Voce del menu -> tab che apre. A ogni passo la guida apre la sezione vera.
+  const TAB_BY_NAV = {
+    "#partnerNavHome": "home",
+    "#partnerNavOffers": "offers",
+    "#partnerNavLocations": "locations",
+    "#partnerNavTrash": "trash",
+    "#partnerNavGeneral": "general",
+    "#partnerNavApi": "api",
+    "#partnerNavTeam": "team",
+    "#partnerNavSub": "sub",
+    "#partnerNavProfile": "profile"
+  };
 
   function storageKeyFor(partner) {
     const isManager = partner.isCollaborator && partner.collaboratorRole === 'Manager';
@@ -12801,43 +12813,45 @@ const maybeStartPartnerGuide = (function () {
     return list;
   }
 
+  const isSmallScreen = () => window.matchMedia("(max-width: 900px)").matches;
+
   function clearHighlight() {
-    document.querySelectorAll(".tour-highlight").forEach(el => el.classList.remove("tour-highlight"));
-    document.querySelectorAll(".tour-highlight-parent").forEach(el => el.classList.remove("tour-highlight-parent"));
+    document.querySelectorAll(".guide-lit-option").forEach(el => el.classList.remove("guide-lit-option"));
+    document.querySelectorAll(".guide-lit-section").forEach(el => el.classList.remove("guide-lit-section"));
+    document.querySelectorAll(".guide-focus").forEach(el => el.classList.remove("guide-focus"));
   }
 
-  function closeSidebarIfOpenedByGuide() {
-    if (sidebarOpenedByGuide) {
-      document.getElementById("partnerSidebar")?.classList.remove("open");
-      sidebarOpenedByGuide = false;
+  // Si può richiamare quante volte serve: il pannello viene ricostruito a ogni
+  // cambio di tab e a ogni refresh dei dati, quindi le classi vanno rimesse
+  // sul DOM nuovo (vedi il ramo "active" in fondo).
+  function applyHighlight() {
+    clearHighlight();
+    const step = steps[current];
+    if (!step || !step.highlight) return;
+
+    const option = document.querySelector(step.highlight);
+    const section = document.getElementById("active-tab-content");
+    if (option) {
+      option.classList.add("guide-lit-option");
+      // Su schermi piccoli il menu è un cassetto che coprirebbe la sezione:
+      // lì resta visibile solo la voce, ferma in alto.
+      if (isSmallScreen()) option.closest(".store-sidebar")?.classList.add("guide-focus");
     }
+    if (section) section.classList.add("guide-lit-section");
   }
 
   function renderStep() {
-    clearHighlight();
     const step = steps[current];
     if (!step) return closeGuide();
 
-    if (step.highlight) {
-      // Su schermi piccoli il menu è a comparsa: va aperto per la durata
-      // della guida, altrimenti il pulsante da evidenziare resta fuori
-      // dallo schermo.
-      if (window.innerWidth < 900) {
-        const sidebar = document.getElementById("partnerSidebar");
-        if (sidebar && !sidebar.classList.contains("open")) {
-          sidebar.classList.add("open");
-          sidebarOpenedByGuide = true;
-        }
-      }
-      const el = document.querySelector(step.highlight);
-      if (el) {
-        el.classList.add("tour-highlight");
-        el.closest(".store-sidebar")?.classList.add("tour-highlight-parent");
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    } else {
-      closeSidebarIfOpenedByGuide();
+    // Ogni passo apre la sezione vera della voce spiegata; il primo e
+    // l'ultimo tornano su Panoramica, senza nulla di illuminato.
+    const tab = step.highlight ? TAB_BY_NAV[step.highlight] : "home";
+    if (tab && storeData.activeTab !== tab) {
+      window.switchStoreTab(tab);
     }
+    applyHighlight();
+    window.scrollTo({ top: 0, behavior: "auto" });
 
     document.getElementById("partnerGuideOverlay")?.classList.add("blocking");
     const titleEl = document.getElementById("partnerGuideTitle");
@@ -12861,9 +12875,8 @@ const maybeStartPartnerGuide = (function () {
   }
 
   function closeGuide() {
+    active = false;
     clearHighlight();
-    closeSidebarIfOpenedByGuide();
-    document.body.style.overflow = prevBodyOverflow;
     document.getElementById("partnerGuideOverlay")?.classList.add("hidden");
     document.getElementById("partnerGuideCard")?.classList.add("hidden");
     const partner = getCurrentPartner();
@@ -12874,13 +12887,22 @@ const maybeStartPartnerGuide = (function () {
 
   function startGuide() {
     current = 0;
-    sidebarOpenedByGuide = false;
-    prevBodyOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    active = true;
     document.getElementById("partnerGuideOverlay")?.classList.remove("hidden");
     document.getElementById("partnerGuideCard")?.classList.remove("hidden");
     renderStep();
   }
+
+  // Durante la guida il pannello si vede ma non si tocca: si può scorrere,
+  // i click no (li ferma prima che arrivino a menu, pulsanti e link).
+  document.addEventListener("click", (e) => {
+    if (!active || !e.target || !e.target.closest) return;
+    if (e.target.closest("#partnerGuideCard")) return;
+    if (e.target.closest("#partnerSidebar, #active-tab-content")) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
 
   document.addEventListener("click", (e) => {
     if (!e.target) return;
@@ -12889,6 +12911,10 @@ const maybeStartPartnerGuide = (function () {
   });
 
   return function () {
+    // Guida già aperta: il pannello è stato ridisegnato (cambio di tab o dati
+    // appena arrivati), quindi rimettiamo l'evidenziazione senza ripartire.
+    if (active) { applyHighlight(); return; }
+
     const partner = getCurrentPartner();
     if (!partner) return;
     if (!document.getElementById("partnerGuideOverlay") || !document.getElementById("partnerGuideCard")) return;
