@@ -711,26 +711,19 @@ body.tour-blocking .container {
         padding-bottom: 280px;
       }
       #partnerGuideCard { z-index: 2220; }
-  
-      @media (max-width: 900px) {
-        /* Il cassetto non si apre: resta solo la voce, senza pannello, in
-           alto al centro sopra la barra scura. */
-        .store-sidebar.guide-focus {
-          transform: translateX(-50%) !important;
-          transition: none !important;
-          top: 0;
-          left: 50%;
-          height: auto;
-          width: max-content;
-          max-width: calc(100vw - 24px);
-          padding: 10px 0;
-          overflow: visible;
-          background: transparent;
-          box-shadow: none;
-          z-index: 2215;
-        }
-        .store-sidebar.guide-focus > :not(.guide-lit-option) { display: none !important; }
-        .store-sidebar.guide-focus .guide-lit-option { width: auto; margin: 0; }
+
+      /* Mentre la guida è aperta la navbar sta sopra la sezione illuminata
+         (così scorrendo la sezione le passa sotto), ma resta scura come il
+         resto della pagina grazie a un velo con lo stesso colore. */
+      body:has(#partnerGuideOverlay:not(.hidden)) .navbar {
+        z-index: 2211;
+      }
+      body:has(#partnerGuideOverlay:not(.hidden)) .navbar::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: rgba(2, 6, 23, 0.6);
+        z-index: 99999;
       }
 
 /* --- NUOVO LAYOUT A RIGA --- */

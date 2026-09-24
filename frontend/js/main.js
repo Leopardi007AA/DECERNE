@@ -12813,12 +12813,11 @@ const maybeStartPartnerGuide = (function () {
     return list;
   }
 
-  const isSmallScreen = () => window.matchMedia("(max-width: 900px)").matches;
+
 
   function clearHighlight() {
     document.querySelectorAll(".guide-lit-option").forEach(el => el.classList.remove("guide-lit-option"));
     document.querySelectorAll(".guide-lit-section").forEach(el => el.classList.remove("guide-lit-section"));
-    document.querySelectorAll(".guide-focus").forEach(el => el.classList.remove("guide-focus"));
   }
 
   // Si può richiamare quante volte serve: il pannello viene ricostruito a ogni
@@ -12831,12 +12830,7 @@ const maybeStartPartnerGuide = (function () {
 
     const option = document.querySelector(step.highlight);
     const section = document.getElementById("active-tab-content");
-    if (option) {
-      option.classList.add("guide-lit-option");
-      // Su schermi piccoli il menu è un cassetto che coprirebbe la sezione:
-      // lì resta visibile solo la voce, ferma in alto.
-      if (isSmallScreen()) option.closest(".store-sidebar")?.classList.add("guide-focus");
-    }
+    if (option) option.classList.add("guide-lit-option");
     if (section) section.classList.add("guide-lit-section");
   }
 
