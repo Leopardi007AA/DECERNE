@@ -1362,6 +1362,8 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
       apiKey: ownerStoreRow.api_key || "",
       membershipCardName: ownerStoreRow.membership_card_name || "",
       membershipCardImage: ownerStoreRow.membership_card_image_url || "",
+      businessType: ownerStoreRow.business_type || "",
+      websiteUrl: ownerStoreRow.website_url || "",
       locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary, latitude: l.latitude, longitude: l.longitude }))),
       plan: ownerStoreRow.plan,
       subscription: {
@@ -6781,6 +6783,8 @@ async function refreshPartnerSession(storeId) {
       apiKey: storeRow.api_key || "",
       membershipCardName: storeRow.membership_card_name || "",  // FIX: mancava anche qui
       membershipCardImage: storeRow.membership_card_image_url || "",  // FIX: idem
+      businessType: storeRow.business_type || "",
+      websiteUrl: storeRow.website_url || "",
       locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary, latitude: l.latitude != null ? parseFloat(l.latitude) : null, longitude: l.longitude != null ? parseFloat(l.longitude) : null }))),
       plan: storeRow.plan,
       subscription: {
@@ -7670,6 +7674,7 @@ function simulateTrialExpiry(partnerId) {
 
 function renderOnboarding(container) {
   const step = storeData.onboardingStep;
+  const isEcom = storeData.tempReg?.type === 'E-commerce';
   
   let detectedCity = "";
   const userLocInput = $("#locationInput");
@@ -7725,6 +7730,7 @@ function renderOnboarding(container) {
             <option value="Negozio per Animali">Negozio per Animali</option>
             <option value="Casalinghi ed Elettrodomestici">Casalinghi ed Elettrodomestici</option>
             <option value="Abbigliamento e Accessori">Abbigliamento e Accessori</option>
+            <option value="E-commerce">E-commerce</option>
             <option value="Altro">Altro</option>
           </select>
           <input type="email" id="obEmail" placeholder="Email Aziendale" autocomplete="email" required value="${storeData.tempReg?.email || ''}">
@@ -7752,6 +7758,17 @@ function renderOnboarding(container) {
         <p style="margin-top:15px; font-size:0.9rem; text-align:center;">
           Non hai ricevuto il codice? <a href="javascript:void(0)" onclick="resendOnboardingOtp()">Invialo di nuovo</a>
         </p>
+      ` : step === 3 && isEcom ? `
+        <h3>Il tuo Negozio Online</h3>
+        <p class="step-sub">Indica il sito ufficiale dove i clienti trovano i tuoi prodotti.</p>
+        <form id="onboardingForm" class="auth-form">
+          <div class="input-group">
+            <label>Sito Web Ufficiale</label>
+            <input type="url" id="obSite" placeholder="https://www.tuonegozio.it" required value="${storeData.tempReg?.website || ''}">
+            <small style="color:#64748b; font-size:0.75rem;">Comparirà nel dettaglio dei tuoi prodotti al posto degli orari. Indirizzo e magazzini (facoltativi) si aggiungono dopo, dal pannello.</small>
+          </div>
+          <button type="submit" class="btn full-width" style="margin-top:14px;">Continua al passo 4</button>
+        </form>
       ` : step === 3 ? `
         <h3>Posizione del Negozio</h3>
         <p class="step-sub">Indica dove si trova il punto vendita.</p>
@@ -7771,22 +7788,7 @@ function renderOnboarding(container) {
             </div>
           </div>
 
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-top:10px;">
-            <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">
-              Facoltativo ma consigliato: le coordinate esatte rendono il tuo negozio localizzabile con precisione sulla mappa dei clienti.
-              <a href="javascript:void(0)" onclick="openOnboardingGoogleMapsHelper()">Trova le tue coordinate su Google Maps →</a>
-            </p>
-            <div class="form-row">
-              <div class="input-group">
-                <label>Latitudine</label>
-                <input type="text" id="obLat" placeholder="Es: 42.4037" value="${storeData.tempReg?.latitude || ''}">
-              </div>
-              <div class="input-group">
-                <label>Longitudine</label>
-                <input type="text" id="obLng" placeholder="Es: 12.8533" value="${storeData.tempReg?.longitude || ''}">
-              </div>
-            </div>
-          </div>
+          <small style="display:block; margin-top:6px; color:#64748b; font-size:0.75rem;">Le coordinate esatte si possono impostare dopo, dalla sezione Sedi.</small>
 
           <button type="submit" class="btn full-width" style="margin-top:14px;">Continua al passo 4</button>
         </form>
@@ -7796,8 +7798,10 @@ function renderOnboarding(container) {
         <form id="onboardingForm" class="auth-form">
           <input type="url" id="obLogo" placeholder="URL Logo (es: https://...)">
           ${renderPhoneInputGroup('obTelPrefix', 'obTel', storeData.tempReg?.phone || '', 'Numero di Telefono')}
+                    ${isEcom ? '' : `
           <input type="text" id="obHours" placeholder="Orari (es: Lun-Sab 08-20)">
           <input type="url" id="obWeb" placeholder="Sito Web">
+          `}
           
           <div class="input-group" style="margin-top: 10px;">
             <label>Codice Presentatore / Email Partner (Referral)</label>
@@ -7935,14 +7939,24 @@ async function handleOnboardingSubmit(step) {
     }
     else if (step === 3) {
       if (!storeData.tempReg) throw new Error("Dati mancanti dallo step precedente.");
-      storeData.tempReg.street = clean($("#obStreet").value);
-      storeData.tempReg.city = clean($("#obCity").value).trim().toLowerCase();
-      storeData.tempReg.cap = clean($("#obCap").value).trim();
+      if (storeData.tempReg.type === 'E-commerce') {
+        const site = ($("#obSite").value || "").trim();
+        if (!/^https?:\/\/[^\s]+\.[^\s]{2,}$/i.test(site)) {
+          if (btn) btn.disabled = false;
+          return toast.error("Inserisci l'indirizzo completo del sito, con https:// all'inizio.");
+        }
+        storeData.tempReg.website = site;
+      } else {
+        storeData.tempReg.street = clean($("#obStreet").value);
+        storeData.tempReg.city = clean($("#obCity").value).trim().toLowerCase();
+        storeData.tempReg.cap = clean($("#obCap").value).trim();
+      }
       storeData.onboardingStep = 4;
       renderStoreView();
     }
     else if (step === 4) {
-      if (!storeData.tempReg || !storeData.tempReg.city) throw new Error("Dati incompleti.");
+      const isEcom = storeData.tempReg?.type === 'E-commerce';
+      if (!storeData.tempReg || (isEcom ? !storeData.tempReg.website : !storeData.tempReg.city)) throw new Error("Dati incompleti.");
 
       const referralInput = document.getElementById("obReferral")?.value.trim() || "";
       let referralNotes = "";
@@ -7968,8 +7982,9 @@ async function handleOnboardingSubmit(step) {
       }
 
       const logoUrl = clean($("#obLogo").value);
+      const obWebValue = clean(document.getElementById("obWeb")?.value || "").trim();
       const phone = getPhoneInputValue('obTelPrefix', 'obTel');
-      const fullAddress = `${storeData.tempReg.street}, ${storeData.tempReg.cap} ${storeData.tempReg.city}`;
+      const fullAddress = isEcom ? null : `${storeData.tempReg.street}, ${storeData.tempReg.cap} ${storeData.tempReg.city}`;
       const emailClean = storeData.tempReg.email;
       const planChoice = storeData.subscription?.plan || 'Starter';
 
@@ -8004,7 +8019,9 @@ async function handleOnboardingSubmit(step) {
           logo_url: logoUrl,
           phone: phone,
           internal_notes: referralNotes,
-          business_type: storeData.tempReg.type
+          business_type: storeData.tempReg.type,
+          website_url: isEcom ? storeData.tempReg.website : (/^https?:\/\//i.test(obWebValue) ? obWebValue : null),
+          hours: isEcom ? null : (clean(document.getElementById("obHours")?.value || "") || null)
           // plan, subscription_status, billing_cycle, renewal_date e api_key non si scrivono più
           // qui: il database forza sempre Starter/trial in inserimento, per sicurezza.
           // Il piano scelto (se a pagamento) viene attivato subito dopo con activate_store_subscription.
@@ -8030,22 +8047,29 @@ async function handleOnboardingSubmit(step) {
           claimStarterTrial(storeRow.id);
         }
 
-      const { data: locationRow } = await storeAuthClient
-        .from('store_locations')
-        .insert({
-          store_id: storeRow.id,
-          name: "Sede Principale",
-          address: fullAddress,
-          city: storeData.tempReg.city,
-          cap: storeData.tempReg.cap,
-          is_primary: true
-        })
-        .select()
-        .single();
+      // Gli E-commerce non hanno una sede fisica: gli eventuali magazzini
+      // si aggiungono dopo, dall'interno del pannello.
+      let locationRow = null;
+      let initialCoords = null;
+      if (!isEcom) {
+        const { data: insertedLocation } = await storeAuthClient
+          .from('store_locations')
+          .insert({
+            store_id: storeRow.id,
+            name: "Sede Principale",
+            address: fullAddress,
+            city: storeData.tempReg.city,
+            cap: storeData.tempReg.cap,
+            is_primary: true
+          })
+          .select()
+          .single();
+        locationRow = insertedLocation;
 
-      // Geocodifica subito l'indirizzo obbligatorio inserito in registrazione, così la sede
-      // ha da subito delle coordinate reali (l'utente potrà comunque affinarle a mano in seguito).
-      const initialCoords = await geocodeStoreAddress({ id: locationRow.id, address: fullAddress, city: storeData.tempReg.city, name: "Sede Principale" });
+        // Geocodifica subito l'indirizzo inserito in registrazione, così la sede
+        // ha da subito delle coordinate reali (le si può comunque affinare dopo).
+        initialCoords = await geocodeStoreAddress({ id: locationRow.id, address: fullAddress, city: storeData.tempReg.city, name: "Sede Principale" });
+      }
 
       const newStore = {
         id: storeRow.id,
@@ -8059,7 +8083,9 @@ async function handleOnboardingSubmit(step) {
         hours: "",
         internalNotes: storeRow.internal_notes || "",
         apiKey: storeRow.api_key || "",
-        locations: [{ id: locationRow.id, name: "Sede Principale", address: fullAddress, city: storeData.tempReg.city, cap: storeData.tempReg.cap, isPrimary: true, latitude: initialCoords?.lat ?? null, longitude: initialCoords?.lng ?? null }],
+        businessType: storeRow.business_type || "",
+        websiteUrl: storeRow.website_url || "",
+        locations: isEcom ? [] : [{ id: locationRow.id, name: "Sede Principale", address: fullAddress, city: storeData.tempReg.city, cap: storeData.tempReg.cap, isPrimary: true, latitude: initialCoords?.lat ?? null, longitude: initialCoords?.lng ?? null }],
         plan: storeRow.plan,
         subscription: isDirectActivation ? {
           plan: storeRow.plan,
