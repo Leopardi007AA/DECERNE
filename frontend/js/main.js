@@ -1371,6 +1371,7 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
       membershipCardImage: ownerStoreRow.membership_card_image_url || "",
       businessType: ownerStoreRow.business_type || "",
       websiteUrl: ownerStoreRow.website_url || "",
+      shippingProvinces: ownerStoreRow.shipping_provinces ?? null,
       locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary, latitude: l.latitude, longitude: l.longitude }))),
       plan: ownerStoreRow.plan,
       subscription: {
@@ -3065,7 +3066,7 @@ function renderProfileTab() {
         <button type="submit" class="btn" style="margin-top: 20px; width: 100%;">Salva Impostazioni Account</button>
       </form>
     </div>
-  ';
+  `;
 }
 
 function extractStreetFromAddress(address, cap, city) {
@@ -6912,6 +6913,7 @@ async function refreshPartnerSession(storeId) {
       membershipCardImage: storeRow.membership_card_image_url || "",  // FIX: idem
       businessType: storeRow.business_type || "",
       websiteUrl: storeRow.website_url || "",
+      shippingProvinces: storeRow.shipping_provinces ?? null,
       locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary, latitude: l.latitude != null ? parseFloat(l.latitude) : null, longitude: l.longitude != null ? parseFloat(l.longitude) : null }))),
       plan: storeRow.plan,
       subscription: {
@@ -8212,6 +8214,7 @@ async function handleOnboardingSubmit(step) {
         apiKey: storeRow.api_key || "",
         businessType: storeRow.business_type || "",
         websiteUrl: storeRow.website_url || "",
+        shippingProvinces: storeRow.shipping_provinces ?? null,
         locations: isEcom ? [] : [{ id: locationRow.id, name: "Sede Principale", address: fullAddress, city: storeData.tempReg.city, cap: storeData.tempReg.cap, isPrimary: true, latitude: initialCoords?.lat ?? null, longitude: initialCoords?.lng ?? null }],
         plan: storeRow.plan,
         subscription: isDirectActivation ? {
