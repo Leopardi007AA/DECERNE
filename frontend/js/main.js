@@ -1983,22 +1983,22 @@ async function getUserProvinceForCap(cap) {
 // fetchPublicLocationsMap: qui recuperiamo nome/indirizzo/piano dal negozio
 // e segnamo quali offerte sono di un e-commerce, con le loro province di spedizione.
 async function enrichOffersWithEcommerceStores(offersFlat, rawRows) {
-  const missingStoreIds = [...new Set(rawRows.filter(r => !r.location_id).map(r => r.store_id).filter(Boolean))];
-  const storesById = missingStoreIds.length ? await fetchPublicStoresMap(missingStoreIds) : {};
+  // Serve il negozio di OGNI offerta, non solo di quelle senza magazzino: un e-commerce
+  // può comunque avere un magazzino collegato, ma resta filtrato per provincia di
+  // spedizione e non per il CAP di quel magazzino.
+  const allStoreIds = [...new Set(rawRows.map(r => r.store_id).filter(Boolean))];
+  const storesById = allStoreIds.length ? await fetchPublicStoresMap(allStoreIds) : {};
   offersFlat.forEach((o, idx) => {
     const raw = rawRows[idx];
-    if (!raw.location_id) {
-      const store = storesById[raw.store_id];
-      if (store) {
-        o.storeName = store.name || o.storeName;
-        o.storeAddress = store.address || o.storeAddress;
-        o.plan = store.plan || o.plan;
-      }
+    const store = storesById[raw.store_id];
+    if (!raw.location_id && store) {
+      o.storeName = store.name || o.storeName;
+      o.storeAddress = store.address || o.storeAddress;
+      o.plan = store.plan || o.plan;
     }
     o.storeId = o.storeId || raw.store_id || "";
-    const st = storesById[raw.store_id];
-    o.isEcommerce = st?.business_type === 'E-commerce';
-    o.shippingProvinces = st?.shipping_provinces || null;
+    o.isEcommerce = store?.business_type === 'E-commerce';
+    o.shippingProvinces = store?.shipping_provinces || null;
   });
 }
 
@@ -9117,7 +9117,7 @@ function displayProductInModal(product) {
           </button>
 
           ${isEcomProduct ? `
-          <button class="btn outline full-width" ${product.websiteUrl ? `onclick="window.open('${product.websiteUrl.replace(/'/g, "\\'")}', '_blank', 'noopener')"` : 'disabled'} style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
+          <button class="btn outline full-width" ${(product.productUrl || product.websiteUrl) ? `onclick="window.open('${(product.productUrl || product.websiteUrl).replace(/'/g, "\\'")}', '_blank', 'noopener')"` : 'disabled'} style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
             ${PANEL_ICONS.map} Vedi sul sito
           </button>` : `
           <button class="btn outline full-width" onclick="openStoreInGoogleMaps('${(product.storeAddress || product.storeName || '').replace(/'/g, "\\'")}')" style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
@@ -10257,6 +10257,7 @@ async function drawShippingTab() {
           <summary style="cursor:pointer; display:flex; align-items:center; gap:8px; font-weight:700;">
             <input type="checkbox" class="ship-region-cb" data-region="${escapeHtml(region)}" onclick="event.stopPropagation()">
             ${escapeHtml(region)} <span class="ship-count" data-region="${escapeHtml(region)}" style="margin-left:auto; font-weight:500; color:#64748b; font-size:0.8rem;"></span>
+            <svg class="ship-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="flex-shrink:0; transition:transform .15s ease;"><path d="M9 6l6 6-6 6"/></svg>
           </summary>
           <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:6px 14px; margin-top:10px;">
             ${byRegion[region].map(p => `
@@ -10271,6 +10272,14 @@ async function drawShippingTab() {
     </div>
     <button class="btn" style="margin-top:18px; width:100%;" onclick="saveShippingTerritories()">Salva territori</button>
   `;
+
+  // Ruota la freccetta quando la tendina della regione si apre o si chiude.
+  body.querySelectorAll('#shipRegions details').forEach(det => {
+    const chevron = det.querySelector('.ship-chevron');
+    const syncChevron = () => { if (chevron) chevron.style.transform = det.open ? 'rotate(90deg)' : 'rotate(0deg)'; };
+    det.addEventListener('toggle', syncChevron);
+    syncChevron();
+  });
 
   const provBoxes = () => Array.from(body.querySelectorAll('.ship-prov-cb'));
   const refreshRegionState = () => {
