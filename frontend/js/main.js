@@ -414,18 +414,25 @@ function getCleanUserCity() {
   return cleanCity;
 }
 
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"'`]/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' }[c]
+  ));
+}
+
 // Funzione per gestire le immagini in modo sicuro in ogni vista
 function getSafeImageUrl(url) {
-  if (!url) return PLACEHOLDER_IMG;
-  const trimmedUrl = url.trim();
-  
-  // Se è un link valido (anche http) o un'immagine in base64
-  if (trimmedUrl.toLowerCase().startsWith("http") || trimmedUrl.startsWith("data:image")) {
-    // Trasformiamo http in https se possibile per evitare blocchi del browser
-    return trimmedUrl.replace("http://", "https://");
+  if (!url || typeof url !== "string") return PLACEHOLDER_IMG;
+  const trimmed = url.trim();
+  if (/[\s"'<>`\\]/.test(trimmed)) return PLACEHOLDER_IMG;
+  if (/^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/i.test(trimmed)) return trimmed;
+  try {
+    const u = new URL(trimmed);
+    if (u.protocol === "http:") u.protocol = "https:";
+    return u.protocol === "https:" ? u.href : PLACEHOLDER_IMG;
+  } catch (e) {
+    return PLACEHOLDER_IMG;
   }
-  
-  return PLACEHOLDER_IMG;
 }
 
 // Funzione Debounce: ritarda l'esecuzione della funzione fn
@@ -1142,7 +1149,7 @@ function showDuplicateDialog(existingProduct) {
       <div style="font-size: 3rem; margin-bottom: 15px;">⚠️</div>
       <h3 style="margin-bottom:10px; color:#1e293b;">Possibile Duplicato</h3>
       <p style="color:#64748b; margin-bottom:20px; line-height:1.5;">
-        Hai già un'offerta per <strong>${existingProduct}</strong> allo stesso prezzo.<br>Cosa vuoi fare?
+        Hai già un'offerta per <strong>${esc(existingProduct)}</strong> allo stesso prezzo.<br>Cosa vuoi fare?
       </p>
       <div style="display:flex; flex-direction:column; gap:10px;">
         <button id="dupUpdate" class="btn" style="background:var(--primary);">Aggiorna offerta esistente</button>
@@ -1212,15 +1219,15 @@ async function renderOfferHistoryUI(offerId) {
   container.innerHTML = history.map(h => `
     <div style="background: #f8fafc; padding: 10px; border-radius: 8px; border-left: 3px solid #cbd5e1;">
       <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-        <strong style="color: var(--primary); text-transform: uppercase; font-size: 0.7rem;">${h.field}</strong>
+        <strong style="color: var(--primary); text-transform: uppercase; font-size: 0.7rem;">${esc(h.field)}</strong>
         <span style="color: #94a3b8; font-size: 0.7rem;">${new Date(h.timestamp).toLocaleString()}</span>
       </div>
       <div style="color: #475569;">
-        <span style="text-decoration: line-through; opacity: 0.6;">${h.oldValue}</span> 
+        <span style="text-decoration: line-through; opacity: 0.6;">${esc(h.oldValue)}</span> 
         <span style="margin: 0 5px;">➔</span> 
-        <span style="font-weight: 600;">${h.newValue}</span>
+        <span style="font-weight: 600;">${esc(h.newValue)}</span>
       </div>
-      <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px;">Modificato da: ${h.modifiedBy}</div>
+      <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px;">Modificato da: ${esc(h.modifiedBy)}</div>
     </div>
   `).join('');
 }
@@ -2534,13 +2541,13 @@ async function buildStoreSearchCardElement(offerOrStore) {
     card.className = "store-search-card";
     card.onclick = () => openStoreProfile(store.id);
     card.innerHTML = `
-      <img src="${getSafeImageUrl(store.logo_url)}" class="store-search-card-logo" alt="${store.name}">
+      <img src="${getSafeImageUrl(store.logo_url)}" class="store-search-card-logo" alt="${esc(store.name)}">
       <div>
         <div class="store-search-card-name">
           ${store.name || 'Supermercato'}
           ${isVerified ? `<span class="store-verified-blue" style="color:#0f62fe; font-weight:800; font-size:0.7rem;">✓ Negozio Verificato</span>` : ''}
         </div>
-        <div class="store-search-card-sub">${store.address || ''}</div>
+        <div class="store-search-card-sub">${esc(store.address || '')}</div>
       </div>
       <span class="store-search-card-cta">Vedi profilo →</span>
     `;
@@ -2563,13 +2570,13 @@ async function buildStoreSearchCardElement(offerOrStore) {
   card.className = "store-search-card";
   card.onclick = () => openStoreProfile(offerOrStore.storeId);
   card.innerHTML = `
-    <img src="${getSafeImageUrl(store.logo_url)}" class="store-search-card-logo" alt="${store.name}">
+    <img src="${getSafeImageUrl(store.logo_url)}" class="store-search-card-logo" alt="${esc(store.name)}">
     <div>
       <div class="store-search-card-name">
-        ${store.name || 'Supermercato'}
+      ${esc(store.name || 'Supermercato')}
         ${isVerified ? `<span class="store-verified-blue" style="color:#0f62fe; font-weight:800; font-size:0.7rem;">✓ Negozio Verificato</span>` : ''}
       </div>
-      <div class="store-search-card-sub">${store.address || ''}</div>
+      <div class="store-search-card-sub">${esc(store.address || '')}</div>
     </div>
     <span class="store-search-card-cta">Vedi profilo →</span>
   `;
@@ -9187,7 +9194,7 @@ window.showStoreInfoPopup = (store) => {
 
   infoContent.innerHTML = `
     ${store.logo ? `<img src="${getSafeImageUrl(store.logo)}" class="store-info-logo" alt="${store.name}">` : ''}
-    <div class="store-info-name">${store.name || 'Supermercato'}</div>
+    <div class="store-info-name">${esc(store.name || 'Supermercato')}</div>
     ${isVerified ? `<span class="store-info-plan-badge"><span style="color:#0f62fe; font-weight:800; font-size:0.8rem;">✓ Negozio Verificato</span></span>` : ''}
     ${row(PANEL_ICONS.pin, 'Indirizzo', addressLine || (store.isEcommerce ? 'Negozio online' : ''))}
     ${store.isEcommerce
@@ -12499,7 +12506,7 @@ const maybeStartTour = (function () {
         row.className = "offer-row " + DEMO_OFFER_CLASS;
         row.innerHTML = `
           <div class="product-image-container">
-            <img src="${o.img}" class="product-img" alt="${o.product}">
+            <img src="${getSafeImageUrl(o.img)}" class="product-img" alt="${o.product}">
             ${discPerc > 0 ? `<span class="perc-badge">-${discPerc}%</span>` : ''}
           </div>
           <div class="product-info">
