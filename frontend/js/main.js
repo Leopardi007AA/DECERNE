@@ -9069,30 +9069,32 @@ function displayProductInModal(product) {
             <span style="display:inline-flex; vertical-align:middle;">${PANEL_ICONS.pin}</span> <span style="font-size: 0.9rem;">${escapeHtml(product.storeAddress || (isEcomProduct ? 'Negozio online' : ''))}</span>
           </p>
           
-          <div style="background: #f0f6ff; padding: 25px; border-radius: 16px; margin-bottom: 25px; border: 1px solid #dbeafe;">
-            <div class="price-container" style="display:flex; align-items: baseline; gap: 12px;">
-              <span class="price-tag" style="font-size: 3rem; color: #0f62fe; font-weight: 900;">${formatPrice(product.price)}</span>
+                    <div style="background: linear-gradient(160deg, #eff6ff 0%, #f8fbff 100%); padding: 26px; border-radius: var(--radius-lg); margin-bottom: 25px; border: 1px solid #dbeafe; box-shadow: var(--shadow-sm);">
+            <div class="price-container" style="display:flex; align-items: baseline; flex-wrap: wrap; gap: 10px 14px;">
+              <span class="price-tag" style="font-size: 3rem; color: #0f62fe; font-weight: 900; letter-spacing: -0.02em; line-height:1;">${formatPrice(product.price)}</span>
               <span style="font-size: 1rem; color: #64748b; font-weight: 600;">/ ${UNIT_LABELS[product.unit] || product.unit}</span>
-              ${product.originalPrice > product.price ? `<span class="old-price-small" style="font-size: 1.4rem; text-decoration: line-through; color: #94a3b8;">${formatPrice(product.originalPrice)}</span>` : ''}
+              ${product.originalPrice > product.price ? `<span class="old-price-small" style="font-size: 1.3rem; text-decoration: line-through; color: #94a3b8; margin-left: auto;">${formatPrice(product.originalPrice)}</span>` : ''}
             </div>
-            <div style="margin-top: 10px; display: flex; align-items: center; gap: 6px; color: #1e40af; font-weight: 600;">
-              <span style="display:inline-flex;">${PANEL_ICONS.calendar}</span> <span>Scade il: ${product.endDate}</span>
-              ${product.limitedQuantity ? `<span style="margin-left:8px; background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; padding:2px 10px; border-radius:20px; font-size:0.75rem; font-weight:700;">Quantità Limitata</span>` : ''}
+
+            <div style="height:1px; background:rgba(15,98,254,0.14); margin:20px 0 16px 0;"></div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:10px;">
+              <div style="display:inline-flex; align-items:center; gap:7px; background:#ffffff; color:#1e40af; font-weight:700; font-size:0.85rem; padding:8px 14px; border-radius: var(--radius-pill); border:1px solid #dbeafe;">
+                <span style="display:inline-flex;">${PANEL_ICONS.calendar}</span> Scade il ${product.endDate}
+              </div>
+              ${product.limitedQuantity ? `<div style="display:inline-flex; align-items:center; background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; padding:8px 14px; border-radius: var(--radius-pill); font-size:0.85rem; font-weight:700;">Quantità limitata</div>` : ''}
             </div>
-            ${isEcomProduct ? (deliveryLabel ? `
-            <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; color: #1e40af; font-weight: 600; background:#eff6ff; padding:8px 12px; border-radius:8px;">
-              ${PANEL_ICONS.calendar} <span>${deliveryLabel}</span>
-            </div>` : '') : `
+
             ${product.cardRequirement === 'required' ? `
-            <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; color: #b45309; font-weight: 600; background:#fffbeb; padding:8px 12px; border-radius:8px;">
-              ${product.storeCardImage ? `<img src="${getSafeImageUrl(product.storeCardImage)}" alt="Tessera" style="width:24px; height:24px; object-fit:contain; border-radius:4px;">` : ''}
+            <div style="margin-top: 14px; display: flex; align-items: center; gap: 10px; color: #92400e; font-weight: 600; background:#fffbeb; padding:10px 14px; border-radius: var(--radius-md); border: 1px solid #fde68a;">
+              ${product.storeCardImage ? `<img src="${getSafeImageUrl(product.storeCardImage)}" alt="Tessera" style="width:26px; height:26px; object-fit:contain; border-radius:5px; flex-shrink:0;">` : `<span style="display:inline-flex; flex-shrink:0;">${PANEL_ICONS.card}</span>`}
               <span>Richiede la tessera${product.storeCardName ? ` "${product.storeCardName}"` : ' del negozio'}</span>
             </div>` : ''}
             ${product.cardRequirement === 'not_required' ? `
-            <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; color: #15803d; font-weight: 600; background:#f0fdf4; padding:8px 12px; border-radius:8px;">
+            <div style="margin-top: 14px; display: flex; align-items: center; gap: 8px; color: #166534; font-weight: 600; background:#f0fdf4; padding:10px 14px; border-radius: var(--radius-md); border: 1px solid #bbf7d0;">
+              <span style="display:inline-flex;">${PANEL_ICONS.card}</span>
               <span>Nessuna tessera necessaria</span>
             </div>` : ''}
-            `}
           </div>
 
           <div style="margin-bottom: 30px;">
