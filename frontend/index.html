@@ -204,9 +204,9 @@
         <div class="input-group"><label>Prezzo Scontato (€)</label><input type="number" step="0.01" id="offPrezzoSconto" required></div>
       </div>
       <div class="input-group">
-        <label>Punto vendita / Sede</label>
+        <label id="offLocLabel">Punto vendita / Sede</label>
         <select id="offLocation" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;"></select>
-        <small style="color: #64748b; font-size: 0.7rem;">Seleziona la sede specifica per questa offerta.</small>
+        <small id="offLocHint" style="color: #64748b; font-size: 0.7rem;">Seleziona la sede specifica per questa offerta.</small>
       </div>
       <div class="input-group">
         <label>Categoria</label>
@@ -273,13 +273,21 @@
             <option value="confezione">Confezione</option>
           </select>
         </div>
-        <div class="input-group">
+        <div class="input-group" id="offCardGroup">
           <label>Tessera negozio</label>
           <select id="offCardReq">
             <option value="">Non specificato</option>
             <option value="required">Necessaria</option>
             <option value="not_required">Non necessaria</option>
           </select>
+        </div>
+        <div class="input-group hidden" id="offDeliveryGroup">
+          <label>Consegna prevista (giorni lavorativi)</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="number" id="offDelMin" min="0" max="60" step="1" placeholder="Da" aria-label="Giorni minimi di consegna">
+            <span>-</span>
+            <input type="number" id="offDelMax" min="0" max="60" step="1" placeholder="A" aria-label="Giorni massimi di consegna">
+          </div>
         </div>
       </div>
         <div class="form-row">
@@ -297,7 +305,12 @@
         placeholder="https://immagine.it/prodotto.jpg" 
         aria-label="URL immagine prodotto" 
         aria-invalid="false">
-      <small id="imgHint" style="color: #64748b; font-size: 0.75rem;">Verifica automatica dell'immagine al salvataggio.</small></div>
+        <small id="imgHint" style="color: #64748b; font-size: 0.75rem;">Verifica automatica dell'immagine al salvataggio.</small></div>
+        <div class="input-group hidden" id="offProductUrlGroup">
+          <label>Link al prodotto sul tuo sito</label>
+          <input type="url" id="offProductUrl" placeholder="https://www.tuosito.it/prodotto" aria-label="Link al prodotto">
+          <small style="color: #64748b; font-size: 0.75rem;">Gli utenti ci arrivano dal pulsante "Vedi sul sito".</small>
+        </div>
       <div class="input-group" style="flex-direction: row; align-items: center; gap: 10px; margin-top: 10px;">
         <input type="checkbox" id="offLimited" style="width: auto;"> <label>Quantità Limitata</label>
       </div>

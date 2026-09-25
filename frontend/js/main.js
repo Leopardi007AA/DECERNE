@@ -1422,6 +1422,12 @@ window.saveStoreProfile = async (e) => {
     const notesInput = document.getElementById("profNotes");
     const cardNameInput = document.getElementById("profCardName");
     const cardImageInput = document.getElementById("profCardImage");
+    const websiteInput = document.getElementById("profWebsite");
+    const isEcomProfile = currentPartner.businessType === 'E-commerce';
+    const newWebsite = (websiteInput?.value || "").trim();
+    if (isEcomProfile && !/^https?:\/\/[^\s]+\.[^\s]{2,}$/i.test(newWebsite)) {
+      return toast.error("Inserisci l'indirizzo completo del sito, con https:// all'inizio.");
+    }
 
     const newName = clean(nameInput?.value || "");
     const newLogo = clean(logoInput?.value || "");
@@ -1435,7 +1441,8 @@ window.saveStoreProfile = async (e) => {
         logo_url: newLogo,
         internal_notes: clean(notesInput?.value || ""),
         membership_card_name: clean(cardNameInput?.value || ""),
-        membership_card_image_url: clean(cardImageInput?.value || "")
+        membership_card_image_url: clean(cardImageInput?.value || ""),
+        ...(isEcomProfile ? { website_url: newWebsite } : {})
       })
       .eq('id', currentPartner.id)
       .select()
@@ -1459,7 +1466,8 @@ window.saveStoreProfile = async (e) => {
       city: storeRow.city,
       cap: storeRow.cap,
       membershipCardName: storeRow.membership_card_name || "",
-      membershipCardImage: storeRow.membership_card_image_url || ""
+      membershipCardImage: storeRow.membership_card_image_url || "",
+      websiteUrl: storeRow.website_url || ""
     };
 
     const dataString = JSON.stringify(updatedStore);
@@ -1585,7 +1593,10 @@ async function refreshMyOffers() {
     cardRequirement: r.card_requirement,
     scheduledPublishAt: r.scheduled_publish_at,
     limitedQuantity: r.limited_quantity || false,  // FIX: mancava qui, per questo "Quantità Limitata" si deselezionava alla riapertura
-    location_id: r.location_id  // FIX: serve per "Miglior sede" e per l'export CSV nella Dashboard Generale
+    location_id: r.location_id,  // FIX: serve per "Miglior sede" e per l'export CSV nella Dashboard Generale
+    productUrl: r.product_url || "",
+    deliveryDaysMin: r.delivery_days_min,
+    deliveryDaysMax: r.delivery_days_max
   }));
 
   storeData.offers = myOffersCache;
@@ -1948,13 +1959,62 @@ function setMode(mode) {
 // Recupera i dati pubblici dei negozi (name, city, cap, address, plan) per una lista
 // di store_id, passando da "public_stores": "stores" ha la RLS bloccata per chi
 // non è il proprietario. Ritorna una mappa { storeId: {...} }.
+// Calcola (una sola volta per CAP) la provincia dell'utente, per confrontarla
+// con le province di spedizione di un e-commerce.
+let __userProvinceCache = { cap: null, value: null };
+async function getUserProvinceForCap(cap) {
+  if (!cap) return null;
+  if (__userProvinceCache.cap === cap) return __userProvinceCache.value;
+  const { data, error } = await supabaseClient.rpc('province_for_cap', { p_cap: cap });
+  if (error) { console.warn("Errore calcolo provincia dal CAP:", error); return null; }
+  __userProvinceCache = { cap, value: data || null };
+  return data || null;
+}
+
+// Un'offerta di un e-commerce senza magazzino non ha una riga in
+// fetchPublicLocationsMap: qui recuperiamo nome/indirizzo/piano dal negozio
+// e segnamo quali offerte sono di un e-commerce, con le loro province di spedizione.
+async function enrichOffersWithEcommerceStores(offersFlat, rawRows) {
+  const missingStoreIds = [...new Set(rawRows.filter(r => !r.location_id).map(r => r.store_id).filter(Boolean))];
+  const storesById = missingStoreIds.length ? await fetchPublicStoresMap(missingStoreIds) : {};
+  offersFlat.forEach((o, idx) => {
+    const raw = rawRows[idx];
+    if (!raw.location_id) {
+      const store = storesById[raw.store_id];
+      if (store) {
+        o.storeName = store.name || o.storeName;
+        o.storeAddress = store.address || o.storeAddress;
+        o.plan = store.plan || o.plan;
+      }
+    }
+    o.storeId = o.storeId || raw.store_id || "";
+    const st = storesById[raw.store_id];
+    o.isEcommerce = st?.business_type === 'E-commerce';
+    o.shippingProvinces = st?.shipping_provinces || null;
+  });
+}
+
+// Un'offerta di un e-commerce si confronta con la provincia di spedizione
+// (o è visibile ovunque se il negozio non ha impostato limiti); un'offerta di
+// un negozio fisico si confronta con città/CAP della sua sede, come prima.
+function offerMatchesUserArea(o, userCity, userCap, userProvince) {
+  if (o.isEcommerce) {
+    if (!userCap) return true;
+    if (!o.shippingProvinces) return true; // nessun limite impostato = spedisce ovunque
+    return !!userProvince && o.shippingProvinces.includes(userProvince);
+  }
+  const matchesCity = !userCity || (o.storeCity === userCity);
+  const matchesCap = !userCap || (o.storeCap === userCap);
+  return matchesCity && matchesCap;
+}
+
 async function fetchPublicStoresMap(storeIds) {
   const uniqueIds = [...new Set(storeIds)].filter(Boolean);
   if (uniqueIds.length === 0) return {};
 
   const { data, error } = await supabaseClient
     .from('public_stores')
-    .select('id, name, city, cap, address, plan, logo_url, phone, hours')
+    .select('id, name, city, cap, address, plan, logo_url, phone, hours, website_url, business_type, shipping_provinces')
     .in('id', uniqueIds);
 
   if (error) console.error("Errore caricamento dati negozi pubblici:", error);
@@ -1967,7 +2027,7 @@ async function fetchPublicLocationsMap(locationIds) {
 
   const { data, error } = await supabaseClient
     .from('public_store_locations')
-    .select('location_id, store_id, location_name, store_name, address, city, cap, latitude, longitude, plan, is_primary, phone, hours, logo_url, membership_card_name, membership_card_image_url')
+    .select('location_id, store_id, location_name, store_name, address, city, cap, latitude, longitude, plan, is_primary, phone, hours, logo_url, membership_card_name, membership_card_image_url, website_url, business_type')
     .in('location_id', uniqueIds);
 
   if (error) console.error("Errore caricamento dati sedi negozio:", error);
@@ -1989,7 +2049,9 @@ async function fetchPublicLocationsMap(locationIds) {
     hours: l.hours || "",
     logo: l.logo_url || "",
     membershipCardName: l.membership_card_name || "",
-    membershipCardImage: l.membership_card_image_url || ""
+    membershipCardImage: l.membership_card_image_url || "",
+    websiteUrl: l.website_url || "",
+    businessType: l.business_type || ""
   }]));
 }
 
@@ -2320,13 +2382,16 @@ function applyOfferRevealAnimation(grid) {
         limitedQuantity: r.limited_quantity || false
       };
     });
+    await enrichOffersWithEcommerceStores(allOffers, rows || []);
+    const userProvince = userCap ? await getUserProvinceForCap(userCap) : null;
 
-    // Filtro base (città/CAP/tessera): la ricerca testuale intelligente viene dopo
+    // Filtro base (zona/tessera): la ricerca testuale intelligente viene dopo.
+    // Un'offerta di un e-commerce si confronta con la provincia di spedizione,
+    // non con città/CAP di una sede che non ha.
     let filtered = allOffers.filter(o => {
-      const matchesCity = !userCity || (o.storeCity === userCity);
-      const matchesCap = !userCap || (o.storeCap === userCap);
+      const matchesArea = offerMatchesUserArea(o, userCity, userCap, userProvince);
       const matchesNoCard = !noCardOnly || o.cardRequirement !== 'required';
-      return matchesCity && matchesCap && matchesNoCard;
+      return matchesArea && matchesNoCard;
     });
 
     // Ricerca intelligente: tollera typo/lettere invertite e, se la query
@@ -2902,6 +2967,7 @@ function renderProfileTab() {
   const primaryLocation = (partner.locations && partner.locations.length > 0)
     ? (partner.locations.find(l => l.isPrimary) || partner.locations[0])
     : { address: partner.address, city: partner.city, cap: partner.cap };
+  const isEcom = partner.businessType === 'E-commerce';
 
   return `
     <header class="tab-header">
@@ -2938,6 +3004,13 @@ function renderProfileTab() {
           <input type="url" id="profLogo" value="${partner.logo || ''}" placeholder="https://link-immagine.png">
         </div>
 
+        ${isEcom ? `
+        <div class="input-group">
+          <label>Sito Web Ufficiale</label>
+          <input type="url" id="profWebsite" value="${escapeHtml(partner.websiteUrl || '')}" placeholder="https://www.tuonegozio.it" required>
+          <small style="color:#94a3b8;">Compare nel dettaglio dei prodotti al posto degli orari.</small>
+        </div>
+        ` : `
         <div class="input-group">
           <label>Orari di Apertura Generali</label>
           <input type="text" id="profHours" value="${partner.hours || ''}" placeholder="Es: Lun-Sab 08:30-20:00">
@@ -2955,7 +3028,9 @@ function renderProfileTab() {
           </div>
         </div>
         <small style="display:block; margin-top:-10px; margin-bottom:15px; color:#94a3b8;">Compila questi campi se i tuoi prodotti possono richiedere una tessera fedeltà: potrai poi indicarlo su ogni singola offerta.</small>
+        `}
 
+        ${isEcom ? '' : `
         <h4 style="color: #64748b; font-size: 0.8rem; text-transform: uppercase; margin-top:20px;">Indirizzo e Posizione</h4>
         <small style="display:block; margin-bottom:10px; color:#94a3b8;">Dati della sede principale, impostata in "Gestione Sedi". Per cambiarli vai in quella scheda.</small>
 
@@ -2973,6 +3048,7 @@ function renderProfileTab() {
             <input type="text" value="${primaryLocation.cap || ''}" disabled style="background:#f8fafc; cursor:not-allowed; color:#94a3b8;">
           </div>
         </div>
+        `}
 
         <div class="input-group">
           <label>Note Interne / Memo</label>
@@ -2982,7 +3058,7 @@ function renderProfileTab() {
         <button type="submit" class="btn" style="margin-top: 20px; width: 100%;">Salva Impostazioni Account</button>
       </form>
     </div>
-  `;
+  ';
 }
 
 function extractStreetFromAddress(address, cap, city) {
@@ -3074,12 +3150,31 @@ window.openOfferModal = (offer = null) => {
   
     document.body.style.overflow = 'hidden';
 
-  // Gestione dinamica del Dropdown Sedi
+  // Gestione dinamica del Dropdown Sedi (per gli E-commerce diventa "Magazzino", facoltativo)
+  const isEcom = partner.businessType === 'E-commerce';
   const locSelect = $("#offLocation");
   const locContainer = locSelect.closest('.input-group'); // Prende il contenitore per nasconderlo/mostrarlo
   const locations = partner.locations || [];
 
-  if (locations.length > 1) {
+  // Campi che cambiano per i negozi online: magazzino facoltativo, link al prodotto,
+  // giorni di consegna al posto della tessera negozio.
+  $("#offLocLabel").textContent = isEcom ? "Magazzino (facoltativo)" : "Punto vendita / Sede";
+  $("#offLocHint").textContent = isEcom ? "Indica da quale magazzino parte il prodotto, se vuoi." : "Seleziona la sede specifica per questa offerta.";
+  $("#offProductUrlGroup").classList.toggle("hidden", !isEcom);
+  $("#offProductUrl").required = isEcom;
+  $("#offDeliveryGroup").classList.toggle("hidden", !isEcom);
+  $("#offDelMin").required = isEcom;
+  $("#offDelMax").required = isEcom;
+  $("#offCardGroup").classList.toggle("hidden", isEcom);
+
+  if (isEcom) {
+    locContainer.classList.remove("hidden");
+    locSelect.innerHTML = `<option value="">Nessun magazzino specificato</option>` + locations.map((loc) => `
+      <option value="${loc.id}" ${offer && offer.location_id === loc.id ? 'selected' : ''}>
+        ${escapeHtml(loc.name || '')}${loc.address ? ' (' + escapeHtml(loc.address) + ')' : ''}
+      </option>
+    `).join('');
+  } else if (locations.length > 1) {
     locContainer.classList.remove("hidden");
     locSelect.innerHTML = locations.map((loc) => `
       <option value="${loc.id}" ${offer && offer.location_id === loc.id ? 'selected' : ''}>
@@ -3090,7 +3185,7 @@ window.openOfferModal = (offer = null) => {
     // FIX: Anche se c'è una sola sede, dobbiamo usare il suo ID reale, non "0"
     locContainer.classList.add("hidden");
     const defaultLoc = locations[0] || { id: null, name: "Sede Principale" };
-    locSelect.innerHTML = `<option value="${defaultLoc.id}">${defaultLoc.name}</option>`;
+    locSelect.innerHTML = `<option value="${defaultLoc.id || ''}">${defaultLoc.name}</option>`;
   }
 
   // Gestione pulsante "Programma": disponibile solo dal piano Standard in su
@@ -3114,6 +3209,9 @@ window.openOfferModal = (offer = null) => {
     $("#offDesc").value = offer.description || "";
     $("#offUnit").value = offer.unit || "pezzo";
     $("#offCardReq").value = offer.cardRequirement || "";
+    $("#offProductUrl").value = offer.productUrl || "";
+    $("#offDelMin").value = offer.deliveryDaysMin ?? "";
+    $("#offDelMax").value = offer.deliveryDaysMax ?? "";
     if ($("#offLimited")) $("#offLimited").checked = !!offer.limitedQuantity;
     if ($("#offScheduleDateTime")) $("#offScheduleDateTime").value = offer.scheduledPublishAt ? toLocalDateTimeInputValue(offer.scheduledPublishAt) : "";
     setOfferStatusPill(offer.scheduledPublishAt ? 'scheduled' : (offer.status || 'active'));
@@ -3223,6 +3321,10 @@ $("#offerForm").onsubmit = async (e) => {
     const dataInizio = $("#offStartDate").value;
     const dataFine = $("#offEndDate").value;
     const imgUrl = $("#offImg").value.trim();
+    const isEcom = partner.businessType === 'E-commerce';
+    const productUrl = isEcom ? $("#offProductUrl").value.trim() : "";
+    const delMin = isEcom ? parseInt($("#offDelMin").value, 10) : null;
+    const delMax = isEcom ? parseInt($("#offDelMax").value, 10) : null;
 
     // Validazione rapida
     if (prezzoSconto >= prezzoOrig) {
@@ -3235,6 +3337,15 @@ $("#offerForm").onsubmit = async (e) => {
       const imgCheck = await validateImageUrl(imgUrl);
       if (!imgCheck.valid) {
         return toast.error("L'URL immagine inserito non è valido o non è sicuro.");
+      }
+    }
+
+    if (isEcom) {
+      if (!/^https?:\/\/[^\s]+\.[^\s]{2,}$/i.test(productUrl)) {
+        return toast.error("Inserisci il link completo al prodotto, con https:// all'inizio.");
+      }
+      if (Number.isNaN(delMin) || Number.isNaN(delMax) || delMin < 0 || delMax > 60 || delMin > delMax) {
+        return toast.error("Controlla i giorni di consegna: il primo numero non può superare il secondo (massimo 60).");
       }
     }
 
@@ -3266,7 +3377,8 @@ $("#offerForm").onsubmit = async (e) => {
     // Recupera location_id dal select
     const locationSelect = $("#offLocation");
         // Recupera location_id direttamente dal valore del select
-        const locationId = $("#offLocation") ? $("#offLocation").value : null;
+        const rawLocationId = $("#offLocation") ? $("#offLocation").value : "";
+        const locationId = (rawLocationId && rawLocationId !== 'null') ? rawLocationId : null;
 
 
 
@@ -3286,7 +3398,10 @@ $("#offerForm").onsubmit = async (e) => {
           location_id: locationId,  // FIX: aggiunto campo location_id
           limited_quantity: $("#offLimited") ? $("#offLimited").checked : false,
           unit_of_measure: $("#offUnit") ? $("#offUnit").value : 'pezzo',
-          card_requirement: $("#offCardReq") && $("#offCardReq").value ? $("#offCardReq").value : null,
+          card_requirement: (!isEcom && $("#offCardReq") && $("#offCardReq").value) ? $("#offCardReq").value : null,
+          product_url: isEcom ? productUrl : null,
+          delivery_days_min: isEcom ? delMin : null,
+          delivery_days_max: isEcom ? delMax : null,
           scheduled_publish_at: scheduledPublishAtISO,
           updated_at: new Date().toISOString()
         };
@@ -6136,6 +6251,7 @@ function renderSearchModal() {
   
     const today = new Date().toISOString().split("T")[0];
     const userCity = getCleanUserCity();
+    const userCap = getCleanUserCap();
   
     // Mostra stato di caricamento
     resultsDiv.innerHTML = `<p style="text-align:center; padding:20px; color:#64748b;">Ricerca in corso...</p>`;
@@ -6167,13 +6283,17 @@ function renderSearchModal() {
         img: r.img_url,
         storeName: loc.name || "",
         storeCity: loc.city ? loc.city.toLowerCase() : "",
-        storeAddress: loc.address || ""
+        storeCap: loc.cap || "",
+        storeAddress: loc.address || "",
+        storeId: loc.store_id || ""
       };
     });
+    await enrichOffersWithEcommerceStores(allOffers, rows || []);
+    const userProvince = userCap ? await getUserProvinceForCap(userCap) : null;
   
-    // Applica fuzzy search + filtro categoria
+    // Applica fuzzy search + filtro zona (province di spedizione per gli e-commerce)
     const filtered = smartFilterOffers(allOffers, rawQuery, null)
-      .filter(o => !userCity || (o.storeCity === userCity));
+      .filter(o => offerMatchesUserArea(o, userCity, userCap, userProvince));
   
       if (filtered.length === 0) {
         resultsDiv.innerHTML = `<p style="text-align:center; padding:20px; color:#64748b;">Nessun risultato trovato per "<b>${escapeHtml(rawQuery)}</b>"${userCity ? ' nella tua zona' : ''}.<br><small>Prova con parole simili o controlla gli accenti.</small></p>`;
@@ -8140,6 +8260,7 @@ const PANEL_ICONS = {
   card: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/><path d="M6 14.5h4"/></svg>`,
   settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>`,
   logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>`,
+  route: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="6" cy="19" r="2.3"/><circle cx="18" cy="5" r="2.3"/><path d="M8.2 19H15a4 4 0 0 0 4-4V9M9 5h5.5a4 4 0 0 1 3.3 6.2"/></svg>`,
   flame: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 2c1 3-3 4-3 8a3 3 0 0 0 6 0c0-1.5-1-2-1-3.5 1.5 1 3 3 3 5.5a5 5 0 1 1-10 0c0-4 3-5 5-10Z"/></svg>`,
   cursor: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M9 4l10 4.5-4 1.5 3 5-2 1-3-5-2.5 3.5z"/></svg>`,
   key: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M19 4l2 2"/></svg>`,
@@ -8304,7 +8425,8 @@ function renderDashboard(container) {
         ${collaboratorBadgeHTML}
         <button id="partnerNavHome" class="store-nav-btn ${storeData.activeTab === 'home' ? 'active' : ''}" onclick="switchStoreTab('home')">${PANEL_ICONS.home} Panoramica</button>
         <button id="partnerNavOffers" class="store-nav-btn ${storeData.activeTab === 'offers' ? 'active' : ''}" onclick="switchStoreTab('offers')">${PANEL_ICONS.tag} Le mie Offerte</button>
-        ${!isManager ? `<button id="partnerNavLocations" class="store-nav-btn ${storeData.activeTab === 'locations' ? 'active' : ''}" onclick="switchStoreTab('locations')">${PANEL_ICONS.pin} Gestione Sedi</button>` : ''}
+        ${!isManager ? `<button id="partnerNavLocations" class="store-nav-btn ${storeData.activeTab === 'locations' ? 'active' : ''}" onclick="switchStoreTab('locations')">${PANEL_ICONS.pin} ${partner.businessType === 'E-commerce' ? 'Magazzini' : 'Gestione Sedi'}</button>` : ''}
+        ${!isManager && partner.businessType === 'E-commerce' ? `<button id="partnerNavShipping" class="store-nav-btn ${storeData.activeTab === 'shipping' ? 'active' : ''}" onclick="switchStoreTab('shipping')">${PANEL_ICONS.route} Spedizioni</button>` : ''}
         <button id="partnerNavTrash" class="store-nav-btn ${storeData.activeTab === 'trash' ? 'active' : ''}" onclick="switchStoreTab('trash')">${PANEL_ICONS.trash} Cestino</button>
         ${(() => {
           const p = getCurrentPartner();
@@ -8639,8 +8761,10 @@ function renderCurrentTab() {
       return renderOffersTab();
       case 'locations': 
       return renderLocationsTab(); // Mostra la tab Sedi a tutti (con i limiti del piano)
-    case 'trash':
-      return renderTrashTab();
+      case 'shipping':
+        return partner.businessType === 'E-commerce' ? renderShippingTab() : renderHomeTab();
+      case 'trash':
+        return renderTrashTab();
     case 'sub': 
       return renderSubTab();
     case 'profile': 
@@ -8886,7 +9010,13 @@ function displayProductInModal(product) {
     ? `<span class="store-verified-blue" style="font-size:0.85rem; margin-left:8px; vertical-align:middle; color:#0f62fe; font-weight:800;">✓ Negozio Verificato</span>` 
     : '';
 
-  title.innerText = "Dettaglio Offerta";
+    title.innerText = "Dettaglio Offerta";
+    const isEcomProduct = !!product.isEcommerce;
+    const deliveryLabel = (product.deliveryDaysMin != null && product.deliveryDaysMax != null)
+      ? (product.deliveryDaysMin === product.deliveryDaysMax
+          ? `Consegna prevista in ${product.deliveryDaysMin} giorni lavorativi`
+          : `Consegna prevista in ${product.deliveryDaysMin}-${product.deliveryDaysMax} giorni lavorativi`)
+      : null;
   // Rende disponibili i dati del negozio al popup informazioni (aperto cliccando sul nome)
   window.__currentOfferStoreInfo = {
     id: product.storeId,
@@ -8897,7 +9027,9 @@ function displayProductInModal(product) {
     logo: product.storeLogo,
     phone: product.storePhone,
     hours: product.storeHours,
-    plan: product.plan
+    plan: product.plan,
+    isEcommerce: isEcomProduct,
+    websiteUrl: product.websiteUrl
   };
   // Dati minimi per il pulsante "Condividi" del popup
   window.__currentOfferForShare = {
@@ -8934,7 +9066,7 @@ function displayProductInModal(product) {
           
           <p style="color: #64748b; font-size: 1rem; margin-bottom: 25px; line-height: 1.5;">
             <span style="display:inline-flex; vertical-align:middle;">${PANEL_ICONS.store}</span> Punto vendita: <strong class="store-name-link" style="color:#0f62fe; cursor:pointer; text-decoration:underline;" onclick="showStoreInfoPopup(window.__currentOfferStoreInfo)">${escapeHtml(product.storeName || '')}</strong>${verifiedBadge}<br>
-            <span style="display:inline-flex; vertical-align:middle;">${PANEL_ICONS.pin}</span> <span style="font-size: 0.9rem;">${escapeHtml(product.storeAddress || '')}</span>
+            <span style="display:inline-flex; vertical-align:middle;">${PANEL_ICONS.pin}</span> <span style="font-size: 0.9rem;">${escapeHtml(product.storeAddress || (isEcomProduct ? 'Negozio online' : ''))}</span>
           </p>
           
           <div style="background: #f0f6ff; padding: 25px; border-radius: 16px; margin-bottom: 25px; border: 1px solid #dbeafe;">
@@ -8947,6 +9079,10 @@ function displayProductInModal(product) {
               <span style="display:inline-flex;">${PANEL_ICONS.calendar}</span> <span>Scade il: ${product.endDate}</span>
               ${product.limitedQuantity ? `<span style="margin-left:8px; background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; padding:2px 10px; border-radius:20px; font-size:0.75rem; font-weight:700;">Quantità Limitata</span>` : ''}
             </div>
+            ${isEcomProduct ? (deliveryLabel ? `
+            <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; color: #1e40af; font-weight: 600; background:#eff6ff; padding:8px 12px; border-radius:8px;">
+              ${PANEL_ICONS.calendar} <span>${deliveryLabel}</span>
+            </div>` : '') : `
             ${product.cardRequirement === 'required' ? `
             <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; color: #b45309; font-weight: 600; background:#fffbeb; padding:8px 12px; border-radius:8px;">
               ${product.storeCardImage ? `<img src="${getSafeImageUrl(product.storeCardImage)}" alt="Tessera" style="width:24px; height:24px; object-fit:contain; border-radius:4px;">` : ''}
@@ -8956,6 +9092,7 @@ function displayProductInModal(product) {
             <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; color: #15803d; font-weight: 600; background:#f0fdf4; padding:8px 12px; border-radius:8px;">
               <span>Nessuna tessera necessaria</span>
             </div>` : ''}
+            `}
           </div>
 
           <div style="margin-bottom: 30px;">
@@ -8967,9 +9104,13 @@ function displayProductInModal(product) {
             ${PANEL_ICONS.basket} ${isExpired ? 'Offerta non disponibile' : 'Aggiungi alla lista spesa'}
           </button>
 
+          ${isEcomProduct ? `
+          <button class="btn outline full-width" ${product.websiteUrl ? `onclick="window.open('${product.websiteUrl.replace(/'/g, "\\'")}', '_blank', 'noopener')"` : 'disabled'} style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
+            ${PANEL_ICONS.map} Vedi sul sito
+          </button>` : `
           <button class="btn outline full-width" onclick="openStoreInGoogleMaps('${(product.storeAddress || product.storeName || '').replace(/'/g, "\\'")}')" style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
             ${PANEL_ICONS.map} Vedi su Google Maps
-          </button>
+          </button>`}
 
           <button class="btn outline full-width" onclick="shareOffer()" style="height: 50px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
             ${PANEL_ICONS.share} Condividi
@@ -9046,9 +9187,17 @@ window.showStoreInfoPopup = (store) => {
     ${store.logo ? `<img src="${getSafeImageUrl(store.logo)}" class="store-info-logo" alt="${store.name}">` : ''}
     <div class="store-info-name">${store.name || 'Supermercato'}</div>
     ${isVerified ? `<span class="store-info-plan-badge"><span style="color:#0f62fe; font-weight:800; font-size:0.8rem;">✓ Negozio Verificato</span></span>` : ''}
-    ${row(PANEL_ICONS.pin, 'Indirizzo', addressLine)}
-    ${row(PANEL_ICONS.phone, 'Telefono', store.phone)}
-    ${row(PANEL_ICONS.clock, 'Orari', store.hours)}
+    ${row(PANEL_ICONS.pin, 'Indirizzo', addressLine || (store.isEcommerce ? 'Negozio online' : ''))}
+    ${store.isEcommerce
+      ? `<div class="store-info-row">
+          <div class="store-info-row-icon">${PANEL_ICONS.map}</div>
+          <div>
+            <div class="store-info-row-label">Sito Web</div>
+            <div class="store-info-row-value${store.websiteUrl ? '' : ' missing'}">${store.websiteUrl ? `<a href="${store.websiteUrl}" target="_blank" rel="noopener">${store.websiteUrl}</a>` : 'Non specificato dal negozio'}</div>
+          </div>
+        </div>`
+      : `${row(PANEL_ICONS.phone, 'Telefono', store.phone)}
+    ${row(PANEL_ICONS.clock, 'Orari', store.hours)}`}
     ${store.id ? `<button class="btn full-width" style="margin-top:14px;" onclick="openStoreProfile('${store.id}')">Vedi Profilo</button>` : ''}
   `;
 
@@ -9086,7 +9235,7 @@ async function openStoreProfile(storeId) {
 
   const { data: storeRow, error } = await supabaseClient
     .from('public_stores')
-    .select('id, name, address, city, cap, plan, logo_url, phone, hours, membership_card_name, membership_card_image_url')
+    .select('id, name, address, city, cap, plan, logo_url, phone, hours, membership_card_name, membership_card_image_url, website_url, business_type')
     .eq('id', storeId)
     .single();
 
@@ -9130,6 +9279,7 @@ function renderStoreProfileCard(store, locations) {
   if (!card || !locWrap) return;
 
   const isVerified = store.plan === 'Professional' || store.plan === 'Enterprise';
+  const isEcomStore = store.business_type === 'E-commerce';
   const primary = locations.find(l => l.is_primary) || locations[0] || {};
 
   card.innerHTML = `
@@ -9140,9 +9290,10 @@ function renderStoreProfileCard(store, locations) {
         ${isVerified ? `<span class="store-verified-blue" style="color:#0f62fe; font-weight:800; font-size:0.75rem;">✓ Negozio Verificato</span>` : ''}
       </h2>
       <div class="store-profile-meta">
-        <span>${PANEL_ICONS.pin} ${primary.address || store.address || 'Indirizzo non specificato'}</span>
-        ${store.phone ? `<span>${PANEL_ICONS.phone} ${store.phone}</span>` : ''}
-        ${store.hours ? `<span>${PANEL_ICONS.clock} ${store.hours}</span>` : ''}
+        <span>${PANEL_ICONS.pin} ${primary.address || store.address || (isEcomStore ? 'Negozio online' : 'Indirizzo non specificato')}</span>
+        ${isEcomStore
+          ? (store.website_url ? `<span>${PANEL_ICONS.map} <a href="${store.website_url}" target="_blank" rel="noopener">${store.website_url}</a></span>` : '')
+          : `${store.phone ? `<span>${PANEL_ICONS.phone} ${store.phone}</span>` : ''}${store.hours ? `<span>${PANEL_ICONS.clock} ${store.hours}</span>` : ''}`}
       </div>
       <span class="store-profile-expand-hint">
         ${locations.length > 1 ? `Vedi tutte le ${locations.length} sedi` : 'Vedi dettagli sede'}
@@ -9166,7 +9317,7 @@ function renderStoreProfileCard(store, locations) {
       </div>
     </div>
   `;
-  }).join("") || `<p style="color:#94a3b8; padding: 14px 0;">Nessuna sede pubblicata.</p>`;
+  }).join("") || `<p style="color:#94a3b8; padding: 14px 0;">${isEcomStore ? 'Nessun magazzino pubblicato.' : 'Nessuna sede pubblicata.'}</p>`;
 }
 
 function toggleStoreProfileLocations() {
@@ -9224,15 +9375,20 @@ async function loadStoreProfileOffers(store, productQuery = "") {
         storeCity: loc.city ? loc.city.toLowerCase() : "",
         storeCap: loc.cap || "",
         storeAddress: loc.address || "",
-        storeId: loc.store_id || "",
+        // Un prodotto e-commerce senza magazzino non ha una riga in locationsById:
+        // lo store_id arriva comunque dalla tabella offers.
+        storeId: loc.store_id || r.store_id || "",
         plan: loc.plan || "Starter",
         cardRequirement: r.card_requirement || null,
-        limitedQuantity: r.limited_quantity || false
+        limitedQuantity: r.limited_quantity || false,
+        isEcommerce: (loc.businessType || store.business_type) === 'E-commerce'
       };
     })
     .filter(o => o.storeId === store.id);
 
-  if (userCap) storeOffers = storeOffers.filter(o => o.storeCap === userCap);
+  // Il CAP dell'utente ha senso solo per confrontarlo con la sede fisica di
+  // un'offerta: i prodotti di un e-commerce restano visibili sul suo stesso profilo.
+  if (userCap) storeOffers = storeOffers.filter(o => o.isEcommerce || o.storeCap === userCap);
 
   const cleanQuery = (productQuery || "").toLowerCase().trim();
   if (cleanQuery) {
@@ -9843,12 +9999,19 @@ window.openProductDetail = async (id) => {
     return;
   }
 
-  const locationsById = await fetchPublicLocationsMap([row.location_id]);
-  const loc = locationsById[row.location_id] || {};
+  const locationsById = row.location_id ? await fetchPublicLocationsMap([row.location_id]) : {};
+  let loc = locationsById[row.location_id] || {};
+  // Un prodotto e-commerce senza magazzino non ha una riga in fetchPublicLocationsMap:
+  // recuperiamo comunque nome, sito e tipologia direttamente dal negozio.
+  if (!loc.store_id) {
+    const storesById = await fetchPublicStoresMap([row.store_id]);
+    const store = storesById[row.store_id] || {};
+    loc = { name: store.name, city: store.city, cap: store.cap, address: store.address, store_id: row.store_id, plan: store.plan, phone: store.phone, hours: store.hours, websiteUrl: store.website_url, businessType: store.business_type };
+  }
 
   // Stesso formato "appiattito" usato dalla griglia, per compatibilità col modal.
-  // Indirizzo/città/CAP arrivano ora dalla SEDE esatta dell'offerta (non più da un
-  // indirizzo generico del negozio); telefono/orari/logo restano a livello negozio.
+  // Indirizzo/città/CAP arrivano dalla sede/magazzino dell'offerta quando c'è,
+  // altrimenti dal negozio; telefono/orari/logo restano a livello negozio.
   const product = {
     id: row.id,
     product: row.product,
@@ -9873,7 +10036,12 @@ window.openProductDetail = async (id) => {
     cardRequirement: row.card_requirement || null,
     limitedQuantity: row.limited_quantity || false,
     storeCardName: loc.membershipCardName || "",
-    storeCardImage: loc.membershipCardImage || ""
+    storeCardImage: loc.membershipCardImage || "",
+    isEcommerce: loc.businessType === 'E-commerce',
+    websiteUrl: loc.websiteUrl || "",
+    productUrl: row.product_url || "",
+    deliveryDaysMin: row.delivery_days_min,
+    deliveryDaysMax: row.delivery_days_max
   };
   syncUrlFromAction(ROUTES.prodotto(id));
   displayProductInModal(product);
@@ -9887,22 +10055,32 @@ function renderLocationsTab() {
   const isProfessional = ['Professional', 'Enterprise'].includes(plan);
   const canSetCoords = PLAN_LEVELS[plan] >= PLAN_LEVELS['Standard'];
   const locations = partner.locations || [];
+  const isEcom = partner.businessType === 'E-commerce';
+  // Un e-commerce può indicare il primo magazzino con qualunque piano; più magazzini restano dal Professional.
+  const canAddLocation = isProfessional || (isEcom && locations.length === 0);
 
   return `
     <header class="tab-header">
-      <h2>${PANEL_ICONS.pin} Gestione Punti Vendita</h2>
-      ${isProfessional ? 
-        `<button class="btn" onclick="openAddLocationModal()">+ Aggiungi Sede</button>` : 
-        `<span class="badge-plan plan-starter">Piano Starter: 1 Sede inclusa</span>`
+      <h2>${PANEL_ICONS.pin} ${isEcom ? 'Gestione Magazzini' : 'Gestione Punti Vendita'}</h2>
+      ${canAddLocation ? 
+        `<button class="btn" onclick="openAddLocationModal()">${isEcom ? '+ Aggiungi Magazzino' : '+ Aggiungi Sede'}</button>` : 
+        `<span class="badge-plan plan-starter">${isEcom ? '1 Magazzino incluso nel tuo piano' : 'Piano Starter: 1 Sede inclusa'}</span>`
       }
     </header>
 
     <div class="card-saas" style="margin-bottom: 20px;">
+      ${isEcom ? `
+      <p style="font-size: 0.9rem; color: #64748b; margin: 0;">
+        I magazzini sono facoltativi. Se ne indichi uno su un prodotto, il suo indirizzo compare nel dettaglio dell'offerta.
+        I clienti ti trovano in base alle province in cui spedisci, che imposti nella scheda Spedizioni.
+      </p>` : `
       <p style="font-size: 0.9rem; color: #64748b; margin: 0;">
         Configura gli indirizzi fisici dei tuoi supermercati. I clienti vedranno le offerte in base alla vicinanza a queste sedi.
         La sede principale è quella selezionata di default quando pubblichi una nuova offerta.
-      </p>
+      </p>`}
     </div>
+
+    ${isEcom && locations.length === 0 ? `<div class="empty-state">Nessun magazzino inserito. Puoi pubblicare i prodotti anche senza.</div>` : ''}
 
     <div id="locationsContainer" style="display: flex; flex-direction: column; gap: 16px;">
       ${locations.map((loc, index) => {
@@ -9914,7 +10092,7 @@ function renderLocationsTab() {
             <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
               <span class="round-ico" style="color: ${loc.isPrimary ? '#10b981' : '#0f62fe'}; background: ${loc.isPrimary ? '#dcfce7' : '#eff6ff'}; width: 42px; height: 42px; border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">${PANEL_ICONS.pin}</span>
               <input type="text" id="locName_${index}" value="${loc.name || ''}" placeholder="Nome sede" style="flex: 1; font-weight: 800; font-size: 1.05rem; border: none; background: transparent; padding: 4px 0;">
-              ${loc.isPrimary ?
+              ${isEcom ? '' : loc.isPrimary ?
                 `<span style="font-size: 0.7rem; font-weight: 800; color: #10b981; background: #dcfce7; padding: 6px 12px; border-radius: 999px; white-space: nowrap;">★ PRINCIPALE</span>` :
                 `<button class="btn outline" style="padding: 6px 14px; font-size: 0.75rem; white-space: nowrap; border-radius: 999px;" onclick="setPrimaryLocation(${index})">Imposta Principale</button>`
               }
@@ -9988,7 +10166,7 @@ ${plan === 'Enterprise' ? `
             </div>
 
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--panel-border-soft);">
-              ${(!loc.isPrimary && locations.length > 1) ? `<button class="btn danger" style="padding: 8px 16px; border-radius: 999px;" onclick="removeLocation(${index})">Rimuovi</button>` : ''}
+              ${((!loc.isPrimary && locations.length > 1) || isEcom) ? `<button class="btn danger" style="padding: 8px 16px; border-radius: 999px;" onclick="removeLocation(${index})">Rimuovi</button>` : ''}
               <button class="btn" style="padding: 8px 20px; border-radius: 999px;" onclick="saveLocationEdit(${index})">Salva Sede</button>
             </div>
           </div>
@@ -9998,14 +10176,155 @@ ${plan === 'Enterprise' ? `
 
     ${!isProfessional ? `
       <div class="upgrade-banner banner-info" style="margin-top: 20px;">
-        <div><strong>Vuoi gestire più punti vendita?</strong> Passa al piano Professional per pubblicare offerte su tutte le tue filiali.</div>
+        <div>${isEcom ? '<strong>Hai più magazzini?</strong> Passa al piano Professional per inserirli tutti e scegliere da quale parte ogni prodotto.' : '<strong>Vuoi gestire più punti vendita?</strong> Passa al piano Professional per pubblicare offerte su tutte le tue filiali.'}</div>
       </div>
     ` : ''}
   `;
 }
 
+// --- TAB: SPEDIZIONI (solo E-commerce) ---
+// Province in cui il negozio online spedisce. Su Supabase, NULL = tutta Italia.
+let itProvincesCache = null;
+
+async function loadItProvinces() {
+  if (itProvincesCache) return itProvincesCache;
+  const { data, error } = await supabaseClient
+    .from('it_province')
+    .select('sigla, nome, regione')
+    .order('regione')
+    .order('nome');
+  if (error) {
+    console.error("Errore caricamento province:", error);
+    return [];
+  }
+  itProvincesCache = data || [];
+  return itProvincesCache;
+}
+
+function renderShippingTab() {
+  setTimeout(drawShippingTab, 0); // il contenuto si riempie appena la tab è nel DOM
+  return `
+    <header class="tab-header">
+      <h2>${PANEL_ICONS.route} Territori di Spedizione</h2>
+    </header>
+    <div class="card-saas" id="shippingTabBody">
+      <p style="color:#64748b;">Caricamento province...</p>
+    </div>
+  `;
+}
+
+async function drawShippingTab() {
+  const body = document.getElementById("shippingTabBody");
+  if (!body) return;
+  const partner = getCurrentPartner();
+  const provinces = await loadItProvinces();
+  if (!document.getElementById("shippingTabBody")) return; // l'utente ha cambiato tab nel frattempo
+  if (provinces.length === 0) {
+    body.innerHTML = `<p style="color:#ef4444;">Non riesco a caricare l'elenco delle province. Riprova tra poco.</p>`;
+    return;
+  }
+
+  const allItaly = !Array.isArray(partner.shippingProvinces);
+  const selected = new Set(allItaly ? provinces.map(p => p.sigla) : partner.shippingProvinces);
+  const byRegion = {};
+  provinces.forEach(p => {
+    if (!byRegion[p.regione]) byRegion[p.regione] = [];
+    byRegion[p.regione].push(p);
+  });
+
+  body.innerHTML = `
+    <p style="font-size:0.9rem; color:#64748b; margin:0 0 14px;">
+      Scegli le province in cui spedisci. Chi cerca da un CAP fuori da queste zone non vedrà i tuoi prodotti.
+    </p>
+    <label style="display:flex; align-items:center; gap:8px; font-weight:700; margin-bottom:14px;">
+      <input type="checkbox" id="shipAllItaly" ${allItaly ? 'checked' : ''}> Spedisco in tutta Italia
+    </label>
+    <div id="shipRegions" style="display:flex; flex-direction:column; gap:8px;">
+      ${Object.keys(byRegion).map(region => `
+        <details style="border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px;">
+          <summary style="cursor:pointer; display:flex; align-items:center; gap:8px; font-weight:700;">
+            <input type="checkbox" class="ship-region-cb" data-region="${escapeHtml(region)}" onclick="event.stopPropagation()">
+            ${escapeHtml(region)} <span class="ship-count" data-region="${escapeHtml(region)}" style="margin-left:auto; font-weight:500; color:#64748b; font-size:0.8rem;"></span>
+          </summary>
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:6px 14px; margin-top:10px;">
+            ${byRegion[region].map(p => `
+              <label style="display:flex; align-items:center; gap:6px; font-size:0.9rem;">
+                <input type="checkbox" class="ship-prov-cb" value="${p.sigla}" data-region="${escapeHtml(region)}" ${selected.has(p.sigla) ? 'checked' : ''}>
+                ${escapeHtml(p.nome)} (${p.sigla})
+              </label>
+            `).join('')}
+          </div>
+        </details>
+      `).join('')}
+    </div>
+    <button class="btn" style="margin-top:18px; width:100%;" onclick="saveShippingTerritories()">Salva territori</button>
+  `;
+
+  const provBoxes = () => Array.from(body.querySelectorAll('.ship-prov-cb'));
+  const refreshRegionState = () => {
+    body.querySelectorAll('.ship-region-cb').forEach(rcb => {
+      const mine = provBoxes().filter(b => b.dataset.region === rcb.dataset.region);
+      const on = mine.filter(b => b.checked).length;
+      rcb.checked = on === mine.length;
+      rcb.indeterminate = on > 0 && on < mine.length;
+      const counter = body.querySelector(`.ship-count[data-region="${CSS.escape(rcb.dataset.region)}"]`);
+      if (counter) counter.textContent = `${on}/${mine.length}`;
+    });
+    body.querySelector('#shipAllItaly').checked = provBoxes().every(b => b.checked);
+  };
+
+  body.querySelectorAll('.ship-region-cb').forEach(rcb => {
+    rcb.onchange = () => {
+      provBoxes().filter(b => b.dataset.region === rcb.dataset.region).forEach(b => { b.checked = rcb.checked; });
+      refreshRegionState();
+    };
+  });
+  provBoxes().forEach(b => { b.onchange = refreshRegionState; });
+  body.querySelector('#shipAllItaly').onchange = (e) => {
+    provBoxes().forEach(b => { b.checked = e.target.checked; });
+    refreshRegionState();
+  };
+  refreshRegionState();
+}
+
+window.saveShippingTerritories = async () => {
+  const partner = getCurrentPartner();
+  if (!partner) return toast.error("Sessione scaduta, effettua nuovamente il login.");
+
+  const boxes = Array.from(document.querySelectorAll('#shippingTabBody .ship-prov-cb'));
+  const chosen = boxes.filter(b => b.checked).map(b => b.value);
+  if (chosen.length === 0) {
+    return toast.error("Seleziona almeno una provincia, altrimenti nessuno vedrebbe i tuoi prodotti.");
+  }
+  // Tutte le province selezionate = "tutta Italia" (NULL), così vale anche per le province future.
+  const value = chosen.length === boxes.length ? null : chosen;
+
+  const { data: row, error } = await storeAuthClient
+    .from('stores')
+    .update({ shipping_provinces: value })
+    .eq('id', partner.id)
+    .select('shipping_provinces')
+    .single();
+
+  if (error) {
+    console.error("Errore salvataggio territori:", error);
+    return toast.error("Errore durante il salvataggio dei territori.");
+  }
+
+  partner.shippingProvinces = row.shipping_provinces ?? null;
+  const dataString = JSON.stringify(partner);
+  sessionStorage.setItem(SESSION_PARTNER, dataString);
+  localStorage.setItem(PARTNER_AUTH_KEY, dataString);
+  state.currentStore = partner;
+
+  toast.success(value === null ? "Spedisci in tutta Italia." : `Salvato: spedisci in ${chosen.length} province.`);
+};
+
 window.openAddLocationModal = () => {
-  if (!checkPermission('Professional')) return;
+  const _p = getCurrentPartner();
+  const isEcomLoc = _p?.businessType === 'E-commerce';
+  // Il primo magazzino di un e-commerce si può inserire con qualunque piano.
+  if (!(isEcomLoc && (_p.locations || []).length === 0) && !checkPermission('Professional')) return;
 
   const overlay = document.createElement("div");
   overlay.className = "location-modal-overlay";
@@ -10013,10 +10332,10 @@ window.openAddLocationModal = () => {
   const box = document.createElement("div");
   box.className = "location-modal-box";
   box.innerHTML = `
-    <h3 class="location-modal-title">${PANEL_ICONS.pin} Aggiungi Sede</h3>
+    <h3 class="location-modal-title">${PANEL_ICONS.pin} ${isEcomLoc ? 'Aggiungi Magazzino' : 'Aggiungi Sede'}</h3>
     <div class="input-group" style="margin-bottom: 14px;">
-      <label>Nome sede</label>
-      <input type="text" id="newLocName" class="location-field-input" placeholder="Es. Filiale Sud">
+      <label>${isEcomLoc ? 'Nome magazzino' : 'Nome sede'}</label>
+      <input type="text" id="newLocName" class="location-field-input" placeholder="${isEcomLoc ? 'Es. Magazzino Nord' : 'Es. Filiale Sud'}">
     </div>
     <div class="input-group" style="margin-bottom: 14px;">
       <label>Indirizzo</label>
@@ -10034,7 +10353,7 @@ window.openAddLocationModal = () => {
     </div>
     <div style="display: flex; gap: 10px;">
       <button id="newLocCancel" class="btn outline" style="flex: 1;">Annulla</button>
-      <button id="newLocConfirm" class="btn" style="flex: 1;">Aggiungi Sede</button>
+      <button id="newLocConfirm" class="btn" style="flex: 1;">${isEcomLoc ? 'Aggiungi Magazzino' : 'Aggiungi Sede'}</button>
     </div>
   `;
 
