@@ -2584,9 +2584,6 @@ async function buildStoreSearchCardElement(offerOrStore) {
   return card;
 }
 
-/**
- * Helper: Crea l'elemento DOM della card prodotto (usato da renderOffers)
- */
 // Tracciamento visualizzazioni reali: un'offerta conta come "vista" solo la
 // prima volta che la sua card entra davvero nel viewport, non ogni volta che
 // il DOM viene ricostruito (renderOffers() viene richiamato da decine di
@@ -2611,6 +2608,9 @@ function getOfferViewCountObserver() {
   return offerViewCountObserver;
 }
 
+/**
+ * Helper: Crea l'elemento DOM della card prodotto (usato da renderOffers)
+ */
 function createOfferCardElement(o) {
   const card = document.createElement("div");
   
@@ -4556,6 +4556,31 @@ async function renderMultiStopMap(cart, overrideStoresById, options = {}) {
   const content = $("#modalContent");
   content.innerHTML = `<div style="padding:50px; text-align:center; color:#64748b;">Preparazione mappa...</div>`;
 
+  // I prodotti di un e-commerce non hanno un negozio fisico da raggiungere:
+  // li teniamo fuori dal percorso e avvisiamo l'utente a parte.
+  const ecomCheckStoreIds = [...new Set(cart.map(o => o.store_id).filter(Boolean))];
+  const ecomStoresById = (ecomCheckStoreIds.length && !overrideStoresById)
+    ? await fetchPublicStoresMap(ecomCheckStoreIds)
+    : {};
+  const onlineOnlyItems = cart.filter(o => ecomStoresById[o.store_id]?.business_type === 'E-commerce');
+  const onlineOnlyIds = new Set(onlineOnlyItems.map(o => o.id));
+  const onlineOnlyNames = onlineOnlyItems.map(o => esc(o.product)).join(', ');
+  const onlineOnlyMessage = onlineOnlyItems.length === 1
+    ? `Il prodotto "${onlineOnlyNames}" è acquistabile solo online: non essendo legato a un negozio fisico, non compare sulla mappa.`
+    : `Questi prodotti sono acquistabili solo online e non compaiono sulla mappa perché non legati a un negozio fisico: ${onlineOnlyNames}.`;
+  cart = cart.filter(o => !onlineOnlyIds.has(o.id));
+
+  if (cart.length === 0) {
+    content.innerHTML = `
+      <div style="padding:14px;">
+        <button class="btn outline" onclick="renderCartContent()" style="margin-bottom:14px;">← Torna alla lista</button>
+        <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:12px 14px; color:#92400e; font-size:0.85rem; display:flex; align-items:flex-start; gap:8px;">
+          ${PANEL_ICONS.alert}<span>${onlineOnlyMessage}</span>
+        </div>
+      </div>`;
+    return;
+  }
+
   const cartItemsByStore = {};
   cart.forEach(o => {
     if (!cartItemsByStore[o.location_id]) cartItemsByStore[o.location_id] = [];
@@ -4618,6 +4643,11 @@ async function renderMultiStopMap(cart, overrideStoresById, options = {}) {
         <button class="btn outline" id="followMeBtn" onclick="toggleFollowMe()" style="margin-left:auto;">${PANEL_ICONS.target} Seguimi</button>
       </div>
       <p style="font-size:0.8rem; color:#94a3b8; margin-bottom:8px;">Tocca un negozio sulla mappa per tracciare subito il percorso.</p>
+      ${onlineOnlyItems.length > 0 ? `
+        <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:0.8rem; color:#92400e; display:flex; align-items:flex-start; gap:6px;">
+          ${PANEL_ICONS.alert}<span>${onlineOnlyMessage}</span>
+        </div>
+      ` : ''}
       ${unlocatableStores.length > 0 ? `
         <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:0.8rem; color:#92400e; display:flex; align-items:flex-start; gap:6px;">
           ${PANEL_ICONS.alert}<span>Non siamo riusciti a individuare l'indirizzo di: ${unlocatableStores.map(s => s.name).join(', ')}. Verifica che l'indirizzo del negozio sia corretto e completo.</span>
@@ -5244,6 +5274,11 @@ window.openSmartShoppingListModal = () => {
           <span>Senza tessera — considera solo offerte che non richiedono la tessera del negozio</span>
         </label>
 
+        <label class="smart-list-checkbox-row" for="smartListNoOnlineOnly">
+          <input type="checkbox" id="smartListNoOnlineOnly">
+          <span>Solo negozi fisici — escludi i prodotti acquistabili solo online</span>
+        </label>
+
         <label class="smart-list-label">Prodotti da cercare</label>
         <div id="smartListFieldsContainer" class="smart-list-fields">
           <div class="smart-list-field-row"><input type="text" class="smart-list-item-input" placeholder="Prodotto 1 (es: latte)" oninput="handleSmartListFieldInput(this)"></div>
@@ -5303,7 +5338,7 @@ window.searchSmartShoppingList = async () => {
   const noCardOnly = document.getElementById('smartListNoCardOnly')?.checked || false;
   const { data: allActiveOffers, error } = await supabaseClient
     .from('offers')
-    .select('id, product, price, location_id, unit_of_measure, card_requirement')
+    .select('id, product, price, location_id, unit_of_measure, card_requirement, store_id')
     .eq('status', 'active')
     .is('deleted_at', null)
     .lte('start_date', today)
@@ -5328,6 +5363,15 @@ window.searchSmartShoppingList = async () => {
   // stessa logica già usata nel filtro generale della griglia offerte.
   if (noCardOnly) {
     offersInArea = offersInArea.filter(o => o.card_requirement !== 'required');
+  }
+
+  // Filtro "Solo negozi fisici": esclude le offerte di negozi di tipo E-commerce,
+  // che non hanno un punto vendita da raggiungere fisicamente.
+  const noOnlineOnly = document.getElementById('smartListNoOnlineOnly')?.checked || false;
+  if (noOnlineOnly) {
+    const onlineCheckStoreIds = [...new Set(offersInArea.map(o => o.store_id).filter(Boolean))];
+    const onlineCheckStoresMap = onlineCheckStoreIds.length ? await fetchPublicStoresMap(onlineCheckStoreIds) : {};
+    offersInArea = offersInArea.filter(o => onlineCheckStoresMap[o.store_id]?.business_type !== 'E-commerce');
   }
 
   const itemCandidates = lines.map(line => ({ line, matches: fuzzyMatchOffers(line, offersInArea) }));
@@ -5444,7 +5488,7 @@ window.searchSmartShoppingList = async () => {
     }
     const storeName = storesForDisplay[match.location_id]?.name || 'Negozio';
     const alreadyInRoute = existingStoreIds.has(match.location_id);
-    matchedResults.push({ id: match.id, product: match.product, price: match.price, location_id: match.location_id });
+    matchedResults.push({ id: match.id, product: match.product, price: match.price, location_id: match.location_id, store_id: match.store_id });
 
     const key = normalizeProductName(ic.line);
     const unit = match.unit_of_measure;
@@ -5506,7 +5550,7 @@ window.traceSmartListOnMap = async () => {
   const existingIds = new Set(realCart.map(o => o.id));
   results.forEach(r => {
     if (!existingIds.has(r.id)) {
-      merged.push({ id: r.id, location_id: r.location_id, product: r.product, price: r.price });
+      merged.push({ id: r.id, location_id: r.location_id, product: r.product, price: r.price, store_id: r.store_id });
       existingIds.add(r.id);
     }
   });
