@@ -846,7 +846,7 @@ body.tour-blocking .container {
 .product-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
@@ -1929,9 +1929,9 @@ select.location-field-input {
       grid-template-columns: 1fr !important; /* Stack verticale su mobile */
   }
   .detail-container img {
-      height: 250px;
-      object-fit: cover;
-  }
+    height: 250px;
+    object-fit: contain;
+}
 }
 
 .description-box {
@@ -2794,7 +2794,7 @@ hr {
 .product-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
@@ -3125,7 +3125,7 @@ hr {
   width: 72px;
   height: 72px;
   border-radius: var(--radius-lg);
-  object-fit: cover;
+  object-fit: contain;
   background: #f1f5f9;
   display: block;
   margin: 0 auto 14px;
@@ -3218,7 +3218,7 @@ hr {
   height: 110px;
   min-width: 110px;
   border-radius: 24px;
-  object-fit: cover;
+  object-fit: contain;
   background: #fff;
   border: 1px solid #e2e8f0;
 }
@@ -3318,7 +3318,7 @@ hr {
   height: 84px;
   min-width: 84px;
   border-radius: 18px;
-  object-fit: cover;
+  object-fit: contain;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
 }
@@ -3837,7 +3837,7 @@ hr {
   overflow: hidden;
   background: #f4f7fb;
 }
-.cart-row-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cart-row-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
 
 .cart-row-body {
   flex: 1;

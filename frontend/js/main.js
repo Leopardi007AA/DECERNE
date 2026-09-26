@@ -2838,7 +2838,7 @@ function renderOffersTable(limit = 999) {
         <td><input type="checkbox" class="offer-select-checkbox" ${isSelected ? 'checked' : ''} onchange="toggleOfferSelection('${o.id}', this.checked)"></td>
         <td>
           <img src="${getSafeImageUrl(o.img)}" alt="${esc(o.product)}"
-               style="width:40px; height:40px; border-radius:4px; object-fit:cover; border:1px solid #eee;">
+               style="width:40px; height:40px; border-radius:4px; object-fit:contain; background:#f8fafc; border:1px solid #eee;">
         </td>
         <td>
           <div style="font-weight:700;">${esc(o.product)}</div>
@@ -6425,7 +6425,7 @@ function renderSearchModal() {
           <div class="cart-list">
             ${filtered.map(o => `
               <div class="cart-item" style="display:flex; align-items:center; cursor:pointer;" data-offer-id="${o.id}">
-                <img src="${getSafeImageUrl(o.img)}" alt="${escapeHtml(o.product)}" style="width:56px; height:56px; object-fit:cover; border-radius:8px; flex-shrink:0;">
+                <img src="${getSafeImageUrl(o.img)}" alt="${escapeHtml(o.product)}" style="width:56px; height:56px; object-fit:contain; background:#f8fafc; border-radius:8px; flex-shrink:0;">
                 <div style="flex:1; margin-left:12px; min-width:0;">
                   <div style="font-weight:700;">${escapeHtml(o.product)}</div>
                   <div style="font-size:0.85em; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(o.storeName)}${o.storeAddress ? ' · ' + escapeHtml(o.storeAddress) : ''}</div>
@@ -6844,7 +6844,7 @@ if (offImgInput) {
     const url = offImgInput.value.trim();
     const hint = $("#imgHint");
     if (url.startsWith('http')) {
-      hint.innerHTML = `<img src="${getSafeImageUrl(url)}" alt="Anteprima immagine prodotto" style="width:50px; height:50px; object-fit:cover; border-radius:4px; margin-top:5px; border:1px solid #ddd;">`;
+      hint.innerHTML = `<img src="${getSafeImageUrl(url)}" alt="Anteprima immagine prodotto" style="width:50px; height:50px; object-fit:contain; background:#f8fafc; border-radius:4px; margin-top:5px; border:1px solid #ddd;">`;
     } else {
       hint.innerText = "Inserisci un URL valido (es. https://...)";
     }
@@ -9171,7 +9171,7 @@ function displayProductInModal(product) {
         <!-- Contenitore Immagine: Grande, Pieno e Arrotondato -->
         <div class="detail-image-container" style="position: relative; width: 100%; background: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
           <img src="${getSafeImageUrl(product.img)}" 
-               style="width: 100%; height: 100%; object-fit: cover; display: block;" 
+               style="width: 100%; height: 100%; object-fit: contain; display: block;" 
                alt="${escapeHtml(product.product)}">
           
           ${discPerc > 0 ? `
