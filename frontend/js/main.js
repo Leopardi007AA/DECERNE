@@ -2989,7 +2989,7 @@ function renderProfileTab() {
           <h4 style="color: #64748b; font-size: 0.8rem; text-transform: uppercase;">Dati Societari (Sola Lettura)</h4>
           <div class="input-group">
             <label>Email Account / Login</label>
-            <input type="text" id="profEmail" value="${partner.email}" disabled style="background: #f8fafc; cursor: not-allowed; color: #94a3b8;">
+value="${esc(partner.email)}"
             <small>L'email principale non può essere modificata autonomamente.</small>
           </div>
         </div>
@@ -2999,7 +2999,7 @@ function renderProfileTab() {
         <div class="form-row">
           <div class="input-group">
             <label>Nome Insegna</label>
-            <input type="text" id="profName" value="${partner.name}" required>
+value="${esc(partner.name)}"
           </div>
           <div class="input-group">
             <label>Telefono Contatto</label>
@@ -3009,7 +3009,7 @@ function renderProfileTab() {
 
         <div class="input-group">
           <label>URL Logo Supermercato</label>
-          <input type="url" id="profLogo" value="${partner.logo || ''}" placeholder="https://link-immagine.png">
+value="${esc(partner.logo || '')}"
         </div>
 
         ${isEcom ? `
@@ -3021,18 +3021,18 @@ function renderProfileTab() {
         ` : `
         <div class="input-group">
           <label>Orari di Apertura Generali</label>
-          <input type="text" id="profHours" value="${partner.hours || ''}" placeholder="Es: Lun-Sab 08:30-20:00">
+value="${esc(partner.hours || '')}"
         </div>
 
         <h4 style="color: #64748b; font-size: 0.8rem; text-transform: uppercase; margin-top:20px;">Tessera Negozio</h4>
         <div class="form-row">
           <div class="input-group">
             <label>Nome Tessera</label>
-            <input type="text" id="profCardName" value="${partner.membershipCardName || ''}" placeholder="Es: Carta Fedeltà Coop">
+value="${esc(partner.membershipCardName || '')}"
           </div>
           <div class="input-group">
             <label>URL Immagine Tessera</label>
-            <input type="url" id="profCardImage" value="${partner.membershipCardImage || ''}" placeholder="https://link-immagine-tessera.png">
+value="${esc(partner.membershipCardImage || '')}"
           </div>
         </div>
         <small style="display:block; margin-top:-10px; margin-bottom:15px; color:#94a3b8;">Compila questi campi se i tuoi prodotti possono richiedere una tessera fedeltà: potrai poi indicarlo su ogni singola offerta.</small>
@@ -3044,23 +3044,23 @@ function renderProfileTab() {
 
         <div class="input-group">
           <label>Indirizzo e Numero Civico</label>
-          <input type="text" value="${extractStreetFromAddress(primaryLocation.address, primaryLocation.cap, primaryLocation.city)}" disabled style="background:#f8fafc; cursor:not-allowed; color:#94a3b8;">
+value="${esc(extractStreetFromAddress(primaryLocation.address, primaryLocation.cap, primaryLocation.city))}"
         </div>
         <div class="form-row">
           <div class="input-group" style="flex: 2;">
             <label>Città</label>
-            <input type="text" value="${primaryLocation.city || ''}" disabled style="background:#f8fafc; cursor:not-allowed; color:#94a3b8;">
+value="${esc(primaryLocation.city || '')}"
           </div>
           <div class="input-group" style="flex: 1;">
             <label>CAP</label>
-            <input type="text" value="${primaryLocation.cap || ''}" disabled style="background:#f8fafc; cursor:not-allowed; color:#94a3b8;">
+value="${esc(primaryLocation.cap || '')}"
           </div>
         </div>
         `}
 
         <div class="input-group">
           <label>Note Interne / Memo</label>
-          <textarea id="profNotes" rows="3" placeholder="Inserisci note visibili solo a te...">${partner.internalNotes || ''}</textarea>
+>${esc(partner.internalNotes || '')}</textarea>
         </div>
 
         <button type="submit" class="btn" style="margin-top: 20px; width: 100%;">Salva Impostazioni Account</button>
@@ -3138,7 +3138,7 @@ async function populateOfferCategorySelect() {
       .order('sort_order', { ascending: true });
     if (error || !data || !data.length) return;
     const current = select.value;
-    select.innerHTML = data.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+    select.innerHTML = data.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
     if (current && data.some(c => c.name === current)) select.value = current;
   } catch (e) {
     console.warn("Elenco categorie non aggiornato dal database:", e);
@@ -3186,14 +3186,14 @@ window.openOfferModal = (offer = null) => {
     locContainer.classList.remove("hidden");
     locSelect.innerHTML = locations.map((loc) => `
       <option value="${loc.id}" ${offer && offer.location_id === loc.id ? 'selected' : ''}>
-        ${loc.name} (${loc.address})
+        ${esc(loc.name)} (${esc(loc.address)})
       </option>
     `).join('');
   } else {
     // FIX: Anche se c'è una sola sede, dobbiamo usare il suo ID reale, non "0"
     locContainer.classList.add("hidden");
     const defaultLoc = locations[0] || { id: null, name: "Sede Principale" };
-    locSelect.innerHTML = `<option value="${defaultLoc.id || ''}">${defaultLoc.name}</option>`;
+    locSelect.innerHTML = `<option value="${defaultLoc.id || ''}">${esc(defaultLoc.name)}</option>`;
   }
 
   // Gestione pulsante "Programma": disponibile solo dal piano Standard in su
@@ -3935,7 +3935,7 @@ function renderOtpVerificationScreen(email) {
   content.innerHTML = `
     <div class="auth-container" style="text-align:center;">
       <h3>Controlla la tua posta</h3>
-      <p style="margin-bottom: 15px; color:#64748b;">Abbiamo inviato un codice a 6 cifre a<br><strong>${email}</strong></p>
+<strong>${esc(email)}</strong>
       <div id="otpError" class="error-msg hidden"></div>
       <input type="text" id="otpCodeInput" maxlength="6" inputmode="numeric" pattern="[0-9]*"
         placeholder="000000" style="font-size:1.5rem; letter-spacing:8px; text-align:center; width:180px; padding:10px; margin:10px 0;">
@@ -7349,7 +7349,7 @@ function renderStoreResetOtpForm(email) {
     <div class="pricing-wrapper" style="max-width: 420px; margin: 60px auto;">
       <div class="onboarding-card">
         <h3>Inserisci il codice</h3>
-        <p style="color:#64748b; margin-bottom:15px; font-size:0.9rem;">Ti abbiamo inviato un codice a 6 cifre a ${email}.</p>
+a ${esc(email)}.
         <div id="storeResetOtpError" class="error-msg hidden"></div>
         <form id="storeResetOtpForm" class="auth-form">
           <input type="text" id="storeResetOtpCode" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="Codice a 6 cifre" required>
@@ -7445,7 +7445,7 @@ function renderTeamFirstLoginOtpForm(email) {
     <div class="pricing-wrapper" style="max-width: 420px; margin: 60px auto;">
       <div class="onboarding-card">
         <h3>Verifica il tuo accesso</h3>
-        <p style="color:#64748b; margin-bottom:15px; font-size:0.9rem;">Primo accesso come Collaboratore: ti abbiamo inviato un codice a 6 cifre a<br><strong>${email}</strong></p>
+<strong>${esc(email)}</strong>
         <div id="teamOtpError" class="error-msg hidden"></div>
         <form id="teamOtpForm" class="auth-form">
           <input type="text" id="teamOtpCode" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="Codice a 6 cifre" required>
@@ -7878,7 +7878,7 @@ function renderOnboarding(container) {
         </form>
       ` : step === 2 ? `
         <h3>Verifica la tua email</h3>
-        <p class="step-sub">Abbiamo inviato un codice a 6 cifre a <strong>${storeData.tempReg?.email || ''}</strong></p>
+<strong>${esc(storeData.tempReg?.email || '')}</strong>
         <form id="onboardingForm" class="auth-form">
           <input type="text" id="obOtpCode" maxlength="6" inputmode="numeric" pattern="[0-9]*"
             placeholder="000000" style="font-size:1.5rem; letter-spacing:8px; text-align:center;" required>
@@ -9117,10 +9117,10 @@ function displayProductInModal(product) {
           </button>
 
           ${isEcomProduct ? `
-          <button class="btn outline full-width" ${(product.productUrl || product.websiteUrl) ? `onclick="window.open('${(product.productUrl || product.websiteUrl).replace(/'/g, "\\'")}', '_blank', 'noopener')"` : 'disabled'} style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
+          <button class="btn outline full-width" ${(product.productUrl || product.websiteUrl) ? `data-url="${esc(product.productUrl || product.websiteUrl)}" onclick="window.open(this.dataset.url, '_blank', 'noopener')"` : 'disabled'} style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
             ${PANEL_ICONS.map} Vedi sul sito
           </button>` : `
-          <button class="btn outline full-width" onclick="openStoreInGoogleMaps('${(product.storeAddress || product.storeName || '').replace(/'/g, "\\'")}')" style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
+          <button class="btn outline full-width" data-addr="${esc(product.storeAddress || product.storeName || '')}" onclick="openStoreInGoogleMaps(this.dataset.addr)" style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
             ${PANEL_ICONS.map} Vedi su Google Maps
           </button>`}
 
