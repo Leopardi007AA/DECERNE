@@ -2989,7 +2989,7 @@ function renderProfileTab() {
           <h4 style="color: #64748b; font-size: 0.8rem; text-transform: uppercase;">Dati Societari (Sola Lettura)</h4>
           <div class="input-group">
             <label>Email Account / Login</label>
-value="${esc(partner.email)}"
+            <input type="text" id="profEmail" value="${esc(partner.email)}" disabled style="background: #f8fafc; cursor: not-allowed; color: #94a3b8;">
             <small>L'email principale non può essere modificata autonomamente.</small>
           </div>
         </div>
@@ -2999,7 +2999,7 @@ value="${esc(partner.email)}"
         <div class="form-row">
           <div class="input-group">
             <label>Nome Insegna</label>
-value="${esc(partner.name)}"
+            <input type="text" id="profName" value="${esc(partner.name)}" required>
           </div>
           <div class="input-group">
             <label>Telefono Contatto</label>
@@ -3009,7 +3009,7 @@ value="${esc(partner.name)}"
 
         <div class="input-group">
           <label>URL Logo Supermercato</label>
-value="${esc(partner.logo || '')}"
+          <input type="url" id="profLogo" value="${esc(partner.logo || '')}" placeholder="https://link-immagine.png">
         </div>
 
         ${isEcom ? `
@@ -3021,18 +3021,18 @@ value="${esc(partner.logo || '')}"
         ` : `
         <div class="input-group">
           <label>Orari di Apertura Generali</label>
-value="${esc(partner.hours || '')}"
+          <input type="text" id="profHours" value="${esc(partner.hours || '')}" placeholder="Es: Lun-Sab 08:30-20:00">
         </div>
 
         <h4 style="color: #64748b; font-size: 0.8rem; text-transform: uppercase; margin-top:20px;">Tessera Negozio</h4>
         <div class="form-row">
           <div class="input-group">
             <label>Nome Tessera</label>
-value="${esc(partner.membershipCardName || '')}"
+            <input type="text" id="profCardName" value="${esc(partner.membershipCardName || '')}" placeholder="Es: Carta Fedeltà Coop">
           </div>
           <div class="input-group">
             <label>URL Immagine Tessera</label>
-value="${esc(partner.membershipCardImage || '')}"
+            <input type="url" id="profCardImage" value="${esc(partner.membershipCardImage || '')}" placeholder="https://link-immagine-tessera.png">
           </div>
         </div>
         <small style="display:block; margin-top:-10px; margin-bottom:15px; color:#94a3b8;">Compila questi campi se i tuoi prodotti possono richiedere una tessera fedeltà: potrai poi indicarlo su ogni singola offerta.</small>
@@ -3044,23 +3044,23 @@ value="${esc(partner.membershipCardImage || '')}"
 
         <div class="input-group">
           <label>Indirizzo e Numero Civico</label>
-value="${esc(extractStreetFromAddress(primaryLocation.address, primaryLocation.cap, primaryLocation.city))}"
+          <input type="text" value="${esc(extractStreetFromAddress(primaryLocation.address, primaryLocation.cap, primaryLocation.city))}" disabled style="background:#f8fafc; cursor:not-allowed; color:#94a3b8;">
         </div>
         <div class="form-row">
           <div class="input-group" style="flex: 2;">
             <label>Città</label>
-value="${esc(primaryLocation.city || '')}"
+            <input type="text" value="${esc(primaryLocation.city || '')}" disabled style="background:#f8fafc; cursor:not-allowed; color:#94a3b8;">
           </div>
           <div class="input-group" style="flex: 1;">
             <label>CAP</label>
-value="${esc(primaryLocation.cap || '')}"
+            <input type="text" value="${esc(primaryLocation.cap || '')}" disabled style="background:#f8fafc; cursor:not-allowed; color:#94a3b8;">
           </div>
         </div>
         `}
 
         <div class="input-group">
           <label>Note Interne / Memo</label>
->${esc(partner.internalNotes || '')}</textarea>
+          <textarea id="profNotes" rows="3" placeholder="Inserisci note visibili solo a te...">${esc(partner.internalNotes || '')}</textarea>
         </div>
 
         <button type="submit" class="btn" style="margin-top: 20px; width: 100%;">Salva Impostazioni Account</button>
@@ -3935,7 +3935,7 @@ function renderOtpVerificationScreen(email) {
   content.innerHTML = `
     <div class="auth-container" style="text-align:center;">
       <h3>Controlla la tua posta</h3>
-<strong>${esc(email)}</strong>
+      <p style="margin-bottom: 15px; color:#64748b;">Abbiamo inviato un codice a 6 cifre a<br><strong>${esc(email)}</strong></p>
       <div id="otpError" class="error-msg hidden"></div>
       <input type="text" id="otpCodeInput" maxlength="6" inputmode="numeric" pattern="[0-9]*"
         placeholder="000000" style="font-size:1.5rem; letter-spacing:8px; text-align:center; width:180px; padding:10px; margin:10px 0;">
@@ -7349,7 +7349,7 @@ function renderStoreResetOtpForm(email) {
     <div class="pricing-wrapper" style="max-width: 420px; margin: 60px auto;">
       <div class="onboarding-card">
         <h3>Inserisci il codice</h3>
-a ${esc(email)}.
+        <p style="color:#64748b; margin-bottom:15px; font-size:0.9rem;">Ti abbiamo inviato un codice a 6 cifre a ${esc(email)}.</p>
         <div id="storeResetOtpError" class="error-msg hidden"></div>
         <form id="storeResetOtpForm" class="auth-form">
           <input type="text" id="storeResetOtpCode" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="Codice a 6 cifre" required>
@@ -7445,7 +7445,7 @@ function renderTeamFirstLoginOtpForm(email) {
     <div class="pricing-wrapper" style="max-width: 420px; margin: 60px auto;">
       <div class="onboarding-card">
         <h3>Verifica il tuo accesso</h3>
-<strong>${esc(email)}</strong>
+        <p style="color:#64748b; margin-bottom:15px; font-size:0.9rem;">Primo accesso come Collaboratore: ti abbiamo inviato un codice a 6 cifre a<br><strong>${esc(email)}</strong></p>
         <div id="teamOtpError" class="error-msg hidden"></div>
         <form id="teamOtpForm" class="auth-form">
           <input type="text" id="teamOtpCode" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="Codice a 6 cifre" required>
