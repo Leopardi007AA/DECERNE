@@ -10846,7 +10846,7 @@ async function loadGeneralChartData() {
   if (!canvas) return; // l'utente potrebbe aver cambiato tab prima che la fetch finisca
 
   try {
-    const { data, error } = await supabaseClient.rpc('get_offer_stat_trend', { p_days: 7 });
+    const { data, error } = await storeAuthClient.rpc('get_offer_stat_trend', { p_days: 7 });
     if (error) {
       console.warn("Errore caricamento trend interazioni:", error);
       drawGeneralChart([]);
