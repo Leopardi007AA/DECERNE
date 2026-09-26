@@ -1979,6 +1979,50 @@ async function getUserProvinceForCap(cap) {
   return data || null;
 }
 
+// Le province di Sicilia e Sardegna impiegano in genere qualche giorno
+// lavorativo in più per la consegna via corriere rispetto al resto d'Italia:
+// la data mostrata nel popup prodotto ne tiene conto quando conosciamo la
+// provincia dell'utente.
+const ISLAND_PROVINCES = new Set([
+  "Cagliari", "Nuoro", "Oristano", "Sassari", "Sud Sardegna",
+  "Agrigento", "Caltanissetta", "Catania", "Enna", "Messina",
+  "Palermo", "Ragusa", "Siracusa", "Trapani"
+]);
+const ISLAND_EXTRA_DAYS = 2;
+
+// Aggiunge N giorni lavorativi a una data, saltando sabato e domenica.
+function addBusinessDays(date, days) {
+  const result = new Date(date);
+  let added = 0;
+  while (added < days) {
+    result.setDate(result.getDate() + 1);
+    const day = result.getDay();
+    if (day !== 0 && day !== 6) added++;
+  }
+  return result;
+}
+
+function formatItDate(date) {
+  return date.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+// Calcola l'etichetta con la data di consegna prevista per un'offerta
+// e-commerce, a partire dai giorni lavorativi min/max impostati dal negozio.
+// Se conosciamo la provincia dell'utente e ricade in Sicilia o Sardegna,
+// aggiunge i giorni extra tipici della spedizione verso le isole.
+function computeDeliveryDateLabel(minDays, maxDays, userProvince) {
+  if (minDays == null || maxDays == null) return null;
+  const isIsland = !!(userProvince && ISLAND_PROVINCES.has(userProvince));
+  const extra = isIsland ? ISLAND_EXTRA_DAYS : 0;
+  const today = new Date();
+  const dateMin = addBusinessDays(today, minDays + extra);
+  const dateMax = addBusinessDays(today, maxDays + extra);
+  const label = minDays === maxDays
+    ? `Consegna prevista entro ${formatItDate(dateMin)}`
+    : `Consegna prevista tra il ${formatItDate(dateMin)} e il ${formatItDate(dateMax)}`;
+  return { label, zoneNote: isIsland ? "tempi aggiornati per la spedizione in Sicilia e Sardegna" : null };
+}
+
 // Un'offerta di un e-commerce senza magazzino non ha una riga in
 // fetchPublicLocationsMap: qui recuperiamo nome/indirizzo/piano dal negozio
 // e segnamo quali offerte sono di un e-commerce, con le loro province di spedizione.
@@ -8365,6 +8409,7 @@ const PANEL_ICONS = {
   phone: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.4 2.1L8.1 9.6a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.4c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.9 2Z"/></svg>`,
   info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r="0.6" fill="currentColor" stroke="none"/></svg>`,
   share: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5 15.4 6.5M8.6 13.5 15.4 17.5"/></svg>`,
+  truck: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/></svg>`,
  };
 
 // ============================================================
@@ -9092,11 +9137,8 @@ function displayProductInModal(product) {
 
     title.innerText = "Dettaglio Offerta";
     const isEcomProduct = !!product.isEcommerce;
-    const deliveryLabel = (product.deliveryDaysMin != null && product.deliveryDaysMax != null)
-      ? (product.deliveryDaysMin === product.deliveryDaysMax
-          ? `Consegna prevista in ${product.deliveryDaysMin} giorni lavorativi`
-          : `Consegna prevista in ${product.deliveryDaysMin}-${product.deliveryDaysMax} giorni lavorativi`)
-      : null;
+    const baseDeliveryInfo = computeDeliveryDateLabel(product.deliveryDaysMin, product.deliveryDaysMax, null);
+    const deliveryLabel = baseDeliveryInfo ? baseDeliveryInfo.label : null;
   // Rende disponibili i dati del negozio al popup informazioni (aperto cliccando sul nome)
   window.__currentOfferStoreInfo = {
     id: product.storeId,
@@ -9175,6 +9217,11 @@ function displayProductInModal(product) {
               <span style="display:inline-flex;">${PANEL_ICONS.card}</span>
               <span>Nessuna tessera necessaria</span>
             </div>` : ''}
+            ${(isEcomProduct && deliveryLabel) ? `
+            <div id="productDeliveryBox" style="margin-top: 14px; display: flex; align-items: center; gap: 10px; color: #1e40af; font-weight: 600; background:#eff6ff; padding:10px 14px; border-radius: var(--radius-md); border: 1px solid #dbeafe;">
+              <span style="display:inline-flex; flex-shrink:0;">${PANEL_ICONS.truck}</span>
+              <span id="productDeliveryLabel">${escapeHtml(deliveryLabel)}</span>
+            </div>` : ''}
           </div>
 
           <div style="margin-bottom: 30px;">
@@ -9204,6 +9251,24 @@ function displayProductInModal(product) {
     </div>
   `;
   modal.style.display = "flex";
+
+  // Se conosciamo il CAP dell'utente, ricalcola la data di consegna tenendo
+  // conto della provincia (es. giorni extra per Sicilia e Sardegna), senza
+  // bloccare l'apertura del popup nel frattempo.
+  if (isEcomProduct && product.deliveryDaysMin != null && product.deliveryDaysMax != null) {
+    (async () => {
+      const userCap = getCleanUserCap();
+      if (!userCap) return;
+      const userProvince = await getUserProvinceForCap(userCap);
+      if (!userProvince) return;
+      const zoneInfo = computeDeliveryDateLabel(product.deliveryDaysMin, product.deliveryDaysMax, userProvince);
+      const el = document.getElementById('productDeliveryLabel');
+      if (el && zoneInfo) {
+        el.textContent = zoneInfo.label + (zoneInfo.zoneNote ? ` (${zoneInfo.zoneNote})` : '');
+      }
+    })();
+  }
+
   // Durante il tour guidato, il pulsante "Aggiungi alla lista spesa" qui
   // dentro non deve scrivere davvero su Supabase né chiedere il login: è
   // un'offerta finta ("demo-1") e per un visitatore anonimo richiederebbe
