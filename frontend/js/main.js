@@ -4295,7 +4295,7 @@ async function renderCartContent() {
         <div class="cart-row-img"><img src="${getSafeImageUrl(o.img_url)}" alt=""></div>
         <div class="cart-row-body">
           <div class="cart-row-info">
-            <div class="cart-row-store">${locationsById[o.location_id]?.name || ""}</div>
+            <div class="cart-row-store">${esc(locationsById[o.location_id]?.name || "")}</div>
             <div class="cart-row-product">${esc(o.product)}</div>
             <div class="cart-row-price">${formatPrice(o.price)}</div>
           </div>
@@ -4646,7 +4646,7 @@ async function renderMultiStopMap(cart, overrideStoresById, options = {}) {
       }
 
       visitOrder.forEach((store, idx) => {
-        const productList = cartItemsByStore[store.id].map(p => `• ${p.product} (${formatPrice(p.price)})`).join('<br>');
+        const productList = cartItemsByStore[store.id].map(p => `• ${esc(p.product)} (${formatPrice(p.price)})`).join('<br>');
         const marker = L.marker([store.latitude, store.longitude], { icon: makeNumberedIcon(idx + 1, store.approximateLocation) }).addTo(cartMap);
         cartStoreMarkers[store.id] = marker;
         bounds.push([store.latitude, store.longitude]);
@@ -5412,7 +5412,7 @@ window.searchSmartShoppingList = async () => {
     if (!match) {
       return `
         <div class="smart-list-result-row">
-          <div class="item-name">${ic.line}</div>
+          <div class="item-name">${esc(ic.line)}</div>
           <div class="item-empty">Nessuna offerta disponibile al momento nelle vicinanze.</div>
         </div>`;
     }
@@ -5434,7 +5434,7 @@ window.searchSmartShoppingList = async () => {
     return `
       <div class="smart-list-result-row">
         <div class="item-name">${ic.line}</div>
-        <div class="item-match">${PANEL_ICONS.pin} ${storeName} — ${formatPrice(match.price)}/${unit}${alreadyInRoute ? `<span class="already-badge">già nel carrello</span>` : ''}</div>
+        <div class="item-match">${PANEL_ICONS.pin} ${esc(storeName)} — ${formatPrice(match.price)}/${unit}${alreadyInRoute ? `<span class="already-badge">già nel carrello</span>` : ''}</div>
         ${weightField}
       </div>`;
   }).join('');
@@ -5591,13 +5591,13 @@ async function evaluateSmartSavings() {
         : `+${r.betterOption.extraKm.toFixed(1)} km extra (~${formatPrice(r.betterOption.extraTravelCost)})`;
       return `
         <div style="padding:8px; border-left:3px solid #16a34a; background:#f0fdf4; margin-bottom:6px; border-radius:6px; font-size:0.85rem;">
-          <strong>${r.product}</strong>: conviene cambiare — risparmi ${formatPrice(r.savings)}<br>
+          <strong>${esc(r.product)}</strong>: conviene cambiare — risparmi ${formatPrice(r.savings)}<br>
           <span style="color:#64748b;">Qui: ${formatPrice(r.currentPrice)} · Altrove: ${formatPrice(r.betterOption.price)} (${travelNote})</span>
         </div>`;
     } else {
       return `
         <div style="padding:8px; border-left:3px solid #2563eb; background:#eff6ff; margin-bottom:6px; border-radius:6px; font-size:0.85rem;">
-          <strong>${r.product}</strong>: conviene restare qui — l'alternativa ti costerebbe ${formatPrice(r.extraCostIfSwitch)} in più tra prezzo e viaggio
+          <strong>${esc(r.product)}</strong>: conviene restare qui — l'alternativa ti costerebbe ${formatPrice(r.extraCostIfSwitch)} in più tra prezzo e viaggio
         </div>`;
     }
   }).join('');
@@ -6197,16 +6197,16 @@ function renderProfileInfo() {
   title.innerText = "Il Tuo Profilo";
   content.innerHTML = `
     <div class="auth-container">
-      <div class="profile-avatar">${user.nome[0]}${user.cognome[0]}</div>
+      <div class="profile-avatar">${esc(user.nome[0])}${esc(user.cognome[0])}</div>
       <form id="profileUpdateForm" class="auth-form">
         <div class="form-row">
-          <div class="input-group"><label>Nome</label><input type="text" id="upNome" value="${user.nome}" required></div>
-          <div class="input-group"><label>Cognome</label><input type="text" id="upCognome" value="${user.cognome}" required></div>
+          <div class="input-group"><label>Nome</label><input type="text" id="upNome" value="${esc(user.nome)}" required></div>
+          <div class="input-group"><label>Cognome</label><input type="text" id="upCognome" value="${esc(user.cognome)}" required></div>
         </div>
-        <div class="input-group"><label>Email</label><input type="email" value="${user.email}" disabled style="background:#f0f0f0"></div>
+        <div class="input-group"><label>Email</label><input type="email" value="${esc(user.email)}" disabled style="background:#f0f0f0"></div>
         <div class="form-row">
-          <div class="input-group"><label>Città</label><input type="text" id="upCitta" value="${user.citta}" required></div>
-          <div class="input-group"><label>CAP</label><input type="text" id="upCap" value="${user.cap}" maxlength="5" required></div>
+          <div class="input-group"><label>Città</label><input type="text" id="upCitta" value="${esc(user.citta)}" required></div>
+          <div class="input-group"><label>CAP</label><input type="text" id="upCap" value="${esc(user.cap)}" maxlength="5" required></div>
         </div>
         <button type="submit" class="btn">Salva Modifiche</button>
         <div style="display: flex; gap: 10px; margin-top: 20px;">
@@ -6730,7 +6730,7 @@ if (offImgInput) {
     const url = offImgInput.value.trim();
     const hint = $("#imgHint");
     if (url.startsWith('http')) {
-      hint.innerHTML = `<img src="${url}" alt="Anteprima immagine prodotto" style="width:50px; height:50px; object-fit:cover; border-radius:4px; margin-top:5px; border:1px solid #ddd;">`;
+      hint.innerHTML = `<img src="${getSafeImageUrl(url)}" alt="Anteprima immagine prodotto" style="width:50px; height:50px; object-fit:cover; border-radius:4px; margin-top:5px; border:1px solid #ddd;">`;
     } else {
       hint.innerText = "Inserisci un URL valido (es. https://...)";
     }
@@ -6826,20 +6826,20 @@ window.showOfferPreview = () => {
   const imgUrl = $("#offImg").value || "";
   
   const percSconto = prezzoOrig > prezzoSconto ? Math.round(((prezzoOrig - prezzoSconto) / prezzoOrig) * 100) : 0;
-  const imageSrc = (imgUrl && imgUrl.startsWith('http')) ? imgUrl : PLACEHOLDER_IMG;
+  const imageSrc = getSafeImageUrl(imgUrl);
   
 
   // Iniezione HTML Card
   container.innerHTML = `
     <div class="offer-row" style="width: 100%; max-width: 600px;">
       <div class="product-image-container">
-        <img src="${imageSrc}" class="product-img" alt="${nome}">
+        <img src="${imageSrc}" class="product-img" alt="${esc(nome)}">
         ${percSconto > 0 ? `<span class="perc-badge">-${percSconto}%</span>` : ''}
       </div>
       <div class="product-info">
         <div class="product-details">
-          <div class="store-name">${partner ? partner.name : 'Supermercato'}</div>
-          <h3>${nome}</h3>
+          <div class="store-name">${esc(partner ? partner.name : 'Supermercato')}</div>
+          <h3>${esc(nome)}</h3>
           <div class="price-container">
             <span class="price-tag">${formatPrice(prezzoSconto)}</span>
             ${prezzoOrig > prezzoSconto ? `<span class="old-price-small">${formatPrice(prezzoOrig)}</span>` : ''}
@@ -7825,7 +7825,7 @@ function renderOnboarding(container) {
         <h3>Configura l'Account</h3>
         <p class="step-sub">Dati di accesso fondamentali.</p>
         <form id="onboardingForm" class="auth-form">
-          <input type="text" id="obName" placeholder="Nome Supermercato (es: Conad City)" required value="${storeData.tempReg?.name || ''}">
+          <input type="text" id="obName" placeholder="Nome Supermercato (es: Conad City)" required value="${esc(storeData.tempReg?.name || '')}">
           <select id="obType" required>
             <option value="">Tipologia Attività</option>
             <option value="Supermercato">Supermercato</option>
@@ -7862,7 +7862,7 @@ function renderOnboarding(container) {
             <option value="E-commerce">E-commerce</option>
             <option value="Altro">Altro</option>
           </select>
-          <input type="email" id="obEmail" placeholder="Email Aziendale" autocomplete="email" required value="${storeData.tempReg?.email || ''}">
+          <input type="email" id="obEmail" placeholder="Email Aziendale" autocomplete="email" required value="${esc(storeData.tempReg?.email || '')}">
           ${storeData.tempReg?.existingAccount ? `
             <p style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px; font-size:0.85rem; color:#1e40af;">
               Questa email è già registrata su Decerne. Userai la password che hai già — non serve impostarne una nuova.
@@ -7873,12 +7873,12 @@ function renderOnboarding(container) {
               <input type="password" id="obPassConfirm" placeholder="Conferma Password" autocomplete="new-password" required>
             </div>
           `}
-          <input type="text" id="obRef" placeholder="Nome Referente" required value="${storeData.tempReg?.ref || ''}">
+          <input type="text" id="obRef" placeholder="Nome Referente" required value="${esc(storeData.tempReg?.ref || '')}">
           <button type="submit" class="btn full-width">Continua alla verifica email</button>
         </form>
       ` : step === 2 ? `
         <h3>Verifica la tua email</h3>
-<strong>${esc(storeData.tempReg?.email || '')}</strong>
+        <p class="step-sub">Abbiamo inviato un codice a 6 cifre a <strong>${esc(storeData.tempReg?.email || '')}</strong></p>
         <form id="onboardingForm" class="auth-form">
           <input type="text" id="obOtpCode" maxlength="6" inputmode="numeric" pattern="[0-9]*"
             placeholder="000000" style="font-size:1.5rem; letter-spacing:8px; text-align:center;" required>
@@ -7904,16 +7904,16 @@ function renderOnboarding(container) {
         <form id="onboardingForm" class="auth-form">
           <div class="input-group">
             <label>Indirizzo e Numero Civico</label>
-            <input type="text" id="obStreet" placeholder="Es: Via Roma, 15" required value="${storeData.tempReg?.street || ''}">
+            <input type="text" id="obStreet" placeholder="Es: Via Roma, 15" required value="${esc(storeData.tempReg?.street || '')}">
           </div>
           <div class="form-row">
             <div class="input-group" style="flex: 2;">
               <label>Città</label>
-              <input type="text" id="obCity" placeholder="Es: Milano" required value="${storeData.tempReg?.city || getCleanUserCity() || ''}">
+              <input type="text" id="obCity" placeholder="Es: Milano" required value="${esc(storeData.tempReg?.city || getCleanUserCity() || '')}">
             </div>
             <div class="input-group" style="flex: 1;">
               <label>CAP</label>
-              <input type="text" id="obCap" placeholder="12345" maxlength="5" required value="${storeData.tempReg?.cap || getCleanUserCap() || ''}">
+              <input type="text" id="obCap" placeholder="12345" maxlength="5" required value="${esc(storeData.tempReg?.cap || getCleanUserCap() || '')}">
             </div>
           </div>
 
@@ -8417,7 +8417,7 @@ function renderDashboard(container) {
 
   const isManager = partner.isCollaborator && partner.collaboratorRole === 'Manager';
   const collaboratorBadgeHTML = partner.isCollaborator
-    ? `<div style="margin-top:6px;"><span class="badge-plan plan-standard" title="Stai operando come collaboratore di ${partner.name}">${PANEL_ICONS.users} Collaboratore · ${partner.collaboratorRole}</span></div>`
+    ? `<div style="margin-top:6px;"><span class="badge-plan plan-standard" title="Stai operando come collaboratore di ${esc(partner.name)}">${PANEL_ICONS.users} Collaboratore · ${esc(partner.collaboratorRole)}</span></div>`
     : '';
 
     container.innerHTML = `
@@ -8668,12 +8668,12 @@ function renderHomeTab() {
       </div>
       <div class="stat-card-saas accent-amber">
         <div class="label stat-label-info" onclick="showStatInfo(event, 'bestOffer')">${PANEL_ICONS.flame} Migliore Offerta ${PANEL_ICONS.info}</div>
-        <div class="value" style="font-size: 1.2rem;">${bestOffer.product}</div>
+        <div class="value" style="font-size: 1.2rem;">${esc(bestOffer.product)}</div>
         <small style="color: #f59e0b; font-weight: 700;">Sconto: ${bestOffer.val}</small>
       </div>
       <div class="stat-card-saas accent-emerald">
         <div class="label stat-label-info" onclick="showStatInfo(event, 'mostClicked')">${PANEL_ICONS.cursor} Più cliccata ${PANEL_ICONS.info}</div>
-        <div class="value" style="font-size: 1.2rem;">${mostClicked.product}</div>
+        <div class="value" style="font-size: 1.2rem;">${esc(mostClicked.product)}</div>
         <small style="color: #10b981; font-weight: 700;">${mostClicked.val} click</small>
       </div>
     </div>
@@ -8688,8 +8688,8 @@ function renderHomeTab() {
     <div class="dual-card-row" style="margin-top: 16px;">
       <div class="card-saas" style="border-left: 4px solid #6929c4;">
         <h3 style="color: #6929c4; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.key} API Key</h3>
-        <input type="text" value="${partner.apiKey || ''}" readonly style="width:100%; padding:8px; margin: 10px 0; border-radius:10px; border:1px solid #ddd; font-family:monospace; font-size:0.8rem;">
-        <button class="btn" style="background:#6929c4; padding:5px 15px;" onclick="navigator.clipboard.writeText('${partner.apiKey || ''}'); toast.success('API Key copiata!')">Copia</button>
+        <input type="text" value="${esc(partner.apiKey || '')}" readonly style="width:100%; padding:8px; margin: 10px 0; border-radius:10px; border:1px solid #ddd; font-family:monospace; font-size:0.8rem;">
+        <button class="btn" style="background:#6929c4; padding:5px 15px;" onclick="navigator.clipboard.writeText('${esc(partner.apiKey || '')}'); toast.success('API Key copiata!')">Copia</button>
       </div>
       <div class="card-saas" style="border-left: 4px solid #10b981; background: #f0fdf4;">
         <h3 style="color: #166534; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.headset} Supporto Prioritario</h3>
@@ -8703,7 +8703,7 @@ function renderHomeTab() {
     <header class="tab-header">
       <div>
         <span class="badge-plan plan-${plan.toLowerCase()}">${plan}</span>
-        <h2 style="margin-top:10px">Benvenuto, ${partner.name}</h2>
+        <h2 style="margin-top:10px">Benvenuto, ${esc(partner.name)}</h2>
       </div>
       <button class="btn" onclick="handleNewOfferClick()">${myOffers.length === 0 ? '+ Crea prima offerta' : '+ Aggiungi Offerta'}</button>
     </header>
@@ -9098,7 +9098,7 @@ function displayProductInModal(product) {
             ${product.cardRequirement === 'required' ? `
             <div style="margin-top: 14px; display: flex; align-items: center; gap: 10px; color: #92400e; font-weight: 600; background:#fffbeb; padding:10px 14px; border-radius: var(--radius-md); border: 1px solid #fde68a;">
               ${product.storeCardImage ? `<img src="${getSafeImageUrl(product.storeCardImage)}" alt="Tessera" style="width:26px; height:26px; object-fit:contain; border-radius:5px; flex-shrink:0;">` : `<span style="display:inline-flex; flex-shrink:0;">${PANEL_ICONS.card}</span>`}
-              <span>Richiede la tessera${product.storeCardName ? ` "${product.storeCardName}"` : ' del negozio'}</span>
+              <span>Richiede la tessera${product.storeCardName ? ` "${esc(product.storeCardName)}"` : ' del negozio'}</span>
             </div>` : ''}
             ${product.cardRequirement === 'not_required' ? `
             <div style="margin-top: 14px; display: flex; align-items: center; gap: 8px; color: #166534; font-weight: 600; background:#f0fdf4; padding:10px 14px; border-radius: var(--radius-md); border: 1px solid #bbf7d0;">
@@ -9188,7 +9188,7 @@ window.showStoreInfoPopup = (store) => {
       <div class="store-info-row-icon">${icon}</div>
       <div>
         <div class="store-info-row-label">${label}</div>
-        <div class="store-info-row-value${value ? '' : ' missing'}">${value || 'Non specificato dal negozio'}</div>
+        <div class="store-info-row-value${value ? '' : ' missing'}">${esc(value || 'Non specificato dal negozio')}</div>
       </div>
     </div>`;
 
@@ -9305,7 +9305,7 @@ function renderStoreProfileCard(store, locations) {
         <span>${PANEL_ICONS.pin} ${primary.address || store.address || (isEcomStore ? 'Negozio online' : 'Indirizzo non specificato')}</span>
         ${isEcomStore
           ? (store.website_url ? `<span>${PANEL_ICONS.map} <a href="${store.website_url}" target="_blank" rel="noopener">${store.website_url}</a></span>` : '')
-          : `${store.phone ? `<span>${PANEL_ICONS.phone} ${store.phone}</span>` : ''}${store.hours ? `<span>${PANEL_ICONS.clock} ${store.hours}</span>` : ''}`}
+          : `${store.phone ? `<span>${PANEL_ICONS.phone} ${esc(store.phone)}</span>` : ''}${store.hours ? `<span>${PANEL_ICONS.clock} ${esc(store.hours)}</span>` : ''}`}
       </div>
       <span class="store-profile-expand-hint">
         ${locations.length > 1 ? `Vedi tutte le ${locations.length} sedi` : 'Vedi dettagli sede'}
@@ -9324,8 +9324,8 @@ function renderStoreProfileCard(store, locations) {
     <div class="store-profile-location-row">
       <div class="store-info-row-icon">${PANEL_ICONS.pin}</div>
       <div>
-        <div class="store-info-row-label">${l.location_name || 'Sede'}${badge}</div>
-        <div class="store-info-row-value">${l.address || 'Indirizzo non specificato'}</div>
+        <div class="store-info-row-label">${esc(l.location_name || 'Sede')}${badge}</div>
+        <div class="store-info-row-value">${esc(l.address || 'Indirizzo non specificato')}</div>
       </div>
     </div>
   `;
@@ -9350,7 +9350,7 @@ async function loadStoreProfileOffers(store, productQuery = "") {
   if (!grid) return;
 
   const userCap = getCleanUserCap();
-  if (title) title.textContent = userCap ? `Offerte Vicine di ${store.name}` : `Offerte di ${store.name}`;
+  if (title) title.textContent = userCap ? `Offerte Vicine di ${esc(store.name)}` : `Offerte di ${esc(store.name)}`;
 
   const today = new Date().toISOString().split("T")[0];
   const { data: rows, error } = await supabaseClient
@@ -10478,7 +10478,7 @@ window.setPrimaryLocation = (index) => {
   if (!loc || !loc.id) return toast.error("Sede non valida.");
   if (loc.isPrimary) return;
 
-  showConfirm(`Impostare "${loc.name}" come sede principale?`, async () => {
+  showConfirm(`Impostare "${esc(loc.name)}" come sede principale?`, async () => {
     const { error: clearError } = await storeAuthClient
       .from('store_locations')
       .update({ is_primary: false })
@@ -10821,12 +10821,12 @@ function renderGeneralDashboardTab() {
       <div style="display: flex; flex-direction: column; gap: 20px;">
         <div class="card-saas accent-purple" style="background: #fdfaff; flex: 1; display: flex; flex-direction: column; justify-content: center;">
           <div class="label stat-label-info" style="color: #6929c4; font-weight: 700; margin-bottom: 10px; display:flex; align-items:center; gap:6px;" onclick="showStatInfo(event, 'bestLocation')">${PANEL_ICONS.trophy} MIGLIOR SEDE ${PANEL_ICONS.info}</div>
-          <div style="font-size: 1.2rem; font-weight: 800; color: #1e293b;">${bestLocName}</div>
+          <div style="font-size: 1.2rem; font-weight: 800; color: #1e293b;">${esc(bestLocName)}</div>
           <small style="color: #64748b; margin-top: 5px;">Sedi totali: ${activeLocCount}</small>
         </div>
         <div class="card-saas" style="background: #f1f5f9; flex: 1; display: flex; flex-direction: column; justify-content: center;">
            <div class="label" style="color: #475569; font-weight: 700; margin-bottom: 5px; display:flex; align-items:center; gap:6px;">${PANEL_ICONS.bulb} CONSIGLIO PRO</div>
-           <p style="font-size: 0.75rem; color: #64748b; margin: 0; line-height: 1.4;">Le offerte nella sede "${bestLocName}" stanno performando meglio. Considera di replicare la strategia dei prezzi di questa sede anche sulle altre.</p>
+           <p style="font-size: 0.75rem; color: #64748b; margin: 0; line-height: 1.4;">Le offerte nella sede "${esc(bestLocName)}" stanno performando meglio. Considera di replicare la strategia dei prezzi di questa sede anche sulle altre.</p>
         </div>
       </div>
     </div>
@@ -11299,7 +11299,7 @@ function renderApiTab() {
     <div class="card-saas" style="margin-bottom: 25px;">
       <h3 style="margin-top:0; font-size: 1rem;">La tua API Key</h3>
       <div style="display: flex; gap: 10px; align-items: center; margin-top: 15px;">
-        <input type="text" id="apiKeyDisplay" value="${partner.apiKey || ''}" placeholder="Nessuna chiave: clicca Rigenera" readonly
+        <input type="text" id="apiKeyDisplay" value="${esc(partner.apiKey || '')}" placeholder="Nessuna chiave: clicca Rigenera" readonly
                style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-family: monospace; background: #f8fafc; font-size: 0.9rem;">
         <div class="api-key-actions-inline" style="display: flex; gap: 10px;">
           <button class="btn outline" onclick="copyApiKeyToClipboard()">Copia</button>
@@ -11509,8 +11509,8 @@ function renderSyncLogTable() {
     return `
       <tr>
         <td style="font-size:0.75rem; color:#64748b;">${new Date(l.createdAt).toLocaleString()}</td>
-        <td style="font-family:monospace; font-size:0.8rem;">${l.sku}</td>
-        <td>${l.name || '-'}</td>
+        <td style="font-family:monospace; font-size:0.8rem;">${esc(l.sku)}</td>
+        <td>${esc(l.name || '-')}</td>
         <td>${l.quantity ?? '-'}</td>
         <td><span style="color:${label.color}; font-weight:600; font-size:0.8rem;">${label.text}</span></td>
       </tr>
@@ -11548,7 +11548,7 @@ function renderIntegrationStatus() {
         <div style="font-size:0.85rem;">${lastSync}</div>
       </div>
       <div style="flex:1 1 220px; display:flex; gap:8px; align-items:center;">
-        <input type="text" id="integrationProviderInput" value="${myIntegrationCache.provider}"
+        <input type="text" id="integrationProviderInput" value="${esc(myIntegrationCache.provider)}"
                placeholder="es. Tilby, TeamSystem..."
                style="flex:1; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:0.85rem;">
         <button class="btn outline" style="padding:8px 14px; font-size:0.8rem;" onclick="saveIntegrationProvider()">Salva</button>
@@ -11569,8 +11569,8 @@ function renderSyncedProductsTable() {
       : `<span style="font-size:0.7rem; color:#94a3b8;">nessuna offerta</span>`;
     return `
       <tr>
-        <td style="font-family:monospace; font-size:0.8rem;">${p.sku}</td>
-        <td>${p.name}</td>
+        <td style="font-family:monospace; font-size:0.8rem;">${esc(p.sku)}</td>
+        <td>${esc(p.name)}</td>
         <td style="${isOut ? 'color:#ef4444; font-weight:700;' : ''}">${p.quantity} ${UNIT_LABELS[p.unit] || ''}</td>
         <td><strong style="color:var(--primary);">${formatPrice(p.price)}</strong></td>
         <td>${offerBadge}</td>
@@ -11788,13 +11788,13 @@ function openCsvMappingModal(headers, rows) {
               </label>
               <select data-field="${f.key}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #e2e8f0;">
                 <option value="">-- Non presente nel file --</option>
-                ${headers.map(h => `<option value="${clean(h)}" ${guessed[f.key] === h ? 'selected' : ''}>${clean(h)}</option>`).join('')}
+                ${headers.map(h => `<option value="${esc(h)}" ${guessed[f.key] === h ? 'selected' : ''}>${esc(h)}</option>`).join('')}
               </select>
             </div>
           `).join('')}
         </div>
         <p style="font-size: 0.75rem; color: #94a3b8;">
-          Anteprima prima riga: <code>${clean(JSON.stringify(sampleRow)).slice(0, 200)}</code>
+          Anteprima prima riga: <code>${esc(JSON.stringify(sampleRow).slice(0, 200))}</code>
         </p>
         <p style="font-size: 0.75rem; color: #94a3b8;">${rows.length} righe trovate nel file.</p>
         <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:15px;">
@@ -12048,7 +12048,7 @@ function renderCsvImportResults(results) {
     ? `<div style="max-height:180px; overflow-y:auto; margin-top:10px; text-align:left; background:#fef2f2; border-radius:8px; padding:10px;">
         ${results.errors.slice(0, 50).map(e => `
           <div style="font-size:0.78rem; color:#991b1b; margin-bottom:4px;">
-            Riga ${e.index !== null ? e.index + 2 : '-'} (${clean(e.product || 'sconosciuto')}): ${clean(e.reasons.join(', '))}
+            Riga ${e.index !== null ? e.index + 2 : '-'} (${esc(e.product || 'sconosciuto')}): ${esc(e.reasons.join(', '))}
           </div>
         `).join('')}
         ${results.errors.length > 50 ? `<div style="font-size:0.78rem; color:#991b1b;">...e altri ${results.errors.length - 50} errori.</div>` : ''}
@@ -12523,8 +12523,8 @@ const maybeStartTour = (function () {
           </div>
           <div class="product-info">
             <div class="product-details">
-              <div class="store-name">${o.store}</div>
-              <h3>${o.product}</h3>
+              <div class="store-name">${esc(o.store)}</div>
+              <h3>${esc(o.product)}</h3>
               <div class="price-container">
                 <span class="price-tag" style="color:#0f62fe;font-weight:800;font-size:1.5rem;">${formatPrice(o.price)}</span>
                 ${discPerc > 0 ? `<span class="old-price-small" style="font-size:0.85rem;color:#94a3b8;text-decoration:line-through;margin-left:8px;">${formatPrice(o.original_price)}</span>` : ''}
@@ -12624,11 +12624,11 @@ const pollId = setInterval(() => {
       </div>
       <div class="cart-list">
         <div class="cart-row" onclick="closeFullPageModal()">
-          <div class="cart-row-img"><img src="${productImg}" alt=""></div>
+          <div class="cart-row-img"><img src="${getSafeImageUrl(productImg)}" alt=""></div>
           <div class="cart-row-body">
             <div class="cart-row-info">
-              <div class="cart-row-store">${storeLabel}</div>
-              <div class="cart-row-product">${productName}</div>
+              <div class="cart-row-store">${esc(storeLabel)}</div>
+              <div class="cart-row-product">${esc(productName)}</div>
               <div class="cart-row-price">${productPrice}</div>
             </div>
             <button class="btn danger cart-remove-btn" onclick="event.stopPropagation(); this.closest('.cart-row').remove();">Rimuovi</button>
