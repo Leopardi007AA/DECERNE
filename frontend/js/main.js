@@ -5503,7 +5503,7 @@ window.searchSmartShoppingList = async () => {
 
     return `
       <div class="smart-list-result-row">
-        <div class="item-name">${ic.line}</div>
+        <div class="item-name">${esc(ic.line)}</div>
         <div class="item-match">${PANEL_ICONS.pin} ${esc(storeName)} — ${formatPrice(match.price)}/${unit}${alreadyInRoute ? `<span class="already-badge">già nel carrello</span>` : ''}</div>
         ${weightField}
       </div>`;
@@ -9368,7 +9368,7 @@ function renderStoreProfileCard(store, locations) {
     <img src="${getSafeImageUrl(store.logo_url)}" class="store-profile-logo" alt="${esc(store.name)}">
     <div class="store-profile-info">
       <h2 class="store-profile-name">
-        ${store.name || 'Supermercato'}
+        ${esc(store.name || 'Supermercato')}
         ${isVerified ? `<span class="store-verified-blue" style="color:#0f62fe; font-weight:800; font-size:0.75rem;">✓ Negozio Verificato</span>` : ''}
       </h2>
       <div class="store-profile-meta">
@@ -10173,7 +10173,7 @@ function renderLocationsTab() {
           <div class="card-saas ${loc.isPrimary ? 'accent-emerald' : 'accent-blue'}" style="padding: 22px;">
             <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
               <span class="round-ico" style="color: ${loc.isPrimary ? '#10b981' : '#0f62fe'}; background: ${loc.isPrimary ? '#dcfce7' : '#eff6ff'}; width: 42px; height: 42px; border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">${PANEL_ICONS.pin}</span>
-              <input type="text" id="locName_${index}" value="${loc.name || ''}" placeholder="Nome sede" style="flex: 1; font-weight: 800; font-size: 1.05rem; border: none; background: transparent; padding: 4px 0;">
+              <input type="text" id="locName_${index}" value="${esc(loc.name || '')}" placeholder="Nome sede" style="flex: 1; font-weight: 800; font-size: 1.05rem; border: none; background: transparent; padding: 4px 0;">
               ${isEcom ? '' : loc.isPrimary ?
                 `<span style="font-size: 0.7rem; font-weight: 800; color: #10b981; background: #dcfce7; padding: 6px 12px; border-radius: 999px; white-space: nowrap;">★ PRINCIPALE</span>` :
                 `<button class="btn outline" style="padding: 6px 14px; font-size: 0.75rem; white-space: nowrap; border-radius: 999px;" onclick="setPrimaryLocation(${index})">Imposta Principale</button>`
@@ -10191,15 +10191,15 @@ ${plan === 'Enterprise' ? `
             <div class="form-row" style="gap: 14px;">
               <div class="input-group" style="flex: 2;">
                 <label>Indirizzo</label>
-                <input type="text" id="locAddr_${index}" class="location-field-input" value="${extractStreetFromAddress(loc.address, loc.cap, loc.city) || ''}" placeholder="Via e numero civico">
+                <input type="text" id="locAddr_${index}" class="location-field-input" value="${esc(extractStreetFromAddress(loc.address, loc.cap, loc.city) || '')}" placeholder="Via e numero civico">
               </div>
               <div class="input-group" style="flex: 1.2;">
                 <label>Città</label>
-                <input type="text" id="locCity_${index}" class="location-field-input" value="${loc.city || ''}" placeholder="Città">
+                <input type="text" id="locCity_${index}" class="location-field-input" value="${esc(loc.city || '')}" placeholder="Città">
               </div>
               <div class="input-group" style="flex: 0 0 90px;">
                 <label>CAP</label>
-                <input type="text" id="locCap_${index}" class="location-field-input" value="${loc.cap || ''}" placeholder="00000">
+                <input type="text" id="locCap_${index}" class="location-field-input" value="${esc(loc.cap || '')}" placeholder="00000">
               </div>
             </div>
 
@@ -13415,7 +13415,7 @@ function openEmailContact(email, subject = '') {
   document.querySelector('.email-contact-overlay')?.remove();
 
   const encodedSubject = encodeURIComponent(subject);
-  const mailtoHref = `mailto:${email}${subject ? '?subject=' + encodedSubject : ''}`;
+  const mailtoHref = `mailto:${encodeURIComponent(email)}${subject ? '?subject=' + encodedSubject : ''}`;
   const gmailHref = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}${subject ? '&su=' + encodedSubject : ''}`;
 
   const overlay = document.createElement('div');
