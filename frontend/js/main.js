@@ -2019,7 +2019,7 @@ function computeDeliveryDateLabel(minDays, maxDays, userProvince) {
   const dateMax = addBusinessDays(today, maxDays + extra);
   const label = minDays === maxDays
     ? `Consegna prevista entro ${formatItDate(dateMin)}`
-    : `Consegna prevista tra il ${formatItDate(dateMin)} e il ${formatItDate(dateMax)}`;
+    : `Consegna prevista tra  ${formatItDate(dateMin)} e ${formatItDate(dateMax)}`;
   return { label, zoneNote: isIsland ? "tempi aggiornati per la spedizione in Sicilia e Sardegna" : null };
 }
 
@@ -13217,6 +13217,7 @@ const maybeStartPartnerGuide = (function () {
     "#partnerNavHome": "home",
     "#partnerNavOffers": "offers",
     "#partnerNavLocations": "locations",
+    "#partnerNavShipping": "shipping",
     "#partnerNavTrash": "trash",
     "#partnerNavGeneral": "general",
     "#partnerNavApi": "api",
@@ -13235,6 +13236,7 @@ const maybeStartPartnerGuide = (function () {
     const plan = partner.plan || 'Starter';
     const isPro = plan === 'Professional' || plan === 'Enterprise';
     const isEnt = plan === 'Enterprise';
+    const isEcom = partner.businessType === 'E-commerce';
 
     const list = [
       {
@@ -13255,10 +13257,22 @@ const maybeStartPartnerGuide = (function () {
     ];
 
     if (!isManager) {
-      list.push({
+      list.push(isEcom ? {
+        title: "Magazzini",
+        text: "Se spedisci da più punti, qui aggiungi i tuoi magazzini: sono facoltativi, ma se ne indichi uno su un prodotto il suo indirizzo compare nel dettaglio dell'offerta.",
+        highlight: "#partnerNavLocations"
+      } : {
         title: "Gestione Sedi",
         text: "Se il tuo negozio ha più punti vendita, qui aggiungi e modifichi i loro indirizzi: ogni offerta si può poi assegnare alla sede giusta.",
         highlight: "#partnerNavLocations"
+      });
+    }
+
+    if (isEcom && !isManager) {
+      list.push({
+        title: "Spedizioni",
+        text: "Qui scegli in quali province italiane spedisci: i clienti fuori da queste zone non vedranno i tuoi prodotti.",
+        highlight: "#partnerNavShipping"
       });
     }
 
@@ -13298,7 +13312,11 @@ const maybeStartPartnerGuide = (function () {
         text: "Qui controlli il piano attivo, la data del prossimo rinnovo e puoi passare a un piano diverso quando vuoi.",
         highlight: "#partnerNavSub"
       });
-      list.push({
+      list.push(isEcom ? {
+        title: "Impostazioni",
+        text: "Logo, contatti, sito web e le altre informazioni del tuo negozio online: qui le tieni sempre aggiornate.",
+        highlight: "#partnerNavProfile"
+      } : {
         title: "Impostazioni",
         text: "Logo, contatti, orari e le altre informazioni del tuo negozio: qui le tieni sempre aggiornate.",
         highlight: "#partnerNavProfile"
