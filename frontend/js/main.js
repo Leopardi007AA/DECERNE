@@ -2317,7 +2317,22 @@ const logSearchQuery = debounce(async () => {
 
     if (error) console.warn("Errore salvataggio ricerca:", error);
   }, 700);
-  
+
+// Tracciamento categoria selezionata in Home Utenti (per "Offerte Consigliate")
+let lastLoggedCategory = "";
+async function logCategoryView(category) {
+  if (!state.currentUser) return;
+  if (!category || category === 'all') return;
+  if (category === lastLoggedCategory) return;
+  lastLoggedCategory = category;
+
+  const { error } = await supabaseClient
+    .from('user_category_views')
+    .insert({ user_id: state.currentUser.id, category });
+
+  if (error) console.warn("Errore salvataggio categoria:", error);
+}
+
   // --- Animazione di comparsa/uscita offerte allo scroll (solo Home Utenti, solo schermi grandi) ---
 let offerRevealObserver = null;
 let lastScrollYForReveal = window.scrollY;
@@ -2646,6 +2661,13 @@ function getOfferViewCountObserver() {
         countedOfferViews.add(offerId);
         supabaseClient.rpc('increment_offer_stat', { p_offer_id: offerId, p_field: 'views' })
           .then(({ error }) => { if (error) console.warn("Errore views:", error); });
+
+        // Vista per-utente, usata da "Offerte Consigliate" (segnale debole)
+        if (state.currentUser) {
+          supabaseClient.from('user_offer_views')
+            .insert({ user_id: state.currentUser.id, offer_id: offerId })
+            .then(({ error }) => { if (error) console.warn("Errore user view:", error); });
+        }
       });
     }, { threshold: 0.5 });
   }
@@ -7195,6 +7217,7 @@ searchInput.oninput = () => {
   if (categorySelect) {
     categorySelect.onchange = () => {
       state.currentPage = 1;
+      logCategoryView(categorySelect.value);
       // Se c'è testo nella searchbar, usa il fuzzy render
       if (searchInput?.value?.trim()) {
         debouncedSmartRender();
