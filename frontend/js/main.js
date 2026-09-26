@@ -2545,7 +2545,7 @@ async function buildStoreSearchCardElement(offerOrStore) {
       <img src="${getSafeImageUrl(store.logo_url)}" class="store-search-card-logo" alt="${esc(store.name)}">
       <div>
         <div class="store-search-card-name">
-          ${store.name || 'Supermercato'}
+          ${esc(store.name || 'Supermercato')}
           ${isVerified ? `<span class="store-verified-blue" style="color:#0f62fe; font-weight:800; font-size:0.7rem;">✓ Negozio Verificato</span>` : ''}
         </div>
         <div class="store-search-card-sub">${esc(store.address || '')}</div>
@@ -2767,11 +2767,12 @@ function renderOffersTable(limit = 999) {
       <tr>
         <td><input type="checkbox" class="offer-select-checkbox" ${isSelected ? 'checked' : ''} onchange="toggleOfferSelection('${o.id}', this.checked)"></td>
         <td>
-          <img src="${getSafeImageUrl(o.img)}" alt="${o.product}"
+          <img src="${getSafeImageUrl(o.img)}" alt="${esc(o.product)}"
                style="width:40px; height:40px; border-radius:4px; object-fit:cover; border:1px solid #eee;">
         </td>
         <td>
-          <div style="font-weight:700;">${o.product}</div>
+        ${esc(o.product)}
+        ${esc(o.category)}
           <div style="font-size:0.75rem; color:#64748b;">${o.category}</div>
         </td>
         <td><span class="status-pill ${statusClass}">${statusLabel}</span>${scheduledBadge}</td>
@@ -4144,7 +4145,7 @@ function renderSimpleChart(offers) {
         return `
             <div style="margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 5px;">
-                    <span>${o.product}</span>
+                    <span>${esc(o.product)}</span>
                     <span style="font-weight: bold;">${o.views || 0} views</span>
                 </div>
                 <div style="height: 12px; background: #f0f4f8; border-radius: 6px; overflow: hidden;">
@@ -4296,7 +4297,7 @@ async function renderCartContent() {
         <div class="cart-row-body">
           <div class="cart-row-info">
             <div class="cart-row-store">${locationsById[o.location_id]?.name || ""}</div>
-            <div class="cart-row-product">${o.product}</div>
+            <div class="cart-row-product">${esc(o.product)}</div>
             <div class="cart-row-price">${formatPrice(o.price)}</div>
           </div>
           ${sharedIds ? '' : `<button class="btn danger cart-remove-btn" onclick="event.stopPropagation(); removeFromCart('${o.id}')">Rimuovi</button>`}
@@ -4655,7 +4656,7 @@ async function renderMultiStopMap(cart, overrideStoresById, options = {}) {
         const approxNote = store.approximateLocation
           ? `<div style="margin-top:6px; font-size:0.75rem; color:#b45309; display:flex; align-items:center; gap:4px;">${PANEL_ICONS.alert} Posizione approssimativa: l'indirizzo esatto non è nel database delle mappe gratuite.</div>` : '';
         marker.bindPopup(`
-          <strong>Tappa ${idx + 1}: ${store.name}</strong><br>${productList}
+          <strong>Tappa ${idx + 1}: ${esc(store.name)}</strong><br>${productList}
           ${legInfo ? `<div style="margin-top:8px; font-size:0.85rem; color:#475569; display:flex; align-items:center; gap:6px;">${PANEL_ICONS.road} ${legInfo.distanceKm.toFixed(1)} km da qui &nbsp;·&nbsp; ${PANEL_ICONS.clock} ${formatDuration(legInfo.durationMin)}</div>` : ''}
           ${approxNote}
         `);
@@ -8845,7 +8846,7 @@ function renderStatsTab() {
       
       return `
         <tr>
-          <td><strong>${o.product}</strong></td>
+          <td><strong>${esc(o.product)}</strong></td>
           <td>${views}</td>
           <td>${opens}</td>
           <td><span style="color: var(--primary); font-weight:700;">${ctr}%</span></td>
@@ -8900,7 +8901,7 @@ function renderTrashTab() {
       <tbody>
         ${trash.map(o => `
           <tr>
-            <td><strong>${o.product}</strong></td>
+            <td><strong>${esc(o.product)}</strong></td>
             <td>${new Date(o.deletedAt).toLocaleString()}</td>
             <td><button class="btn outline" onclick="restoreOffer('${o.id}')">Ripristina</button></td>
           </tr>
@@ -9196,7 +9197,7 @@ window.showStoreInfoPopup = (store) => {
   const isVerified = store.plan === 'Professional' || store.plan === 'Enterprise';
 
   infoContent.innerHTML = `
-    ${store.logo ? `<img src="${getSafeImageUrl(store.logo)}" class="store-info-logo" alt="${store.name}">` : ''}
+    ${store.logo ? `<img src="${getSafeImageUrl(store.logo)}" class="store-info-logo" alt="${esc(store.name)}">` : ''}
     <div class="store-info-name">${esc(store.name || 'Supermercato')}</div>
     ${isVerified ? `<span class="store-info-plan-badge"><span style="color:#0f62fe; font-weight:800; font-size:0.8rem;">✓ Negozio Verificato</span></span>` : ''}
     ${row(PANEL_ICONS.pin, 'Indirizzo', addressLine || (store.isEcommerce ? 'Negozio online' : ''))}
@@ -9295,7 +9296,7 @@ function renderStoreProfileCard(store, locations) {
   const primary = locations.find(l => l.is_primary) || locations[0] || {};
 
   card.innerHTML = `
-    <img src="${getSafeImageUrl(store.logo_url)}" class="store-profile-logo" alt="${store.name}">
+    <img src="${getSafeImageUrl(store.logo_url)}" class="store-profile-logo" alt="${esc(store.name)}">
     <div class="store-profile-info">
       <h2 class="store-profile-name">
         ${store.name || 'Supermercato'}
@@ -12518,7 +12519,7 @@ const maybeStartTour = (function () {
         row.className = "offer-row " + DEMO_OFFER_CLASS;
         row.innerHTML = `
           <div class="product-image-container">
-            <img src="${getSafeImageUrl(o.img)}" class="product-img" alt="${o.product}">
+            <img src="${getSafeImageUrl(o.img)}" class="product-img" alt="${esc(o.product)}">
             ${discPerc > 0 ? `<span class="perc-badge">-${discPerc}%</span>` : ''}
           </div>
           <div class="product-info">
