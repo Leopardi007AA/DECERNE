@@ -2771,9 +2771,8 @@ function renderOffersTable(limit = 999) {
                style="width:40px; height:40px; border-radius:4px; object-fit:cover; border:1px solid #eee;">
         </td>
         <td>
-        ${esc(o.product)}
-        ${esc(o.category)}
-          <div style="font-size:0.75rem; color:#64748b;">${o.category}</div>
+          <div style="font-weight:700;">${esc(o.product)}</div>
+          <div style="font-size:0.75rem; color:#64748b;">${esc(o.category)}</div>
         </td>
         <td><span class="status-pill ${statusClass}">${statusLabel}</span>${scheduledBadge}</td>
         <td><strong style="color:var(--primary);">${formatPrice(o.price)}</strong></td>
