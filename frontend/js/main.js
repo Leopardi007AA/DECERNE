@@ -2587,9 +2587,31 @@ async function buildStoreSearchCardElement(offerOrStore) {
 /**
  * Helper: Crea l'elemento DOM della card prodotto (usato da renderOffers)
  */
+// Tracciamento visualizzazioni reali: un'offerta conta come "vista" solo la
+// prima volta che la sua card entra davvero nel viewport, non ogni volta che
+// il DOM viene ricostruito (renderOffers() viene richiamato da decine di
+// azioni del pannello partner, anche a griglia pubblica non visibile).
+const countedOfferViews = new Set();
+let offerViewCountObserver = null;
+
+function getOfferViewCountObserver() {
+  if (!offerViewCountObserver) {
+    offerViewCountObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const offerId = entry.target.dataset.offerId;
+        offerViewCountObserver.unobserve(entry.target);
+        if (!offerId || countedOfferViews.has(offerId)) return;
+        countedOfferViews.add(offerId);
+        supabaseClient.rpc('increment_offer_stat', { p_offer_id: offerId, p_field: 'views' })
+          .then(({ error }) => { if (error) console.warn("Errore views:", error); });
+      });
+    }, { threshold: 0.5 });
+  }
+  return offerViewCountObserver;
+}
+
 function createOfferCardElement(o) {
-  supabaseClient.rpc('increment_offer_stat', { p_offer_id: o.id, p_field: 'views' })
-    .then(({ error }) => { if (error) console.warn("Errore views:", error); });
   const card = document.createElement("div");
   
   const isEnterprise = o.plan === 'Enterprise';
@@ -2678,6 +2700,10 @@ function createOfferCardElement(o) {
   
   card.appendChild(imgCont);
   card.appendChild(info);
+
+  card.dataset.offerId = o.id;
+  getOfferViewCountObserver().observe(card);
+
   return card;
 }
 
