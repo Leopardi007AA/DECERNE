@@ -2531,12 +2531,17 @@ function applyOfferRevealAnimation(grid) {
     } 
     else if (!hasSearchQuery) {
       // Ordinamento di default per piano: solo quando non si sta cercando nulla,
-      // altrimenti si mantiene l'ordine per rilevanza dato da smartFilterOffers
+      // altrimenti si mantiene l'ordine per rilevanza dato da smartFilterOffers.
+      // A parità di piano l'ordine viene mischiato, non lasciato a blocchi per negozio.
       const planWeight = { Enterprise: 4, Professional: 3, Standard: 2, Starter: 1 };
-      filtered.sort((a, b) => (planWeight[b.plan] || 0) - (planWeight[a.plan] || 0));
+      const randomTiebreak = new Map(filtered.map(o => [o, Math.random()]));
+      filtered.sort((a, b) => {
+        const planDiff = (planWeight[b.plan] || 0) - (planWeight[a.plan] || 0);
+        if (planDiff !== 0) return planDiff;
+        return randomTiebreak.get(a) - randomTiebreak.get(b);
+      });
     }
 
-    
 
 // Cerca il negozio direttamente (anche se non ha offerte attive)
 let matchedStore = null;
