@@ -1372,6 +1372,7 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
       businessType: ownerStoreRow.business_type || "",
       websiteUrl: ownerStoreRow.website_url || "",
       shippingProvinces: ownerStoreRow.shipping_provinces ?? null,
+      deliveryDaysByRegion: ownerStoreRow.delivery_days_by_region ?? null,
       locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary, latitude: l.latitude, longitude: l.longitude }))),
       plan: ownerStoreRow.plan,
       subscription: {
@@ -1979,6 +1980,52 @@ async function getUserProvinceForCap(cap) {
   return data || null;
 }
 
+// Calcola (una sola volta per CAP) la regione dell'utente, per applicare
+// eventuali giorni di consegna specifici impostati dal negozio per quella
+// regione (scheda "Territori di Spedizione").
+let __userRegionCache = { cap: null, value: null };
+async function getUserRegionForCap(cap) {
+  if (!cap) return null;
+  if (__userRegionCache.cap === cap) return __userRegionCache.value;
+  const { data, error } = await supabaseClient.rpc('region_for_cap', { p_cap: cap });
+  if (error) { console.warn("Errore calcolo regione dal CAP:", error); return null; }
+  __userRegionCache = { cap, value: data || null };
+  return data || null;
+}
+
+// Aggiunge N giorni lavorativi a una data, saltando sabato e domenica.
+function addBusinessDays(date, days) {
+  const result = new Date(date);
+  let added = 0;
+  while (added < days) {
+    result.setDate(result.getDate() + 1);
+    const day = result.getDay();
+    if (day !== 0 && day !== 6) added++;
+  }
+  return result;
+}
+
+function formatItDate(date) {
+  return date.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+// Calcola l'etichetta con la data di consegna prevista per un'offerta
+// e-commerce. Se il negozio ha impostato giorni diversi per la regione
+// dell'utente (regionOverride, dalla scheda Spedizioni), quelli sostituiscono
+// i giorni min/max dell'offerta; altrimenti si usano questi ultimi.
+function computeDeliveryDateLabel(minDays, maxDays, regionOverride) {
+  const min = regionOverride ? regionOverride.min : minDays;
+  const max = regionOverride ? regionOverride.max : maxDays;
+  if (min == null || max == null) return null;
+  const today = new Date();
+  const dateMin = addBusinessDays(today, min);
+  const dateMax = addBusinessDays(today, max);
+  const label = min === max
+    ? `Consegna prevista entro ${formatItDate(dateMin)}`
+    : `Consegna prevista tra il ${formatItDate(dateMin)} e il ${formatItDate(dateMax)}`;
+  return { label };
+}
+
 // Le province di Sicilia e Sardegna impiegano in genere qualche giorno
 // lavorativo in più per la consegna via corriere rispetto al resto d'Italia:
 // la data mostrata nel popup prodotto ne tiene conto quando conosciamo la
@@ -2043,6 +2090,7 @@ async function enrichOffersWithEcommerceStores(offersFlat, rawRows) {
     o.storeId = o.storeId || raw.store_id || "";
     o.isEcommerce = store?.business_type === 'E-commerce';
     o.shippingProvinces = store?.shipping_provinces || null;
+    o.deliveryDaysByRegion = store?.delivery_days_by_region || null;
   });
 }
 
@@ -2066,7 +2114,7 @@ async function fetchPublicStoresMap(storeIds) {
 
   const { data, error } = await supabaseClient
     .from('public_stores')
-    .select('id, name, city, cap, address, plan, logo_url, phone, hours, website_url, business_type, shipping_provinces')
+    .select('id, name, city, cap, address, plan, logo_url, phone, hours, website_url, business_type, shipping_provinces, delivery_days_by_region')
     .in('id', uniqueIds);
 
   if (error) console.error("Errore caricamento dati negozi pubblici:", error);
@@ -7050,6 +7098,7 @@ async function refreshPartnerSession(storeId) {
       businessType: storeRow.business_type || "",
       websiteUrl: storeRow.website_url || "",
       shippingProvinces: storeRow.shipping_provinces ?? null,
+      deliveryDaysByRegion: storeRow.delivery_days_by_region ?? null,
       locations: sortLocationsPrimaryFirst((locationsRows || []).map(l => ({ id: l.id, name: l.name, address: l.address, city: l.city || "", cap: l.cap || "", isPrimary: !!l.is_primary, latitude: l.latitude != null ? parseFloat(l.latitude) : null, longitude: l.longitude != null ? parseFloat(l.longitude) : null }))),
       plan: storeRow.plan,
       subscription: {
@@ -8352,6 +8401,7 @@ async function handleOnboardingSubmit(step) {
         businessType: storeRow.business_type || "",
         websiteUrl: storeRow.website_url || "",
         shippingProvinces: storeRow.shipping_provinces ?? null,
+        deliveryDaysByRegion: storeRow.delivery_days_by_region ?? null,
         locations: isEcom ? [] : [{ id: locationRow.id, name: "Sede Principale", address: fullAddress, city: storeData.tempReg.city, cap: storeData.tempReg.cap, isPrimary: true, latitude: initialCoords?.lat ?? null, longitude: initialCoords?.lng ?? null }],
         plan: storeRow.plan,
         subscription: isDirectActivation ? {
@@ -9278,17 +9328,17 @@ function displayProductInModal(product) {
   // Se conosciamo il CAP dell'utente, ricalcola la data di consegna tenendo
   // conto della provincia (es. giorni extra per Sicilia e Sardegna), senza
   // bloccare l'apertura del popup nel frattempo.
-  if (isEcomProduct && product.deliveryDaysMin != null && product.deliveryDaysMax != null) {
+  if (isEcomProduct && deliveryLabel) {
     (async () => {
       const userCap = getCleanUserCap();
       if (!userCap) return;
-      const userProvince = await getUserProvinceForCap(userCap);
-      if (!userProvince) return;
-      const zoneInfo = computeDeliveryDateLabel(product.deliveryDaysMin, product.deliveryDaysMax, userProvince);
+      const userRegion = await getUserRegionForCap(userCap);
+      if (!userRegion) return;
+      const override = product.deliveryDaysByRegion && product.deliveryDaysByRegion[userRegion];
+      if (!override) return;
+      const info = computeDeliveryDateLabel(product.deliveryDaysMin, product.deliveryDaysMax, override);
       const el = document.getElementById('productDeliveryLabel');
-      if (el && zoneInfo) {
-        el.textContent = zoneInfo.label + (zoneInfo.zoneNote ? ` (${zoneInfo.zoneNote})` : '');
-      }
+      if (el && info) el.textContent = info.label;
     })();
   }
 
@@ -10396,6 +10446,7 @@ async function drawShippingTab() {
 
   const allItaly = !Array.isArray(partner.shippingProvinces);
   const selected = new Set(allItaly ? provinces.map(p => p.sigla) : partner.shippingProvinces);
+  const regionOverrides = partner.deliveryDaysByRegion || {};
   const byRegion = {};
   provinces.forEach(p => {
     if (!byRegion[p.regione]) byRegion[p.regione] = [];
@@ -10425,11 +10476,29 @@ async function drawShippingTab() {
               </label>
             `).join('')}
           </div>
+          <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #e2e8f0; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; color:#475569;">
+              <input type="checkbox" class="ship-region-override-cb" data-region="${escapeHtml(region)}" ${regionOverrides[region] ? 'checked' : ''}>
+              Tempi di consegna diversi per questa regione
+            </label>
+            <span class="ship-region-days" data-region="${escapeHtml(region)}" style="display:${regionOverrides[region] ? 'inline-flex' : 'none'}; align-items:center; gap:6px; font-size:0.85rem;">
+              da <input type="number" class="ship-region-min" data-region="${escapeHtml(region)}" min="0" max="60" value="${regionOverrides[region]?.min ?? ''}" style="width:56px; padding:4px 6px; border:1px solid #cbd5e1; border-radius:6px;">
+              a <input type="number" class="ship-region-max" data-region="${escapeHtml(region)}" min="0" max="60" value="${regionOverrides[region]?.max ?? ''}" style="width:56px; padding:4px 6px; border:1px solid #cbd5e1; border-radius:6px;">
+              giorni lavorativi
+            </span>
+          </div>
         </details>
       `).join('')}
     </div>
     <button class="btn" style="margin-top:18px; width:100%;" onclick="saveShippingTerritories()">Salva territori</button>
   `;
+
+  body.querySelectorAll('.ship-region-override-cb').forEach(cb => {
+    cb.onchange = () => {
+      const span = body.querySelector(`.ship-region-days[data-region="${CSS.escape(cb.dataset.region)}"]`);
+      if (span) span.style.display = cb.checked ? 'inline-flex' : 'none';
+    };
+  });
 
   // Ruota la freccetta quando la tendina della regione si apre o si chiude.
   body.querySelectorAll('#shipRegions details').forEach(det => {
@@ -10478,11 +10547,27 @@ window.saveShippingTerritories = async () => {
   // Tutte le province selezionate = "tutta Italia" (NULL), così vale anche per le province future.
   const value = chosen.length === boxes.length ? null : chosen;
 
+  let deliveryDaysByRegion = null;
+  const overrideBoxes = Array.from(document.querySelectorAll('#shippingTabBody .ship-region-override-cb'));
+  for (const cb of overrideBoxes) {
+    if (!cb.checked) continue;
+    const region = cb.dataset.region;
+    const minInput = document.querySelector(`.ship-region-min[data-region="${CSS.escape(region)}"]`);
+    const maxInput = document.querySelector(`.ship-region-max[data-region="${CSS.escape(region)}"]`);
+    const min = parseInt(minInput.value, 10);
+    const max = parseInt(maxInput.value, 10);
+    if (!Number.isInteger(min) || !Number.isInteger(max) || min < 0 || max > 60 || min > max) {
+      return toast.error(`Imposta giorni di consegna validi per ${region} (da 0 a 60, minimo non superiore al massimo).`);
+    }
+    if (!deliveryDaysByRegion) deliveryDaysByRegion = {};
+    deliveryDaysByRegion[region] = { min, max };
+  }
+
   const { data: row, error } = await storeAuthClient
     .from('stores')
-    .update({ shipping_provinces: value })
+    .update({ shipping_provinces: value, delivery_days_by_region: deliveryDaysByRegion })
     .eq('id', partner.id)
-    .select('shipping_provinces')
+    .select('shipping_provinces, delivery_days_by_region')
     .single();
 
   if (error) {
@@ -10491,6 +10576,7 @@ window.saveShippingTerritories = async () => {
   }
 
   partner.shippingProvinces = row.shipping_provinces ?? null;
+  partner.deliveryDaysByRegion = row.delivery_days_by_region ?? null;
   const dataString = JSON.stringify(partner);
   sessionStorage.setItem(SESSION_PARTNER, dataString);
   localStorage.setItem(PARTNER_AUTH_KEY, dataString);
