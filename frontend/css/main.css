@@ -3663,6 +3663,15 @@ hr {
   @media (max-width: 600px) {
     .api-key-actions-inline { display: none !important; }
     .actions-kebab-wrap { display: inline-flex; }
+    #apiKeyDisplay {
+      flex: 0 1 150px !important;
+      width: 150px !important;
+      min-width: 0;
+      padding: 12px 10px !important;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   }
   
   /* --- Box contenuto: linee curve "stonate" invece di riquadri netti --- */
