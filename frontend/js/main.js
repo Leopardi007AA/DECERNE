@@ -1363,6 +1363,7 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
       latitude: ownerStoreRow.latitude,
       longitude: ownerStoreRow.longitude,
       logo: ownerStoreRow.logo_url || "",
+      mapLogo: ownerStoreRow.map_logo_url || "",
       phone: ownerStoreRow.phone || "",
       hours: ownerStoreRow.hours || "",
       internalNotes: ownerStoreRow.internal_notes || "",
@@ -1429,6 +1430,7 @@ window.saveStoreProfile = async (e) => {
     // davvero richiederebbe il flusso di verifica di Supabase Auth, non lo facciamo qui.
     const nameInput = document.getElementById("profName");
     const logoInput = document.getElementById("profLogo");
+    const mapLogoInput = document.getElementById("profMapLogo");
     const hoursInput = document.getElementById("profHours");
     const notesInput = document.getElementById("profNotes");
     const cardNameInput = document.getElementById("profCardName");
@@ -1442,6 +1444,7 @@ window.saveStoreProfile = async (e) => {
 
     const newName = clean(nameInput?.value || "");
     const newLogo = clean(logoInput?.value || "");
+    const newMapLogo = clean(mapLogoInput?.value || "");
 
     const { data: storeRow, error } = await storeAuthClient
       .from('stores')
@@ -1450,6 +1453,7 @@ window.saveStoreProfile = async (e) => {
         phone: getPhoneInputValue('profTelPrefix', 'profTel'),
         hours: clean(hoursInput?.value || ""),
         logo_url: newLogo,
+        map_logo_url: newMapLogo,
         internal_notes: clean(notesInput?.value || ""),
         membership_card_name: clean(cardNameInput?.value || ""),
         membership_card_image_url: clean(cardImageInput?.value || ""),
@@ -1473,6 +1477,7 @@ window.saveStoreProfile = async (e) => {
       hours: storeRow.hours || "",
       internalNotes: storeRow.internal_notes || "",
       logo: storeRow.logo_url || "",
+      mapLogo: storeRow.map_logo_url || "",
       address: storeRow.address,
       city: storeRow.city,
       cap: storeRow.cap,
@@ -3160,6 +3165,12 @@ function renderProfileTab() {
         <div class="input-group">
           <label>URL Logo Supermercato</label>
           <input type="url" id="profLogo" value="${esc(partner.logo || '')}" placeholder="https://link-immagine.png">
+        </div>
+
+        <div class="input-group">
+          <label>URL Logo Mappa</label>
+          <input type="url" id="profMapLogo" value="${esc(partner.mapLogo || '')}" placeholder="https://link-immagine-piccola.png">
+          <small style="color:#94a3b8;">Usata al posto del logo normale sul pin della mappa: consigliato un file più semplice e leggibile anche in piccolo. Se lo lasci vuoto viene usato il logo normale.</small>
         </div>
 
         ${isEcom ? `
@@ -5134,7 +5145,7 @@ function makeStoreMapIcon(logoUrl) {
 async function fetchAllMapLocations() {
   const { data, error } = await supabaseClient
     .from('public_map_locations')
-    .select('location_id, store_id, location_name, store_name, address, city, cap, latitude, longitude, logo_url, phone, hours, is_primary');
+    .select('location_id, store_id, location_name, store_name, address, city, cap, latitude, longitude, logo_url, map_logo_url, phone, hours, business_type, website_url, is_primary');
 
   if (error) { console.error("Errore caricamento negozi per la mappa:", error); return []; }
   return (data || []).filter(l => l.latitude != null && l.longitude != null);
@@ -5148,7 +5159,7 @@ async function addAllStoresLayer(map, excludeLocationIds = []) {
 
   locations.forEach(loc => {
     if (excludeSet.has(loc.location_id)) return;
-    const marker = L.marker([loc.latitude, loc.longitude], { icon: makeStoreMapIcon(loc.logo_url) }).addTo(map);
+    const marker = L.marker([loc.latitude, loc.longitude], { icon: makeStoreMapIcon(loc.map_logo_url || loc.logo_url) }).addTo(map);
     marker.on('click', () => {
       showStoreInfoPopup({
         id: loc.store_id,
@@ -5156,7 +5167,9 @@ async function addAllStoresLayer(map, excludeLocationIds = []) {
         logo: loc.logo_url,
         address: loc.address || '',
         phone: loc.phone,
-        hours: loc.hours
+        hours: loc.hours,
+        isEcommerce: loc.business_type === 'E-commerce',
+        websiteUrl: loc.website_url
       });
     });
   });
@@ -7140,6 +7153,7 @@ async function refreshPartnerSession(storeId) {
       latitude: storeRow.latitude,
       longitude: storeRow.longitude,
       logo: storeRow.logo_url || "",
+      mapLogo: storeRow.map_logo_url || "",
       phone: storeRow.phone || "",
       hours: storeRow.hours || "",
       internalNotes: storeRow.internal_notes || "",
@@ -8450,6 +8464,7 @@ async function handleOnboardingSubmit(step) {
         city: storeRow.city,
         cap: storeRow.cap,
         logo: storeRow.logo_url || "",
+        mapLogo: storeRow.map_logo_url || "",
         phone: storeRow.phone || "",
         hours: "",
         internalNotes: storeRow.internal_notes || "",
