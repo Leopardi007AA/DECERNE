@@ -89,6 +89,14 @@ let _sessionReady = false; // true solo dopo che restoreUserSession() ha stabili
 window.__isSharedProductLoad = normalizePath(window.location.pathname).startsWith('/prodotto/') ||
   !!(normalizePath(window.location.pathname) === '/carrello' && new URLSearchParams(window.location.search).get('lista'));
 
+// Id della lista condivisa (se presenti) letti subito, prima che il router
+// cambi l'URL (es. verso /accedi durante il login) e li faccia perdere.
+// Servono per riaprire il carrello con la lista giusta appena l'utente si
+// logga — vedi closeFullPageModal.
+window.__pendingSharedListIds = (normalizePath(window.location.pathname) === '/carrello')
+  ? (new URLSearchParams(window.location.search).get('lista') || null)
+  : null;
+
 function navigate(path, { replace = false, state = null } = {}) {
   const base = getBasePath();
   const full = (base + path).replace(/\/{2,}/g, '/') || '/';
@@ -6741,6 +6749,19 @@ function closeFullPageModal() {
         if (typeof window.__cookieChoiceMade === "function" && window.__cookieChoiceMade()) {
           maybeStartTour();
         }
+      }
+
+      // Arrivati da un link di lista condivisa senza essere loggati: appena
+      // il login va a buon fine e questo popup (login/"Il Tuo Profilo") si
+      // chiude, riapriamo subito il carrello con la lista condivisa invece
+      // di tornare alla home. Una tantum per sessione di pagina.
+      if (window.__pendingSharedListIds && !window.__sharedListReopenConsumed && state.currentUser) {
+        window.__sharedListReopenConsumed = true;
+        const base = getBasePath();
+        const url = (base + ROUTES.carrello).replace(/\/{2,}/g, '/') + '?lista=' + encodeURIComponent(window.__pendingSharedListIds);
+        history.replaceState({ path: ROUTES.carrello }, '', url);
+        openFullPageModal('cart');
+        return;
       }
 
       // torna all'URL della vista corrente
