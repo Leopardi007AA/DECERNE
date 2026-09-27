@@ -1736,7 +1736,10 @@ async function refreshMyIntegration() {
   myIntegrationCache = row ? {
     provider: row.provider,
     status: row.status,
-    lastSyncAt: row.last_sync_at
+    lastSyncAt: row.last_sync_at,
+    platform: row.platform,
+    syncMode: row.sync_mode,
+    lastError: row.last_error
   } : null;
 
   if (state.mode === 'store') renderStoreView();
@@ -11877,6 +11880,7 @@ function renderApiTab() {
           Prodotti ricevuti dal tuo gestionale via /inventory-sync. Sola lettura: le bozze d'offerta generate si completano e pubblicano dalla tab "Le mie Offerte".
         </p>
         ${renderIntegrationStatus()}
+        ${renderEcommercePlatformConnect()}
         ${renderSyncedProductsTable()}
       </div>
 
@@ -11925,6 +11929,8 @@ function renderSyncLogTable() {
   `;
 }
 
+const ECOM_PLATFORM_LABELS = { custom: 'Personalizzato', woocommerce: 'WooCommerce', prestashop: 'PrestaShop', shopify: 'Shopify', amazon: 'Amazon' };
+
 function renderIntegrationStatus() {
   if (!myIntegrationCache) {
     return `<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; margin-top:15px; font-size:0.82rem; color:#64748b;">
@@ -11934,6 +11940,7 @@ function renderIntegrationStatus() {
 
   const statusColor = myIntegrationCache.status === 'active' ? '#10b981' : (myIntegrationCache.status === 'error' ? '#ef4444' : '#94a3b8');
   const lastSync = myIntegrationCache.lastSyncAt ? new Date(myIntegrationCache.lastSyncAt).toLocaleString() : 'mai';
+  const isPull = myIntegrationCache.syncMode === 'pull';
 
   return `
     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; margin-top:15px; display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
@@ -11945,12 +11952,133 @@ function renderIntegrationStatus() {
         <div style="font-size:0.7rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.03em;">Ultima sincronizzazione</div>
         <div style="font-size:0.85rem;">${lastSync}</div>
       </div>
-      <div style="flex:1 1 220px; display:flex; gap:8px; align-items:center;">
-        <input type="text" id="integrationProviderInput" value="${esc(myIntegrationCache.provider)}"
-               placeholder="es. Tilby, TeamSystem..."
-               style="flex:1; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:0.85rem;">
-        <button class="btn outline" style="padding:8px 14px; font-size:0.8rem;" onclick="saveIntegrationProvider()">Salva</button>
+      ${isPull ? `
+        <div>
+          <div style="font-size:0.7rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.03em;">Piattaforma collegata</div>
+          <div style="font-size:0.85rem; font-weight:600;">${esc(ECOM_PLATFORM_LABELS[myIntegrationCache.platform] || myIntegrationCache.platform)}</div>
+        </div>
+        <button class="btn outline" style="padding:8px 14px; font-size:0.8rem; margin-left:auto;" onclick="disconnectEcommercePlatform()">Disconnetti</button>
+      ` : `
+        <div style="flex:1 1 220px; display:flex; gap:8px; align-items:center;">
+          <input type="text" id="integrationProviderInput" value="${esc(myIntegrationCache.provider)}"
+                 placeholder="es. Tilby, TeamSystem..."
+                 style="flex:1; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:0.85rem;">
+          <button class="btn outline" style="padding:8px 14px; font-size:0.8rem;" onclick="saveIntegrationProvider()">Salva</button>
+        </div>
+      `}
+    </div>
+    ${myIntegrationCache.lastError ? `
+      <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:10px 14px; margin-top:10px; font-size:0.8rem; color:#b91c1c;">
+        Ultimo errore: ${esc(myIntegrationCache.lastError)}
       </div>
+    ` : ''}
+  `;
+}
+
+window.renderEcomCredentialFields = () => {
+  const platform = document.getElementById('ecomPlatformSelect')?.value || 'woocommerce';
+  const box = document.getElementById('ecomCredentialFields');
+  if (!box) return;
+  const FIELDS = {
+    woocommerce: [
+      { id: 'ecomCredA', label: 'Consumer Key (ck_...)' },
+      { id: 'ecomCredB', label: 'Consumer Secret (cs_...)' }
+    ],
+    prestashop: [
+      { id: 'ecomCredA', label: 'Chiave API Webservice' }
+    ],
+    shopify: [
+      { id: 'ecomCredA', label: 'Access Token (shpat_...)' }
+    ],
+    amazon: []
+  };
+  box.innerHTML = (FIELDS[platform] || []).map(f => `
+    <input type="text" id="${f.id}" placeholder="${esc(f.label)}"
+           style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:0.85rem; margin-top:8px;">
+  `).join('') || `<p style="font-size:0.8rem; color:#94a3b8; margin-top:8px;">Collegamento non ancora disponibile per questa piattaforma.</p>`;
+};
+
+window.connectEcommercePlatform = async () => {
+  const platform = document.getElementById('ecomPlatformSelect')?.value;
+  const shopUrl = (document.getElementById('ecomShopUrlInput')?.value || '').trim();
+  const a = document.getElementById('ecomCredA')?.value?.trim();
+  const b = document.getElementById('ecomCredB')?.value?.trim();
+
+  if (!shopUrl) return toast.error("Inserisci l'indirizzo del tuo sito.");
+
+  let credentials;
+  if (platform === 'woocommerce') {
+    if (!a || !b) return toast.error("Inserisci Consumer Key e Consumer Secret.");
+    credentials = { consumer_key: a, consumer_secret: b };
+  } else if (platform === 'prestashop') {
+    if (!a) return toast.error("Inserisci la chiave API.");
+    credentials = { api_key: a };
+  } else if (platform === 'shopify') {
+    if (!a) return toast.error("Inserisci l'Access Token.");
+    credentials = { access_token: a };
+  } else {
+    return toast.error("Questa piattaforma non è ancora collegabile.");
+  }
+
+  const { error } = await storeAuthClient.rpc('connect_store_integration', {
+    p_platform: platform,
+    p_shop_url: shopUrl,
+    p_credentials: JSON.stringify(credentials)
+  });
+
+  if (error) {
+    console.error("Errore collegamento piattaforma:", error);
+    return toast.error("Errore durante il collegamento. Controlla i dati inseriti.");
+  }
+
+  toast.success("Piattaforma collegata. La prima sincronizzazione avverrà entro un'ora.");
+  refreshMyIntegration();
+};
+
+window.disconnectEcommercePlatform = () => {
+  showConfirm(
+    "Disconnettendo, la sincronizzazione automatica dei prodotti si interrompe. Le offerte già create restano invariate. Procedere?",
+    executeDisconnectEcommercePlatform
+  );
+};
+
+async function executeDisconnectEcommercePlatform() {
+  const { error } = await storeAuthClient.rpc('disconnect_store_integration');
+  if (error) {
+    console.error("Errore disconnessione piattaforma:", error);
+    return toast.error("Errore durante la disconnessione.");
+  }
+  toast.success("Piattaforma disconnessa.");
+  refreshMyIntegration();
+}
+
+function renderEcommercePlatformConnect() {
+  const partner = getCurrentPartner();
+  if (!partner || partner.businessType !== 'E-commerce') return '';
+  if (myIntegrationCache?.syncMode === 'pull') return '';
+
+  return `
+    <div class="card-saas" style="margin-top: 20px;">
+      <h3 style="margin-top:0; font-size: 1rem; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.plug} Collega la tua piattaforma e-commerce</h3>
+      <p style="color: #64748b; font-size: 0.85rem;">
+        In alternativa al gestionale personalizzato, collega direttamente WooCommerce, PrestaShop o Shopify: i prodotti si sincronizzano automaticamente ogni ora.
+      </p>
+      <select id="ecomPlatformSelect" onchange="renderEcomCredentialFields()"
+              style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:0.85rem; margin-top:10px;">
+        <option value="woocommerce">WooCommerce</option>
+        <option value="prestashop">PrestaShop</option>
+        <option value="shopify">Shopify</option>
+        <option value="amazon">Amazon (in arrivo)</option>
+      </select>
+      <input type="text" id="ecomShopUrlInput" placeholder="Indirizzo del tuo sito (es. https://tuosito.it)"
+             style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:0.85rem; margin-top:8px;">
+      <div id="ecomCredentialFields">
+        <input type="text" id="ecomCredA" placeholder="Consumer Key (ck_...)"
+               style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:0.85rem; margin-top:8px;">
+        <input type="text" id="ecomCredB" placeholder="Consumer Secret (cs_...)"
+               style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:0.85rem; margin-top:8px;">
+      </div>
+      <button class="btn" style="margin-top: 12px;" onclick="connectEcommercePlatform()">Connetti</button>
     </div>
   `;
 }
