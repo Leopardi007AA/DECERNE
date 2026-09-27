@@ -1381,6 +1381,8 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
         startedAt: ownerStoreRow.trial_started_at,
         renewalDate: ownerStoreRow.renewal_date,
         billingCycle: ownerStoreRow.billing_cycle || 'monthly',
+        pendingPlan: ownerStoreRow.pending_plan || null,
+        pendingCycle: ownerStoreRow.pending_billing_cycle || null,
         daysLeft: ownerStoreRow.subscription_status === 'trial' && ownerStoreRow.trial_started_at
           ? Math.max(0, 30 - Math.floor((Date.now() - Date.parse(ownerStoreRow.trial_started_at)) / (24*60*60*1000)))
           : 30
@@ -7112,6 +7114,8 @@ async function refreshPartnerSession(storeId) {
         startedAt: storeRow.trial_started_at,
         renewalDate: storeRow.renewal_date,  // FIX: idem, spariva ad ogni refresh
         billingCycle: storeRow.billing_cycle || 'monthly',
+        pendingPlan: storeRow.pending_plan || null,
+        pendingCycle: storeRow.pending_billing_cycle || null,
         daysLeft: storeRow.subscription_status === 'trial' && storeRow.trial_started_at
           ? Math.max(0, 30 - Math.floor((Date.now() - Date.parse(storeRow.trial_started_at)) / (24*60*60*1000)))
           : 30
@@ -7770,9 +7774,12 @@ const getPlanButton = (planName, priceText) => {
     return `<button class="btn full-width disabled" disabled title="Disponibile dal giorno di scadenza">Piano Attuale</button>`;
   }
 
-  // Il partner è loggato e sta guardando un piano superiore al suo (upgrade diretto, no trial)
+  // Il partner è loggato e sta guardando un piano superiore al suo: upgrade, con scelta subito/alla scadenza
   if (partner && PLAN_LEVELS[currentPlan] < PLAN_LEVELS[planName]) {
-    return `<button class="btn full-width" onclick="activatePlan('${planName}')">Passa a ${planName}</button>`;
+    if (currentSub?.pendingPlan === planName) {
+      return `<button class="btn full-width disabled" disabled title="Partirà automaticamente alla scadenza del piano attuale">Già programmato</button>`;
+    }
+    return `<button class="btn full-width" onclick="openUpgradeChoiceModal('${planName}', '${cycle}')">Passa a ${planName}</button>`;
   }
 
   // Prova gratuita SOLO per Starter mensile. Ogni altra combinazione piano/ciclo
@@ -9770,6 +9777,118 @@ function showConfirm(message, onConfirm, confirmColor = '#ff3b30') {
 }
 
 
+/**
+ * Mostra la scelta tra attivare subito un piano superiore (sostituendo quello
+ * attuale da oggi) oppure programmarlo per quando scade il piano in corso.
+ */
+window.openUpgradeChoiceModal = function(planName, cycle) {
+  const partner = getCurrentPartner();
+  if (!partner) return;
+  const sub = partner.subscription || {};
+  const renewalLabel = sub.renewalDate ? new Date(sub.renewalDate).toLocaleDateString('it-IT') : 'la prossima scadenza';
+
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9999; display:flex; align-items:flex-end; justify-content:center; padding-bottom:30px;";
+
+  const box = document.createElement("div");
+  box.style.cssText = "background:white; padding:20px; border-radius:20px; width:90%; max-width:420px; box-shadow:0 10px 40px rgba(0,0,0,0.2); text-align:center; animation: slideUp 0.3s ease-out;";
+
+  box.innerHTML = `
+    <p style="margin-bottom:20px; font-weight:600; color:#161616;">Come vuoi passare a ${planName}?</p>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <button id="upgradeNowBtn" class="btn" style="width:100%">Attiva subito (sostituisce il piano attuale)</button>
+      <button id="upgradeLaterBtn" class="btn outline" style="width:100%">Parti dal ${renewalLabel} (finisci di usare il piano attuale)</button>
+      <button id="upgradeCancelBtn" class="btn outline" style="width:100%; border-color:transparent; color:#64748b;">Annulla</button>
+    </div>
+  `;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  box.querySelector("#upgradeCancelBtn").onclick = () => overlay.remove();
+  box.querySelector("#upgradeNowBtn").onclick = () => {
+    overlay.remove();
+    activatePlan(planName, cycle);
+  };
+  box.querySelector("#upgradeLaterBtn").onclick = () => {
+    overlay.remove();
+    scheduleUpgrade(planName, cycle);
+  };
+};
+
+/**
+ * Programma un upgrade: il piano attuale resta attivo fino alla sua scadenza,
+ * poi parte automaticamente il nuovo piano scelto qui.
+ */
+window.scheduleUpgrade = async function(planName, cycle) {
+  const partner = getCurrentPartner();
+  if (!partner) return toast.error("Esegui il login come partner per programmare un piano.");
+
+  const { data: storeRow, error } = await storeAuthClient
+    .rpc('schedule_store_subscription_change', {
+      p_store_id: partner.id,
+      p_plan: planName,
+      p_cycle: cycle
+    });
+
+  if (error) {
+    console.error("Errore programmazione cambio piano:", error);
+    return toast.error("Errore durante la programmazione del cambio piano.");
+  }
+
+  const updatedStore = {
+    ...partner,
+    subscription: {
+      ...partner.subscription,
+      pendingPlan: storeRow.pending_plan,
+      pendingCycle: storeRow.pending_billing_cycle
+    }
+  };
+  const dataString = JSON.stringify(updatedStore);
+  sessionStorage.setItem(SESSION_PARTNER, dataString);
+  localStorage.setItem(PARTNER_AUTH_KEY, dataString);
+  state.currentStore = updatedStore;
+
+  toast.success(`Passaggio a ${planName} programmato per il ${new Date(storeRow.renewal_date).toLocaleDateString('it-IT')}.`);
+  storeData.step = 'dashboard';
+  storeData.activeTab = 'home';
+  renderStoreView();
+};
+
+/**
+ * Annulla un cambio piano programmato non ancora applicato.
+ */
+window.cancelScheduledPlanChange = async function() {
+  const partner = getCurrentPartner();
+  if (!partner) return;
+
+  showConfirm("Vuoi annullare il cambio piano programmato?", async () => {
+    const { data: storeRow, error } = await storeAuthClient
+      .rpc('cancel_scheduled_subscription_change', { p_store_id: partner.id });
+
+    if (error) {
+      console.error("Errore annullamento cambio piano:", error);
+      return toast.error("Errore durante l'annullamento.");
+    }
+
+    const updatedStore = {
+      ...partner,
+      subscription: {
+        ...partner.subscription,
+        pendingPlan: null,
+        pendingCycle: null
+      }
+    };
+    const dataString = JSON.stringify(updatedStore);
+    sessionStorage.setItem(SESSION_PARTNER, dataString);
+    localStorage.setItem(PARTNER_AUTH_KEY, dataString);
+    state.currentStore = updatedStore;
+
+    toast.success("Cambio piano programmato annullato.");
+    renderStoreView();
+  }, '#0f62fe');
+};
+
 // Banner speciale con tasto "Annulla"
 function showUndoBanner(message, offerId) {
   const banner = document.createElement("div");
@@ -9931,6 +10050,20 @@ function getSubscriptionBanner() {
   const partner = getCurrentPartner();
   if (!partner || !partner.subscription) return "";
 
+  if (partner.subscription.pendingPlan) {
+    const pendingRenewalLabel = partner.subscription.renewalDate
+      ? new Date(partner.subscription.renewalDate).toLocaleDateString('it-IT')
+      : 'alla prossima scadenza';
+    return `
+      <div class="upgrade-banner banner-info">
+        <div>
+          <strong>Cambio piano programmato: ${partner.subscription.pendingPlan}</strong>
+          <small style="display: block; opacity: 0.8;">Partirà automaticamente il ${pendingRenewalLabel}, alla scadenza del piano attuale.</small>
+        </div>
+        <button class="btn outline" onclick="cancelScheduledPlanChange()">Annulla</button>
+      </div>`;
+  }
+
   const sub = partner.subscription;
   const plan = partner.plan || 'Starter';
   const today = new Date();
@@ -9989,6 +10122,20 @@ function getSubscriptionBanner() {
         </div>
         ${nextPlan ? `<button class="btn" style="background: #3b82f6;" onclick="storeData.step='pricing'; renderStoreView();">Passa a ${nextPlan}</button>` : ''}
       </div>`;
+  }
+
+  if (sub.status === 'active') {
+    const nextPlan = getNextPlan(plan);
+    if (nextPlan) {
+      return `
+        <div class="upgrade-banner banner-info">
+          <div>
+            <strong>Fai crescere il tuo negozio con ${nextPlan}</strong>
+            <small style="display: block; opacity: 0.8;">Sblocca nuove funzionalità quando vuoi.</small>
+          </div>
+          <button class="btn" style="background: #3b82f6;" onclick="openUpgradeChoiceModal('${nextPlan}', '${sub.billingCycle || 'monthly'}')">Passa a ${nextPlan}</button>
+        </div>`;
+    }
   }
 
   return "";
@@ -10104,7 +10251,9 @@ window.activatePlan = async function(planName, forceCycle) {
         plan: storeRow.plan,
         status: storeRow.subscription_status,
         renewalDate: storeRow.renewal_date,
-        billingCycle: storeRow.billing_cycle || cycle
+        billingCycle: storeRow.billing_cycle || cycle,
+        pendingPlan: storeRow.pending_plan || null,
+        pendingCycle: storeRow.pending_billing_cycle || null
       }
     };
     const dataString = JSON.stringify(updatedStore);
