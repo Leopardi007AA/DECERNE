@@ -3945,6 +3945,41 @@ async function logoutUser() {
   toast.info(TEXT.auth.logoutBtn);
 }
 
+function promptPasswordThenDeleteAccount() {
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9999; display:flex; align-items:flex-end; justify-content:center; padding-bottom:30px;";
+
+  const box = document.createElement("div");
+  box.style.cssText = "background:white; padding:20px; border-radius:20px; width:90%; max-width:400px; box-shadow:0 10px 40px rgba(0,0,0,0.2); text-align:center;";
+
+  box.innerHTML = `
+    <p style="margin-bottom:10px; font-weight:600; color:#161616;">Per sicurezza, conferma la password prima di eliminare l'account.</p>
+    <input type="password" id="deleteAccountPwd" placeholder="Password" style="width:100%; padding:10px; margin-bottom:6px; border-radius:10px; border:1px solid #ddd;">
+    <p id="deleteAccountPwdErr" style="color:#ff3b30; font-size:0.8rem; min-height:1.1em; margin-bottom:10px;"></p>
+    <div style="display:flex; gap:10px;">
+      <button id="deleteAccountPwdCancel" class="btn outline" style="flex:1">Annulla</button>
+      <button id="deleteAccountPwdConfirm" class="btn" style="flex:1; background:#ff3b30">Conferma</button>
+    </div>
+  `;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  box.querySelector("#deleteAccountPwdCancel").onclick = () => overlay.remove();
+  box.querySelector("#deleteAccountPwdConfirm").onclick = async () => {
+    const pwd = box.querySelector("#deleteAccountPwd").value;
+    const errEl = box.querySelector("#deleteAccountPwdErr");
+    const email = state.currentUser?.email;
+    if (!pwd || !email) { errEl.textContent = "Inserisci la password."; return; }
+
+    const { error: reauthError } = await supabaseClient.auth.signInWithPassword({ email, password: pwd });
+    if (reauthError) { errEl.textContent = "Password errata."; return; }
+
+    overlay.remove();
+    deleteAccount();
+  };
+}
+
 function deleteAccount() {
   showConfirm("Sei sicuro di voler eliminare definitivamente il tuo account? L'operazione non si può annullare.", async () => {
     try {
@@ -3964,7 +3999,13 @@ function deleteAccount() {
       });
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Errore eliminazione account.");
+      if (!response.ok) {
+        if (result.error === "reauth_required") {
+          toast.error(result.message || "Effettua di nuovo l'accesso e riprova.");
+          return;
+        }
+        throw new Error(result.error || "Errore eliminazione account.");
+      }
 
       await supabaseClient.auth.signOut();
       state.currentUser = null;
@@ -6405,7 +6446,7 @@ function renderProfileInfo() {
         <button type="submit" class="btn">Salva Modifiche</button>
         <div style="display: flex; gap: 10px; margin-top: 20px;">
         <button type="button" class="btn outline" onclick="logoutUser()" style="flex: 1;">Esci dall'account</button>
-        <button type="button" class="btn danger" onclick="deleteAccount()" style="flex: 1;">Elimina Account</button>
+        <button type="button" class="btn danger" onclick="promptPasswordThenDeleteAccount()" style="flex: 1;">Elimina Account</button>
         </div>
       </form>
     </div>
