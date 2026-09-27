@@ -92,10 +92,13 @@ window.__isSharedProductLoad = normalizePath(window.location.pathname).startsWit
 // Id della lista condivisa (se presenti) letti subito, prima che il router
 // cambi l'URL (es. verso /accedi durante il login) e li faccia perdere.
 // Servono per riaprire il carrello con la lista giusta appena l'utente si
-// logga — vedi closeFullPageModal.
+// logga — vedi closeFullPageModal. Con login social il ritorno dal provider
+// è un reload completo della pagina: in quel caso l'id non è più nell'URL,
+// quindi lo recuperiamo da sessionStorage (salvato lì da signInWithProvider
+// prima del redirect).
 window.__pendingSharedListIds = (normalizePath(window.location.pathname) === '/carrello')
   ? (new URLSearchParams(window.location.search).get('lista') || null)
-  : null;
+  : (sessionStorage.getItem('decerne_pending_shared_list') || null);
 
 function navigate(path, { replace = false, state = null } = {}) {
   const base = getBasePath();
@@ -6225,6 +6228,12 @@ async function signInWithProvider(provider, intent = 'register') {
   try {
     showLoading();
     sessionStorage.setItem('decerne_oauth_intent', intent);
+    // Se si stava per vedere una lista condivisa, salviamo gli id anche qui:
+    // dopo il redirect al provider la pagina ricarica da zero e la variabile
+    // in memoria (window.__pendingSharedListIds) andrebbe persa.
+    if (window.__pendingSharedListIds) {
+      sessionStorage.setItem('decerne_pending_shared_list', window.__pendingSharedListIds);
+    }
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider,
       options: { redirectTo: window.location.origin + window.location.pathname }
@@ -6757,6 +6766,7 @@ function closeFullPageModal() {
       // di tornare alla home. Una tantum per sessione di pagina.
       if (window.__pendingSharedListIds && !window.__sharedListReopenConsumed && state.currentUser) {
         window.__sharedListReopenConsumed = true;
+        sessionStorage.removeItem('decerne_pending_shared_list');
         const base = getBasePath();
         const url = (base + ROUTES.carrello).replace(/\/{2,}/g, '/') + '?lista=' + encodeURIComponent(window.__pendingSharedListIds);
         history.replaceState({ path: ROUTES.carrello }, '', url);
