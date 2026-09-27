@@ -3163,7 +3163,7 @@ function renderProfileTab() {
         </div>
 
         <div class="input-group">
-          <label>URL Logo Supermercato</label>
+          <label>URL Logo Negozio</label>
           <input type="url" id="profLogo" value="${esc(partner.logo || '')}" placeholder="https://link-immagine.png">
         </div>
 
@@ -4692,7 +4692,7 @@ async function tourRenderDemoMap() {
   const demoStoresById = {
     [demoLocationId]: {
       id: demoLocationId,
-      name: "Supermercato Demo",
+      name: "Negozio Demo",
       latitude: center.lat,
       longitude: center.lng,
       approximateLocation: true
