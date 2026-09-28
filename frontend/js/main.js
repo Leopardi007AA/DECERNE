@@ -7967,7 +7967,7 @@ const isAnnual = isAnnualView;
             <li>Export dei dati in CSV quando serve</li>
             <li>Account manager dedicato e SLA concordato via contratto</li>
           </ul>
-          <button class="btn outline full-width">Contattaci</button>
+          <button class="btn outline full-width" onclick="openEmailContact('contact@decerne.it', 'Richiesta informazioni sui piani')">Contattaci</button>
         </div>
       </div>
 
