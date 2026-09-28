@@ -11821,7 +11821,7 @@ function renderApiTab() {
       
       ${partner.plan === 'Enterprise' ? `
         <!-- VISUALIZZAZIONE COMPLETA: Solo Enterprise -->
-        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; margin-top: 15px; font-size: 0.8rem; color: #1e3a8a;">
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; margin-top: 15px; font-size: 0.8rem; color: #1e3a8a; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap;">
           <strong>Base URL:</strong> https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/offers<br>
           <strong>Autenticazione:</strong> header <code>x-api-key</code> con la chiave qui sopra (nessun altro header richiesto)
         </div>
@@ -11923,7 +11923,7 @@ function renderApiTab() {
         <div style="margin-top: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
           
           <!-- Endpoint incluso nel piano Professional -->
-          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.8rem; color: #1e3a8a;">
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.8rem; color: #1e3a8a; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap;">
             <strong>Base URL:</strong> https://noqdpjlbmyjqzlmstfvx.supabase.co/functions/v1/offers<br>
             <strong>Autenticazione:</strong> header <code>x-api-key</code> con la chiave qui sopra (nessun altro header richiesto)
           </div>
