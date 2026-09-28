@@ -14,8 +14,13 @@ function escapeAttr(str) {
     .replace(/>/g, '&gt;');
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 module.exports = async (req, res) => {
-  const { id } = req.query;
+  // Se il parametro è ripetuto nell'URL, req.query.id arriva come array: lo scartiamo.
+  // Un id che non è un UUID valido non deve mai raggiungere la query a Supabase.
+  const rawId = req.query.id;
+  const id = typeof rawId === 'string' && UUID_RE.test(rawId) ? rawId : null;
   // Percorso relativo al file stesso (frontend/api/prodotto/[id].js), non a
   // process.cwd() — nel bundle Vercel mantiene la struttura frontend/api/...,
   // quindi process.cwd() punta alla root del repo, non a frontend/.
@@ -23,6 +28,7 @@ module.exports = async (req, res) => {
   let html = fs.readFileSync(indexPath, 'utf8');
 
   try {
+    if (!id) throw new Error('id non valido, salto la ricerca offerta');
     const url = `${SUPABASE_URL}/rest/v1/offers?id=eq.${encodeURIComponent(id)}&deleted_at=is.null&select=product,price,original_price,img_url,status,end_date`;
     const resp = await fetch(url, {
       headers: {
