@@ -11460,9 +11460,16 @@ window.exportOffersToCSV = () => {
     // Recupero nome sede
     const locName = locations.find(l => l.id === o.location_id)?.name || "Sede Principale";
 
-    // Pulizia testi (evita che virgole nel nome prodotto rompano il CSV)
-    const safeProduct = `"${o.product.replace(/"/g, '""')}"`;
-    const safeLoc = `"${locName.replace(/"/g, '""')}"`;
+    // Pulizia testi: escape delle virgolette (evita che rompano il CSV) e, se il valore
+    // inizia con = + - @ o un carattere di tabulazione/ritorno a capo, un apice davanti,
+    // altrimenti Excel/Sheets lo interpreta come formula (CSV injection).
+    const csvSafe = (value) => {
+      let v = String(value);
+      if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
+      return `"${v.replace(/"/g, '""')}"`;
+    };
+    const safeProduct = csvSafe(o.product);
+    const safeLoc = csvSafe(locName);
 
     return [
       safeProduct,
