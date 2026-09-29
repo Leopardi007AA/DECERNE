@@ -4949,6 +4949,7 @@ async function renderMultiStopMap(cart, overrideStoresById, options = {}) {
         speakVoiceMessage(visitOrder.length === 1
           ? `Percorso pronto. Direzione ${firstStopName}.`
           : `Percorso pronto con ${visitOrder.length} tappe. Prima tappa: ${firstStopName}.`);
+        if (multiRoute && multiRoute.startFollow) speakVoiceMessage(`${multiRoute.startFollow}.`);
       }
       addAllStoresLayer(cartMap, visitOrder.map(s => s.id)); // gli altri negozi, solo come riferimento
       cartMap.fitBounds(bounds, { padding: [40, 40] });
@@ -4996,6 +4997,12 @@ let cartLastHeading = null;
 let cartWrongDirectionCount = 0;
 let cartWrongDirectionAnnounced = false;
 let cartOffRouteCount = 0;
+let cartOnRouteStreak = 0;
+let cartUturnAnnounced = false;
+let cartUturnCheckInFlight = false;
+let cartPassedManeuvers = [];
+let cartLastSpokenText = '';
+let cartLastSpokenTime = 0;
 
 function computeVisitOrder(startLat, startLng, stores) {
   const remaining = [...stores];
@@ -5037,7 +5044,8 @@ async function requestOsrmRoute(coordsStr) {
       totalDistanceKm: r.distance / 1000,
       totalDurationMin: r.duration / 60,
       legs: r.legs.map(l => ({ distanceKm: l.distance / 1000, durationMin: l.duration / 60 })),
-      maneuvers: buildManeuverList(r.legs)
+      maneuvers: buildManeuverList(r.legs),
+      startFollow: startFollowText(r.legs)
     };
   }
   return null;
@@ -5131,15 +5139,44 @@ function maneuverInstructionText(step, exitVia) {
   }
 }
 
+// Sotto questa distanza due manovre vengono annunciate insieme ("poi subito...")
+const CLOSE_MANEUVER_DIST_M = 180;
+// Un tratto dritto più lungo di così viene ricordato dopo la svolta
+const FOLLOW_MIN_DIST_M = 500;
+
+function formatFollowDistance(m) {
+  if (m >= 1000) {
+    const km = Math.round(m / 100) / 10;
+    return km === 1 ? '1 chilometro' : `${String(km).replace('.', ',')} chilometri`;
+  }
+  return `${Math.round(m / 50) * 50} metri`;
+}
+
+function followText(name, distM) {
+  if (!distM || distM < FOLLOW_MIN_DIST_M) return null;
+  const dist = formatFollowDistance(distM);
+  return name ? `Prosegui su ${name} per ${dist}` : `Prosegui dritto per ${dist}`;
+}
+
+// Tratto iniziale (dopo la partenza o dopo un ricalcolo), se è lungo
+function startFollowText(legs) {
+  const first = legs && legs[0] && legs[0].steps && legs[0].steps[0];
+  if (!first || first.maneuver.type !== 'depart') return null;
+  return followText(first.name, first.distance);
+}
+
 // Trasforma gli step di OSRM in una lista piatta di manovre da annunciare,
 // escludendo partenza e arrivo (già gestiti dall'annuncio "sei arrivato a...").
 // Lo step "exit roundabout" non diventa una manovra a sé: la fondiamo
-// nell'annuncio di ingresso, perché la rotonda è troppo piccola perché i
-// due annunci restino separati senza accavallarsi.
+// nell'annuncio di ingresso. Le manovre ravvicinate (es. due rotatorie
+// una dopo l'altra) finiscono in un solo annuncio, così nessuna si perde
+// e non si accavallano più frasi. Ogni manovra ricorda anche la strada
+// che segue e la sua lunghezza, per dire "prosegui su ... per ..." dopo la svolta.
 function buildManeuverList(legs) {
   const manovre = [];
   legs.forEach(leg => {
     const steps = leg.steps || [];
+    const legMan = [];
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
       const type = step.maneuver.type;
@@ -5147,21 +5184,42 @@ function buildManeuverList(legs) {
       if (type === 'exit roundabout' || type === 'exit rotary') continue;
 
       let text;
+      let followStep = step;
       if (type === 'roundabout' || type === 'rotary' || type === 'roundabout turn') {
         const nextStep = steps[i + 1];
         const isExitStep = nextStep && (nextStep.maneuver.type === 'exit roundabout' || nextStep.maneuver.type === 'exit rotary');
         text = maneuverInstructionText(step, isExitStep ? nextStep.name : null);
+        if (isExitStep) followStep = nextStep;
       } else {
         text = maneuverInstructionText(step);
       }
 
-      manovre.push({
+      legMan.push({
         lat: step.maneuver.location[1],
         lng: step.maneuver.location[0],
         text,
-        announcedFar: false
+        announcedFar: false,
+        passed: false,
+        silent: false,
+        follow: followText(followStep.name, followStep.distance)
       });
     }
+
+    for (let a = 0; a < legMan.length; a++) {
+      const head = legMan[a];
+      let prev = head;
+      let count = 1;
+      while (count < 3 && a + 1 < legMan.length) {
+        const next = legMan[a + 1];
+        if (distanceMeters(prev.lat, prev.lng, next.lat, next.lng) > CLOSE_MANEUVER_DIST_M) break;
+        head.text += `, poi subito ${next.text}`;
+        next.silent = true;
+        prev = next;
+        count++;
+        a++;
+      }
+    }
+    manovre.push(...legMan);
   });
   return manovre;
 }
@@ -5351,20 +5409,23 @@ function drawRoutePolyline(coords) {
   }
 }
 
-// Quando il ricalcolo del percorso rigenera le manovre da zero, una svolta
-// già segnalata (annuncio "tra X metri...") non deve tornare "nuova" solo
-// perché è la stessa fisica svolta ricapitata nella lista rigenerata:
-// altrimenti la si annuncia di nuovo a ogni ricalcolo (ogni 20s, o subito
-// se fuori percorso) finché non la si supera.
+// Quando il ricalcolo periodico rigenera le manovre da zero, una svolta già
+// annunciata (o già superata) non deve tornare "nuova" solo perché è la
+// stessa fisica svolta ricapitata nella lista rigenerata: altrimenti la si
+// ripete a ogni ricalcolo (ogni 20s). Si confronta la posizione, non il testo.
 function carryOverManeuverState(oldManeuvers, oldIndex, newManeuvers) {
+  const stessoPunto = (a, b) => distanceMeters(a.lat, a.lng, b.lat, b.lng) < 30;
   const giaAvvisate = oldManeuvers.slice(oldIndex).filter(m => m.announcedFar);
   newManeuvers.forEach(nm => {
-    const stessaSvolta = giaAvvisate.some(om => distanceMeters(nm.lat, nm.lng, om.lat, om.lng) < 25);
-    if (stessaSvolta) nm.announcedFar = true;
+    if (cartPassedManeuvers.some(pm => stessoPunto(nm, pm))) {
+      nm.passed = true;
+    } else if (giaAvvisate.some(om => stessoPunto(nm, om))) {
+      nm.announcedFar = true;
+    }
   });
 }
 
-async function recalculateTrip(currentLat, currentLng) {
+async function recalculateTrip(currentLat, currentLng, isReroute = false) {
   const remainingStops = cartVisitOrder.slice(cartNextStopIndex);
   if (!remainingStops.length) return;
 
@@ -5403,13 +5464,18 @@ async function recalculateTrip(currentLat, currentLng) {
   const multiRoute = await fetchMultiStopRoute(routePoints);
   if (multiRoute) {
     const newManeuvers = multiRoute.maneuvers || [];
-    carryOverManeuverState(cartManeuvers, cartNextManeuverIndex, newManeuvers);
+    if (isReroute) {
+      cartPassedManeuvers = [];
+    } else {
+      carryOverManeuverState(cartManeuvers, cartNextManeuverIndex, newManeuvers);
+    }
     cartMultiRoute = multiRoute;
     cartManeuvers = newManeuvers;
     cartNextManeuverIndex = 0;
     cartManeuverMinDist = Infinity;
     updateTripInfoBar();
     drawRoutePolyline(multiRoute.coords);
+    if (isReroute && cartVoiceEnabled && multiRoute.startFollow) speakVoiceMessage(`${multiRoute.startFollow}.`);
   }
 }
 
@@ -5946,8 +6012,47 @@ function expectedRouteHeading() {
   return null;
 }
 
+// Inversione a U dopo un'uscita dal percorso: la annunciamo solo se la
+// strada su cui siamo è a senso unico (true). Metti false per annunciarla
+// invece solo sulle strade a doppio senso.
+const CART_UTURN_SOLO_SENSO_UNICO = true;
+
+// Chiede a OpenStreetMap (Overpass) se la strada in cui ci troviamo è a senso
+// unico. Restituisce true/false, oppure null se il servizio non risponde.
+async function isRoadOneWay(lat, lng) {
+  const query = `[out:json][timeout:4];way(around:15,${lat},${lng})["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$"];out tags;`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4500);
+  try {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'data=' + encodeURIComponent(query),
+      signal: ctrl.signal
+    });
+    const data = await res.json();
+    const ways = (data.elements || []).map(e => e.tags || {});
+    if (!ways.length) return null;
+    return ways.every(t => {
+      if (t.oneway === 'no') return false;
+      return ['yes', 'true', '1', '-1'].includes(t.oneway) ||
+        t.junction === 'roundabout' ||
+        String(t.highway || '').startsWith('motorway');
+    });
+  } catch (e) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function speakVoiceMessage(text) {
   if (!cartVoiceEnabled || !('speechSynthesis' in window)) return;
+  // Una frase identica già in coda o pronunciata da pochi secondi non si ripete.
+  const now = Date.now();
+  if (cartVoiceQueue.includes(text) || (text === cartLastSpokenText && now - cartLastSpokenTime < 25000)) return;
+  cartLastSpokenText = text;
+  cartLastSpokenTime = now;
   // Ogni messaggio va in coda invece di interrompere quello in corso:
   // così nessun annuncio taglia a metà quello precedente.
   cartVoiceQueue.push(text);
@@ -6098,70 +6203,95 @@ function startLiveTracking() {
       const offRouteThreshold = Math.max(60, (pos.coords.accuracy || 30) + 30);
       const rawOffRoute = cartMultiRoute && distFromRoute > offRouteThreshold;
       // Serve conferma su due letture consecutive: un singolo salto GPS non deve
-      // far scattare ricalcolo e annuncio da solo, altrimenti "sei uscito dal
-      // percorso" si sente troppo spesso.
+      // far scattare ricalcolo e annuncio da solo.
       if (rawOffRoute) {
         cartOffRouteCount++;
+        cartOnRouteStreak = 0;
       } else {
         cartOffRouteCount = 0;
-        cartOffRouteAnnounced = false;
+        cartOnRouteStreak++;
+        // L'uscita dal percorso si considera chiusa solo dopo qualche lettura
+        // stabile sul tracciato: così un GPS ballerino non fa riannunciare tutto.
+        if (cartOnRouteStreak >= 4 && !cartRecalcInFlight && !confirmedWrongDirection) {
+          cartOffRouteAnnounced = false;
+          cartUturnAnnounced = false;
+        }
       }
       const offRoute = cartOffRouteCount >= 2;
-      const recalcWait = (offRoute || confirmedWrongDirection) ? 0 : 20000;
+      const needsReroute = offRoute || confirmedWrongDirection;
+      const recalcWait = needsReroute ? 3000 : 20000;
       if (cartVisitOrder.length && !cartRecalcInFlight && now - cartLastRouteRecalc > recalcWait) {
         cartLastRouteRecalc = now;
         cartRecalcInFlight = true;
-        recalculateTrip(newLat, newLng).finally(() => { cartRecalcInFlight = false; });
+        recalculateTrip(newLat, newLng, needsReroute).finally(() => { cartRecalcInFlight = false; });
       }
 
-      if (cartVoiceEnabled && confirmedWrongDirection) {
-        if (!cartWrongDirectionAnnounced) {
-          speakVoiceMessage("Sembra che tu stia andando in direzione opposta al percorso. Se puoi, fai un'inversione a U: sto ricalcolando la strada.");
-          cartWrongDirectionAnnounced = true;
-        }
-      } else if (cartVoiceEnabled && offRoute) {
-        // Fuori percorso ma non necessariamente in direzione opposta: le
-        // manovre già calcolate si riferiscono ancora alla strada vecchia,
-        // quindi non vanno annunciate finché il ricalcolo avviato sopra non
-        // le sostituisce — altrimenti si sentirebbe un'indicazione sbagliata.
+      if (cartVoiceEnabled && needsReroute) {
+        // Le manovre già calcolate si riferiscono alla strada vecchia: non le
+        // annunciamo finché il ricalcolo non le sostituisce. L'avviso di uscita
+        // dal percorso si dice una volta sola per episodio.
         if (!cartOffRouteAnnounced) {
-          speakVoiceMessage("Sei uscito dal percorso previsto, sto ricalcolando.");
           cartOffRouteAnnounced = true;
+          speakVoiceMessage("Sei uscito dal percorso, sto ricalcolando.");
+        }
+        // Inversione a U: solo se la strada è del tipo scelto (vedi
+        // CART_UTURN_SOLO_SENSO_UNICO), e una sola volta per episodio.
+        if (confirmedWrongDirection && !cartUturnAnnounced && !cartUturnCheckInFlight) {
+          cartUturnCheckInFlight = true;
+          isRoadOneWay(newLat, newLng).then(oneWay => {
+            cartUturnAnnounced = true;
+            if (oneWay === CART_UTURN_SOLO_SENSO_UNICO && cartWrongDirectionCount >= 2) {
+              speakVoiceMessage("Alla prima occasione fai un'inversione a U.");
+            }
+          }).finally(() => { cartUturnCheckInFlight = false; });
         }
       } else if (cartVoiceEnabled && cartManeuvers.length && cartNextManeuverIndex < cartManeuvers.length) {
         // L'anticipo con cui avvisare scala con la velocità: a passo d'uomo
         // restano le soglie minime, ad alta velocità l'anticipo cresce fino
         // a un tetto ragionevole.
         const farAnnounceDist = Math.min(500, Math.max(200, currentSpeedMs * 12));
-        const nearAnnounceDist = Math.min(150, Math.max(45, currentSpeedMs * 5));
+        // Entro questo raggio la manovra conta come raggiunta; da lì ci si
+        // allontana di almeno "jitter" metri prima di darla per superata.
+        const passRadius = Math.max(40, currentSpeedMs * 4);
+        const jitter = Math.max(20, (pos.coords.accuracy || 30) * 0.5);
 
-        // Due manovre molto ravvicinate (es. due rotatorie una dopo l'altra):
-        // cartManeuverMinDist tiene il minimo storico verso la manovra
-        // corrente; se la distanza torna a crescere dopo essere stata
-        // vicina, la consideriamo comunque superata e si passa alla
-        // successiva (fino a 3 per ciclo, per recuperare più salti insieme).
+        // Ogni manovra si annuncia una volta sola. Se ne sono vicine più
+        // d'una il ciclo le supera in fila (fino a 4 per lettura GPS), senza
+        // saltarne nessuna e senza ripetere frasi.
         let guard = 0;
-        while (cartVoiceEnabled && cartNextManeuverIndex < cartManeuvers.length && guard < 3) {
+        while (cartNextManeuverIndex < cartManeuvers.length && guard < 4) {
           guard++;
-          const nextManeuver = cartManeuvers[cartNextManeuverIndex];
-          const distToManeuver = distanceMeters(newLat, newLng, nextManeuver.lat, nextManeuver.lng);
-          if (distToManeuver < cartManeuverMinDist) cartManeuverMinDist = distToManeuver;
-          const wasClose = cartManeuverMinDist <= farAnnounceDist;
-          const movingAway = distToManeuver > cartManeuverMinDist + 20;
-          const reached = distToManeuver < nearAnnounceDist || (wasClose && movingAway);
-
-          if (!nextManeuver.announcedFar && distToManeuver < farAnnounceDist && !reached) {
-            const roundedDist = Math.max(50, Math.round(distToManeuver / 50) * 50);
-            speakVoiceMessage(`Tra ${roundedDist} metri, ${nextManeuver.text}.`);
-            nextManeuver.announcedFar = true;
-          }
-          if (reached) {
-            speakVoiceMessage(`${capitalizeFirst(nextManeuver.text)}.`);
+          const m = cartManeuvers[cartNextManeuverIndex];
+          if (m.passed) {
             cartNextManeuverIndex++;
             cartManeuverMinDist = Infinity;
-          } else {
-            break;
+            continue;
           }
+          const d = distanceMeters(newLat, newLng, m.lat, m.lng);
+          if (d < cartManeuverMinDist) cartManeuverMinDist = d;
+
+          // Manovra mai "toccata" dal GPS ma già sorpassata: la successiva è vicina, questa no
+          const following = cartManeuvers[cartNextManeuverIndex + 1];
+          const overtaken = following && d > passRadius &&
+            distanceMeters(newLat, newLng, following.lat, following.lng) < passRadius;
+          const passed = overtaken ||
+            (cartManeuverMinDist <= passRadius && (d < 15 || d > cartManeuverMinDist + jitter));
+
+          if (!passed && !m.silent && !m.announcedFar && d < farAnnounceDist) {
+            m.announcedFar = true;
+            const roundedDist = Math.max(50, Math.round(d / 50) * 50);
+            speakVoiceMessage(d < 70
+              ? `${capitalizeFirst(m.text)}.`
+              : `Tra ${roundedDist} metri, ${m.text}.`);
+          }
+          if (!passed) break;
+
+          cartPassedManeuvers.push({ lat: m.lat, lng: m.lng });
+          if (cartPassedManeuvers.length > 12) cartPassedManeuvers.shift();
+          // Dopo l'ultima svolta: se la strada è lunga, dì quale e per quanto
+          if (m.follow && !overtaken) speakVoiceMessage(`${m.follow}.`);
+          cartNextManeuverIndex++;
+          cartManeuverMinDist = Infinity;
         }
       }
 
@@ -6227,6 +6357,12 @@ function stopCartMapTracking() {
   cartWrongDirectionAnnounced = false;
   cartManeuverMinDist = Infinity;
   cartOffRouteAnnounced = false;
+  cartOnRouteStreak = 0;
+  cartUturnAnnounced = false;
+  cartUturnCheckInFlight = false;
+  cartPassedManeuvers = [];
+  cartLastSpokenText = '';
+  cartLastSpokenTime = 0;
   cartLastSpeedPos = null;
   cartLastSpeedTime = null;
   cartLastKnownSpeedMs = null;
