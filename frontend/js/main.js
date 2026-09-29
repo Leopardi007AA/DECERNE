@@ -464,6 +464,19 @@ function getSafeImageUrl(url) {
   }
 }
 
+// Link esterno sicuro: solo http/https, altrimenti stringa vuota
+function getSafeLinkUrl(url) {
+  if (!url || typeof url !== "string") return "";
+  const trimmed = url.trim();
+  if (/[\s"'<>`\\]/.test(trimmed)) return "";
+  try {
+    const u = new URL(trimmed);
+    return (u.protocol === "https:" || u.protocol === "http:") ? u.href : "";
+  } catch (e) {
+    return "";
+  }
+}
+
 // Funzione Debounce: ritarda l'esecuzione della funzione fn
 function debounce(fn, wait) {
   let timeout;
@@ -4863,7 +4876,7 @@ async function renderMultiStopMap(cart, overrideStoresById, options = {}) {
       ` : ''}
       ${unlocatableStores.length > 0 ? `
         <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:0.8rem; color:#92400e; display:flex; align-items:flex-start; gap:6px;">
-          ${PANEL_ICONS.alert}<span>Non siamo riusciti a individuare l'indirizzo di: ${unlocatableStores.map(s => s.name).join(', ')}. Verifica che l'indirizzo del negozio sia corretto e completo.</span>
+          ${PANEL_ICONS.alert}<span>Non siamo riusciti a individuare l'indirizzo di: ${unlocatableStores.map(s => esc(s.name)).join(', ')}. Verifica che l'indirizzo del negozio sia corretto e completo.</span>
         </div>
       ` : ''}
       <div id="cartMapContainer" style="width:100%; height:52vh; border-radius:12px; overflow:hidden;"></div>
@@ -5277,7 +5290,7 @@ function updateTripInfoBar() {
   const bar = document.getElementById('cartRouteInfoBar');
   if (!bar || !cartMultiRoute || !cartVisitOrder.length) return;
   bar.style.display = 'block';
-  const stopsList = cartVisitOrder.map((s, i) => `${i + 1}. ${s.name}`).join(' → ');
+  const stopsList = cartVisitOrder.map((s, i) => `${i + 1}. ${esc(s.name)}`).join(' → ');
 
   // cartPaceFactor confronta il ritmo di guida reale con quello previsto da
   // OSRM per la strada appena percorsa: se il conducente va più piano/veloce
@@ -9541,7 +9554,7 @@ window.showStoreInfoPopup = (store) => {
           <div class="store-info-row-icon">${PANEL_ICONS.map}</div>
           <div>
             <div class="store-info-row-label">Sito Web</div>
-            <div class="store-info-row-value${store.websiteUrl ? '' : ' missing'}">${store.websiteUrl ? `<a href="${store.websiteUrl}" target="_blank" rel="noopener">${store.websiteUrl}</a>` : 'Non specificato dal negozio'}</div>
+            <div class="store-info-row-value${getSafeLinkUrl(store.websiteUrl) ? '' : ' missing'}">${getSafeLinkUrl(store.websiteUrl) ? `<a href="${esc(getSafeLinkUrl(store.websiteUrl))}" target="_blank" rel="noopener noreferrer">${esc(store.websiteUrl)}</a>` : 'Non specificato dal negozio'}</div>
           </div>
         </div>`
       : `${row(PANEL_ICONS.phone, 'Telefono', store.phone)}
@@ -9638,9 +9651,9 @@ function renderStoreProfileCard(store, locations) {
         ${isVerified ? `<span class="store-verified-blue" style="color:#0f62fe; font-weight:800; font-size:0.75rem;">✓ Negozio Verificato</span>` : ''}
       </h2>
       <div class="store-profile-meta">
-        <span>${PANEL_ICONS.pin} ${primary.address || store.address || (isEcomStore ? 'Negozio online' : 'Indirizzo non specificato')}</span>
+        <span>${PANEL_ICONS.pin} ${esc(primary.address || store.address || (isEcomStore ? 'Negozio online' : 'Indirizzo non specificato'))}</span>
         ${isEcomStore
-          ? (store.website_url ? `<span>${PANEL_ICONS.map} <a href="${store.website_url}" target="_blank" rel="noopener">${store.website_url}</a></span>` : '')
+          ? (getSafeLinkUrl(store.website_url) ? `<span>${PANEL_ICONS.map} <a href="${esc(getSafeLinkUrl(store.website_url))}" target="_blank" rel="noopener noreferrer">${esc(store.website_url)}</a></span>` : '')
           : `${store.phone ? `<span>${PANEL_ICONS.phone} ${esc(store.phone)}</span>` : ''}${store.hours ? `<span>${PANEL_ICONS.clock} ${esc(store.hours)}</span>` : ''}`}
       </div>
       <span class="store-profile-expand-hint">
