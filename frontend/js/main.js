@@ -255,6 +255,24 @@ window.addEventListener('popstate', () => {
 
 const PARTNER_AUTH_KEY = "decerne_partner_auth"; // Per il "Remember Me"
 
+// Il salvataggio "Ricordami" sopravvive anche a giorni di distanza: le note interne
+// e l'hash della API key non ci finiscono mai, a prescindere da quale delle tante
+// funzioni del pannello stia scrivendo la sessione in quel momento.
+const _rawLocalStorageSetItem = localStorage.setItem.bind(localStorage);
+localStorage.setItem = function(key, value) {
+  if (key === PARTNER_AUTH_KEY) {
+    try {
+      const obj = JSON.parse(value);
+      if (obj && typeof obj === 'object') {
+        obj.internalNotes = '';
+        obj.apiKey = '';
+        value = JSON.stringify(obj);
+      }
+    } catch (e) { /* non è JSON valido, lascialo passare così com'è */ }
+  }
+  return _rawLocalStorageSetItem(key, value);
+};
+
 const STORAGE_RATE_LIMIT = "decerne_rate_limits";
 
 const LOCK_TTL_MS = 5000; // Il lock scade automaticamente dopo 5 secondi
@@ -3234,7 +3252,15 @@ function renderProfileTab() {
           <label>Note Interne / Memo</label>
           <textarea id="profNotes" rows="3" placeholder="Inserisci note visibili solo a te...">${esc(partner.internalNotes || '')}</textarea>
         </div>
-
+// Le note interne non sopravvivono più nel salvataggio "Ricordami": le ripeschiamo
+// dal database ogni volta che si apre questa scheda, nel caso mancassero.
+(async () => {
+  const p = getCurrentPartner();
+  const el = document.getElementById('profNotes');
+  if (!p || !el || el.value) return; // già presente, niente da fare
+  const { data } = await storeAuthClient.from('stores').select('internal_notes').eq('id', p.id).maybeSingle();
+  if (data) el.value = data.internal_notes || '';
+})();
         <button type="submit" class="btn" style="margin-top: 20px; width: 100%;">Salva Impostazioni Account</button>
       </form>
     </div>
@@ -8978,7 +9004,7 @@ function renderHomeTab() {
     <div class="dual-card-row" style="margin-top: 16px;">
       <div class="card-saas" style="border-left: 4px solid #6929c4;">
         <h3 style="color: #6929c4; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.key} API Key</h3>
-        <input type="text" value="${esc(partner.apiKey || '')}" readonly style="width:100%; padding:8px; margin: 10px 0; border-radius:10px; border:1px solid #ddd; font-family:monospace; font-size:0.8rem;">
+        <input type="text" id="apiKeyDisplayHome" value="${esc(partner.apiKey || '')}" readonly style="width:100%; padding:8px; margin: 10px 0; border-radius:10px; border:1px solid #ddd; font-family:monospace; font-size:0.8rem;">
         <button class="btn" style="background:#6929c4; padding:5px 15px;" onclick="navigator.clipboard.writeText('${esc(partner.apiKey || '')}'); toast.success('API Key copiata!')">Copia</button>
       </div>
       <div class="card-saas" style="border-left: 4px solid #10b981; background: #f0fdf4;">
@@ -11692,6 +11718,15 @@ function renderTeamTab() {
   wrapper.append(header, grid);
 
   return wrapper; // Restituisce un elemento DOM invece di una stringa
+
+  (async () => {
+    const p = getCurrentPartner();
+    const el = document.getElementById('apiKeyDisplayHome');
+    if (!p || !el || el.value) return;
+    const { data } = await storeAuthClient.from('stores').select('api_key').eq('id', p.id).maybeSingle();
+    if (data) el.value = data.api_key || '';
+  })();
+
 }
 
 /**
@@ -11985,6 +12020,15 @@ function renderApiTab() {
       </div>
     ` : ''}
   `;
+  // L'hash della API key non sopravvive più nel salvataggio "Ricordami": lo ripeschiamo
+// dal database se manca.
+(async () => {
+  const p = getCurrentPartner();
+  const el = document.getElementById('apiKeyDisplay');
+  if (!p || !el || el.value) return;
+  const { data } = await storeAuthClient.from('stores').select('api_key').eq('id', p.id).maybeSingle();
+  if (data) el.value = data.api_key || '';
+})();
 }
 
 function renderSyncLogTable() {
