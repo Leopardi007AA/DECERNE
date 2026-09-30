@@ -4589,6 +4589,17 @@ async function tryGeocodeQuery(query) {
   }
 }
 
+// Reverse geocoding (GPS -> indirizzo) tramite il nostro backend: il browser non invia più
+// la posizione a Nominatim. Restituisce una Response con corpo { address: { road, postcode, city } }.
+function reverseGeocodeFetch(lat, lon, options = {}) {
+  return fetch(`${SUPABASE_URL}/functions/v1/reverse-geocode`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
+    body: JSON.stringify({ lat, lon }),
+    signal: options.signal
+  });
+}
+
 // Estrae solo il nome della via, senza numero civico/CAP/città (es: "via porrara 54" -> "via porrara")
 function extractStreetName(address) {
   const beforeComma = address.split(',')[0].trim();
@@ -7213,7 +7224,7 @@ async function updateLocation() {
 
     try {
       // Utilizziamo il servizio gratuito Nominatim per il Reverse Geocoding
-      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`);
+      const response = await reverseGeocodeFetch(lat, lon);
       const data = await response.json();
       
       const addr = data.address;
@@ -7617,7 +7628,7 @@ async function fetchAddress(lat, lon) {
     const timeoutId = setTimeout(() => controller.abort(), 5000); 
 
     // User-Agent obbligatorio per Nominatim
-    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`, { 
+    const response = await reverseGeocodeFetch(lat, lon, { 
       signal: controller.signal,
       headers: { 'User-Agent': 'DecerneApp/1.0' } 
     });
