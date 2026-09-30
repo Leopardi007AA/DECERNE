@@ -11886,16 +11886,16 @@ function renderTeamTab() {
   grid.append(formCard, listCard);
   wrapper.append(header, grid);
 
-  return wrapper; // Restituisce un elemento DOM invece di una stringa
-
-  (async () => {
+  setTimeout(() => {
     const p = getCurrentPartner();
     const el = document.getElementById('apiKeyDisplayHome');
     if (!p || !el || el.value) return;
-    const { data } = await storeAuthClient.from('stores').select('api_key').eq('id', p.id).maybeSingle();
-    if (data) el.value = data.api_key || '';
-  })();
+    storeAuthClient.from('stores').select('api_key').eq('id', p.id).maybeSingle().then(({ data }) => {
+      if (data) el.value = data.api_key || '';
+    });
+  }, 0);
 
+  return wrapper; // Restituisce un elemento DOM invece di una stringa
 }
 
 /**
@@ -11979,6 +11979,14 @@ window.removeTeamMember = (id) => {
  * Esclusivo per Professional ed Enterprise.
  */
 function renderApiTab() {
+  setTimeout(() => {
+    const p = getCurrentPartner();
+    const el = document.getElementById('apiKeyDisplay');
+    if (!p || !el || el.value) return;
+    storeAuthClient.from('stores').select('api_key').eq('id', p.id).maybeSingle().then(({ data }) => {
+      if (data) el.value = data.api_key || '';
+    });
+  }, 0);
   const partner = getCurrentPartner();
   const isEnterprise = partner.plan === 'Enterprise';
   if (!checkPermission('Professional')) {
@@ -12189,15 +12197,6 @@ function renderApiTab() {
       </div>
     ` : ''}
   `;
-  // L'hash della API key non sopravvive più nel salvataggio "Ricordami": lo ripeschiamo
-// dal database se manca.
-(async () => {
-  const p = getCurrentPartner();
-  const el = document.getElementById('apiKeyDisplay');
-  if (!p || !el || el.value) return;
-  const { data } = await storeAuthClient.from('stores').select('api_key').eq('id', p.id).maybeSingle();
-  if (data) el.value = data.api_key || '';
-})();
 }
 
 function renderSyncLogTable() {
