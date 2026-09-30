@@ -1472,6 +1472,12 @@ select.location-field-input {
   align-items: center;
   justify-content: center;
   padding: 20px;
+  opacity: 0;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.location-modal-overlay.is-visible {
+  opacity: 1;
 }
 
 .location-modal-box {
@@ -1481,7 +1487,12 @@ select.location-field-input {
   padding: 26px;
   border-radius: var(--panel-radius-b, 16px 30px 14px 26px);
   box-shadow: var(--shadow-xl);
-  animation: slideUp 0.3s ease-out;
+  transform: translateY(12px) scale(0.98);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.location-modal-overlay.is-visible .location-modal-box {
+  transform: translateY(0) scale(1);
 }
 
 .location-modal-title {
@@ -3088,10 +3099,17 @@ hr {
   align-items: center;
   justify-content: center;
   padding: 20px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.25s;
 }
 
-.store-info-overlay.hidden {
-  display: none;
+.store-info-overlay.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
 }
 
 .store-info-card {
@@ -3104,6 +3122,12 @@ hr {
   overflow-y: auto;
   padding: 32px 24px 24px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  transform: translateY(12px) scale(0.98);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.store-info-overlay.is-visible .store-info-card {
+  transform: translateY(0) scale(1);
 }
 
 .store-info-close {
@@ -4129,4 +4153,6 @@ hr {
 .email-contact-actions .btn.outline {
   width: 100%;
   text-align: center;
+  border-radius: var(--radius-pill);
+  padding: 14px 22px;
 }

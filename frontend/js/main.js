@@ -9709,14 +9709,14 @@ window.showStoreInfoPopup = (store) => {
     ${store.id ? `<button class="btn full-width" style="margin-top:14px;" onclick="openStoreProfile('${store.id}')">Vedi Profilo</button>` : ''}
   `;
 
-  overlay.classList.remove("hidden");
+  overlay.classList.add("is-visible");
   document.body.style.overflow = 'hidden';
   trapFocusOnOpen(overlay);
 };
 
 window.closeStoreInfoPopup = () => {
   const overlay = $("#storeInfoOverlay");
-  if (overlay) overlay.classList.add("hidden");
+  if (overlay) overlay.classList.remove("is-visible");
   document.body.style.overflow = '';
   releaseFocusOnClose(overlay);
 };
@@ -11054,9 +11054,15 @@ window.openAddLocationModal = () => {
 
   overlay.appendChild(box);
   document.body.appendChild(overlay);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => overlay.classList.add('is-visible'));
+  });
   document.getElementById('newLocName').focus();
 
-  const close = () => overlay.remove();
+  const close = () => {
+    overlay.classList.remove('is-visible');
+    setTimeout(() => overlay.remove(), 250);
+  };
   overlay.onclick = (e) => { if (e.target === overlay) close(); };
   box.querySelector('#newLocCancel').onclick = close;
 
