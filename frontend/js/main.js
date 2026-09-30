@@ -4634,10 +4634,19 @@ async function geocodeStoreAddress(store) {
 
 
 
+// Calcolo percorso tramite il nostro backend: il browser non contatta più il server OSRM.
+// Restituisce una Response con corpo { routes: [...] } (stessa forma che usava il sito).
+function fetchRouteFromBackend(points, withSteps) {
+  return fetch(`${SUPABASE_URL}/functions/v1/route`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
+    body: JSON.stringify({ points, steps: !!withSteps })
+  });
+}
+
 async function fetchRouteCoords(fromLat, fromLng, toLat, toLng) {
   try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`;
-    const res = await fetch(url);
+    const res = await fetchRouteFromBackend([{ lat: fromLat, lng: fromLng }, { lat: toLat, lng: toLng }], false);
     const data = await res.json();
     if (data.routes && data.routes[0]) {
       const r = data.routes[0];
@@ -5036,8 +5045,11 @@ function routeCacheKey(points) {
 }
 
 async function requestOsrmRoute(coordsStr) {
-  const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=true`;
-  const res = await fetch(url);
+  const points = coordsStr.split(';').map(pair => {
+    const [lng, lat] = pair.split(',').map(Number);
+    return { lat, lng };
+  });
+  const res = await fetchRouteFromBackend(points, true);
   const data = await res.json();
   if (data.routes && data.routes[0]) {
     const r = data.routes[0];
