@@ -7616,7 +7616,7 @@ async function fetchAddress(lat, lon) {
   const locInput = $("#locationInput");
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); 
+    const timeoutId = setTimeout(() => controller.abort(), 12000); 
 
     // User-Agent obbligatorio per Nominatim
     const response = await reverseGeocodeFetch(lat, lon, { 
