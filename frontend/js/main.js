@@ -3265,15 +3265,6 @@ function renderProfileTab() {
           <label>Note Interne / Memo</label>
           <textarea id="profNotes" rows="3" placeholder="Inserisci note visibili solo a te...">${esc(partner.internalNotes || '')}</textarea>
         </div>
-// Le note interne non sopravvivono più nel salvataggio "Ricordami": le ripeschiamo
-// dal database ogni volta che si apre questa scheda, nel caso mancassero.
-(async () => {
-  const p = getCurrentPartner();
-  const el = document.getElementById('profNotes');
-  if (!p || !el || el.value) return; // già presente, niente da fare
-  const { data } = await storeAuthClient.from('stores').select('internal_notes').eq('id', p.id).maybeSingle();
-  if (data) el.value = data.internal_notes || '';
-})();
         <button type="submit" class="btn" style="margin-top: 20px; width: 100%;">Salva Impostazioni Account</button>
       </form>
     </div>
@@ -8943,6 +8934,18 @@ function renderDashboard(container) {
   }
   setupPartnerSidebarDrag();
   maybeStartPartnerGuide();
+
+  // Le note interne non sopravvivono più nel salvataggio "Ricordami": le ripeschiamo
+  // dal database quando si apre la scheda Impostazioni, nel caso mancassero.
+  if (storeData.activeTab === 'profile') {
+    (async () => {
+      const p = getCurrentPartner();
+      const el = document.getElementById('profNotes');
+      if (!p || !el || el.value) return; // già presente, niente da fare
+      const { data } = await storeAuthClient.from('stores').select('internal_notes').eq('id', p.id).maybeSingle();
+      if (data && !el.value) el.value = data.internal_notes || '';
+    })();
+  }
 }
 
 // Menu laterale del Pannello Partner a comparsa su schermi piccoli (sotto i 900px):

@@ -3640,7 +3640,17 @@ hr {
     }
   }
 
-  /* --- Azioni secondarie compresse in un menu "..." invece di stare a impatto
+  /* Pannello Partner su telefono: meno margine sprecato ai lati, così
+     campi e scritte (fino a "Salva Impostazioni Account") hanno più spazio. */
+     @media (max-width: 600px) {
+      body.dashboard-active .container { padding-left: 5px; padding-right: 5px; }
+      body.dashboard-active #store-view.view { padding: 14px 10px; }
+      body.dashboard-active .store-content { padding: 14px 6px; }
+      body.dashboard-active .store-content .card-saas { padding: 18px 14px; }
+      body.dashboard-active .store-content .card-saas[style*="padding: 22px"] { padding: 18px 14px !important; }
+    }
+  
+    /* --- Azioni secondarie compresse in un menu "..." invece di stare a impatto
      tutte in riga (es. Copia/Rigenera della API Key): il bottone dei tre puntini
      resta nascosto e appare solo sotto i 600px, quando le versioni inline scompaiono. */
   .actions-kebab-wrap { position: relative; display: none; }
