@@ -4775,10 +4775,14 @@ async function tourGeocodeDemoCenter(query) {
   // indirizzo reale da salvare), quindi non ha senso farla passare dal
   // backend riservato agli utenti autenticati.
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=it&q=${encodeURIComponent(query)}`);
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/geocode-public`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
+      body: JSON.stringify({ query })
+    });
     const data = await res.json();
-    if (data && data[0]) {
-      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    if (data && Number.isFinite(data.lat) && Number.isFinite(data.lng)) {
+      return { lat: data.lat, lng: data.lng };
     }
   } catch (e) {
     console.warn("Tour: geocodifica demo fallita, uso il centro Italia.", e);
@@ -6034,25 +6038,17 @@ const CART_UTURN_SOLO_SENSO_UNICO = true;
 // Chiede a OpenStreetMap (Overpass) se la strada in cui ci troviamo è a senso
 // unico. Restituisce true/false, oppure null se il servizio non risponde.
 async function isRoadOneWay(lat, lng) {
-  const query = `[out:json][timeout:4];way(around:15,${lat},${lng})["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$"];out tags;`;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 4500);
+  const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const res = await fetch('https://overpass-api.de/api/interpreter', {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/road-oneway`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'data=' + encodeURIComponent(query),
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
+      body: JSON.stringify({ lat, lng }),
       signal: ctrl.signal
     });
     const data = await res.json();
-    const ways = (data.elements || []).map(e => e.tags || {});
-    if (!ways.length) return null;
-    return ways.every(t => {
-      if (t.oneway === 'no') return false;
-      return ['yes', 'true', '1', '-1'].includes(t.oneway) ||
-        t.junction === 'roundabout' ||
-        String(t.highway || '').startsWith('motorway');
-    });
+    return typeof data.oneway === 'boolean' ? data.oneway : null;
   } catch (e) {
     return null;
   } finally {
