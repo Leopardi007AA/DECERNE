@@ -1409,7 +1409,8 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
       phone: ownerStoreRow.phone || "",
       hours: ownerStoreRow.hours || "",
       internalNotes: ownerStoreRow.internal_notes || "",
-      apiKey: ownerStoreRow.api_key || "",
+      apiKey: "",
+      apiKeyHint: ownerStoreRow.api_key_hint || "",
       membershipCardName: ownerStoreRow.membership_card_name || "",
       membershipCardImage: ownerStoreRow.membership_card_image_url || "",
       businessType: ownerStoreRow.business_type || "",
@@ -7373,7 +7374,8 @@ async function refreshPartnerSession(storeId) {
       phone: storeRow.phone || "",
       hours: storeRow.hours || "",
       internalNotes: storeRow.internal_notes || "",
-      apiKey: storeRow.api_key || "",
+      apiKey: "",
+      apiKeyHint: storeRow.api_key_hint || "",
       membershipCardName: storeRow.membership_card_name || "",  // FIX: mancava anche qui
       membershipCardImage: storeRow.membership_card_image_url || "",  // FIX: idem
       businessType: storeRow.business_type || "",
@@ -8684,7 +8686,8 @@ async function handleOnboardingSubmit(step) {
         phone: storeRow.phone || "",
         hours: "",
         internalNotes: storeRow.internal_notes || "",
-        apiKey: storeRow.api_key || "",
+        apiKey: "",
+        apiKeyHint: storeRow.api_key_hint || "",
         businessType: storeRow.business_type || "",
         websiteUrl: storeRow.website_url || "",
         shippingProvinces: storeRow.shipping_provinces ?? null,
@@ -9175,8 +9178,8 @@ function renderHomeTab() {
     <div class="dual-card-row" style="margin-top: 16px;">
       <div class="card-saas" style="border-left: 4px solid #6929c4;">
         <h3 style="color: #6929c4; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.key} API Key</h3>
-        <input type="text" id="apiKeyDisplayHome" value="${esc(partner.apiKey || '')}" readonly style="width:100%; padding:8px; margin: 10px 0; border-radius:10px; border:1px solid #ddd; font-family:monospace; font-size:0.8rem;">
-        <button class="btn" style="background:#6929c4; padding:5px 15px;" onclick="navigator.clipboard.writeText('${esc(partner.apiKey || '')}'); toast.success('API Key copiata!')">Copia</button>
+        <input type="text" id="apiKeyDisplayHome" value="${esc(partner.apiKeyHint || '')}" placeholder="Nessuna chiave: vai nella sezione API" readonly style="width:100%; padding:8px; margin: 10px 0; border-radius:10px; border:1px solid #ddd; font-family:monospace; font-size:0.8rem;">
+        <button class="btn" style="background:#6929c4; padding:5px 15px;" onclick="switchStoreTab('api')">Gestisci chiave</button>
       </div>
       <div class="card-saas" style="border-left: 4px solid #10b981; background: #f0fdf4;">
         <h3 style="color: #166534; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.headset} Supporto Prioritario</h3>
@@ -10533,7 +10536,8 @@ window.activatePlan = async function(planName, forceCycle) {
       const updatedStore = {
       ...partner,
       plan: storeRow.plan,
-      apiKey: storeRow.api_key || partner.apiKey || "",
+      apiKey: "",
+      apiKeyHint: storeRow.api_key_hint || partner.apiKeyHint || "",
       subscription: {
         plan: storeRow.plan,
         status: storeRow.subscription_status,
@@ -10551,6 +10555,8 @@ window.activatePlan = async function(planName, forceCycle) {
     toast.success(`Piano ${planName} attivato con successo!`);
     storeData.step = 'dashboard';
     renderStoreView();
+    // La prima chiave API (piani Professional/Enterprise) si vede solo qui, una volta
+    if (storeRow.api_key) showNewApiKeyModal(storeRow.api_key);
   });
 };
 
@@ -11894,15 +11900,6 @@ function renderTeamTab() {
   grid.append(formCard, listCard);
   wrapper.append(header, grid);
 
-  setTimeout(() => {
-    const p = getCurrentPartner();
-    const el = document.getElementById('apiKeyDisplayHome');
-    if (!p || !el || el.value) return;
-    storeAuthClient.from('stores').select('api_key').eq('id', p.id).maybeSingle().then(({ data }) => {
-      if (data) el.value = data.api_key || '';
-    });
-  }, 0);
-
   return wrapper; // Restituisce un elemento DOM invece di una stringa
 }
 
@@ -11987,14 +11984,6 @@ window.removeTeamMember = (id) => {
  * Esclusivo per Professional ed Enterprise.
  */
 function renderApiTab() {
-  setTimeout(() => {
-    const p = getCurrentPartner();
-    const el = document.getElementById('apiKeyDisplay');
-    if (!p || !el || el.value) return;
-    storeAuthClient.from('stores').select('api_key').eq('id', p.id).maybeSingle().then(({ data }) => {
-      if (data) el.value = data.api_key || '';
-    });
-  }, 0);
   const partner = getCurrentPartner();
   const isEnterprise = partner.plan === 'Enterprise';
   if (!checkPermission('Professional')) {
@@ -12014,10 +12003,9 @@ function renderApiTab() {
     <div class="card-saas" style="margin-bottom: 25px;">
       <h3 style="margin-top:0; font-size: 1rem;">La tua API Key</h3>
       <div style="display: flex; gap: 10px; align-items: center; margin-top: 15px;">
-        <input type="text" id="apiKeyDisplay" value="${esc(partner.apiKey || '')}" placeholder="Nessuna chiave: clicca Rigenera" readonly
+        <input type="text" id="apiKeyDisplay" value="${esc(partner.apiKeyHint || '')}" placeholder="Nessuna chiave: clicca Rigenera" readonly
                style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-family: monospace; background: #f8fafc; font-size: 0.9rem;">
         <div class="api-key-actions-inline" style="display: flex; gap: 10px;">
-          <button class="btn outline" onclick="copyApiKeyToClipboard()">Copia</button>
           <button class="btn" style="background: #ef4444;" onclick="regeneratePartnerApiKey()">Rigenera</button>
         </div>
         <div class="actions-kebab-wrap">
@@ -12025,13 +12013,12 @@ function renderApiTab() {
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
           </button>
           <div class="actions-kebab-menu" id="apiKeyKebabMenu">
-            <button onclick="copyApiKeyToClipboard(); toggleKebabMenu('apiKeyKebabMenu')">Copia chiave</button>
             <button onclick="regeneratePartnerApiKey(); toggleKebabMenu('apiKeyKebabMenu')" style="color:#ef4444;">Rigenera chiave</button>
           </div>
         </div>
       </div>
       <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 12px;">
-        <strong>Sicurezza:</strong> Non condividere mai la tua API Key. Se rigeneri la chiave, le integrazioni attuali smetteranno di funzionare immediatamente.
+        <strong>Sicurezza:</strong> La chiave completa si vede una sola volta, quando la generi: copiala subito e conservala in un posto sicuro. Non condividerla mai. Se rigeneri la chiave, le integrazioni attuali smetteranno di funzionare immediatamente.
       </p>
     </div>
 
@@ -12469,7 +12456,8 @@ async function executeRegeneratePartnerApiKey() {
       }
 
     // 2. Allineamento dello stato locale (Session & LocalStorage) per riflettere le modifiche
-    partner.apiKey = newKey;
+    partner.apiKey = '';
+    partner.apiKeyHint = 'dec_live_…' + String(newKey).slice(-4);
     const dataString = JSON.stringify(partner);
     sessionStorage.setItem(SESSION_PARTNER, dataString);
     
@@ -12479,8 +12467,9 @@ async function executeRegeneratePartnerApiKey() {
     
     toast.success("API Key rigenerata e sincronizzata con successo!");
     
-    // 3. Ricarica la vista per mostrare istantaneamente il nuovo valore
+    // 3. Ricarica la vista e mostra la nuova chiave completa, una sola volta
     renderStoreView();
+    showNewApiKeyModal(newKey);
     
   } catch (err) {
     console.error("Errore inatteso:", err);
@@ -12493,17 +12482,58 @@ async function executeRegeneratePartnerApiKey() {
   }
 };
 
-/**
- * Copia la chiave negli appunti.
- */
-window.copyApiKeyToClipboard = () => {
-  const copyText = document.getElementById("apiKeyDisplay");
-  if (!copyText || !copyText.value) return toast.error("Non c'è ancora nessuna chiave da copiare: usa Rigenera.");
-  copyText.select();
-  copyText.setSelectionRange(0, 99999); // Per mobile
-  
-  navigator.clipboard.writeText(copyText.value);
-  toast.info("API Key copiata negli appunti!");
+// Mostra la chiave API completa una sola volta, subito dopo la generazione.
+// Non viene salvata né in sessione né in locale: dopo la chiusura non si può più rivedere.
+window.showNewApiKeyModal = (plainKey) => {
+  if (!plainKey) return;
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;";
+
+  const box = document.createElement("div");
+  box.style.cssText = "background:white; padding:24px; border-radius:20px; width:100%; max-width:460px; box-shadow:0 10px 40px rgba(0,0,0,0.25);";
+
+  const title = document.createElement("h3");
+  title.style.cssText = "margin:0 0 8px;";
+  title.textContent = "La tua nuova API Key";
+
+  const info = document.createElement("p");
+  info.style.cssText = "margin:0 0 14px; color:#64748b; font-size:0.9rem;";
+  info.textContent = "Copiala adesso: per sicurezza non potrai rivederla. Se la perdi, dovrai rigenerarla.";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.readOnly = true;
+  input.value = plainKey;
+  input.style.cssText = "width:100%; box-sizing:border-box; padding:12px; border-radius:8px; border:1px solid #e2e8f0; font-family:monospace; font-size:0.85rem; background:#f8fafc;";
+  input.onfocus = () => input.select();
+
+  const row = document.createElement("div");
+  row.style.cssText = "display:flex; gap:10px; margin-top:16px;";
+
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "btn";
+  copyBtn.style.flex = "1";
+  copyBtn.textContent = "Copia chiave";
+  copyBtn.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(plainKey);
+      toast.success("API Key copiata!");
+    } catch (e) {
+      input.select();
+      toast.info("Seleziona il testo e copialo a mano.");
+    }
+  };
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "btn outline";
+  closeBtn.style.flex = "1";
+  closeBtn.textContent = "Ho salvato la chiave";
+  closeBtn.onclick = () => overlay.remove();
+
+  row.append(copyBtn, closeBtn);
+  box.append(title, info, input, row);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
 };
 
 // ==========================================================================
