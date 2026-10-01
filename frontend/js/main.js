@@ -7007,7 +7007,7 @@ function notifyChiSiamoDrawerState(isOpen) {
   try {
     const frame = $("#chiSiamoFrame");
     if (frame && frame.contentWindow) {
-      frame.contentWindow.postMessage({ source: 'decerne', type: 'drawerState', open: isOpen }, '*');
+      frame.contentWindow.postMessage({ source: 'decerne', type: 'drawerState', open: isOpen }, window.location.origin);
     }
   } catch (e) {}
 }

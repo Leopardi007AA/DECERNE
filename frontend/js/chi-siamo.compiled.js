@@ -661,6 +661,7 @@ function App() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   useEffect(() => {
     const onMessage = event => {
+      if (event.origin !== window.location.origin || event.source !== window.parent) return;
       const data = event.data;
       if (data && data.source === 'decerne' && data.type === 'drawerState') {
         setIsDrawerOpen(!!data.open);
