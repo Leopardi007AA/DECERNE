@@ -9572,10 +9572,10 @@ function renderStoreLoginForm(container) {
       toast.error("Email o password errati.");
       errBox.innerText = "Email o password non corretti.";
     } else if (result.reason === 'no-store') {
-      toast.error("Nessun account supermercato trovato.");
-      errBox.innerHTML = `Non esiste un account supermercato collegato a questa email.<br><br>
+      toast.error("Email o password non corretti.");
+      errBox.innerHTML = `Email o password non corretti.<br><br>
                           <button class="btn outline" style="padding:5px 10px; font-size:0.7rem;" 
-                          onclick="storeData.step='pricing'; renderStoreView();">Registra il tuo negozio</button>`;
+                          onclick="storeData.step='pricing'; renderStoreView();">Non hai ancora un negozio? Registrati</button>`;
     } else {
       toast.error("Si è verificato un errore tecnico durante l'accesso.");
       errBox.innerText = "Errore tecnico. Riprova.";
