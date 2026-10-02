@@ -4,7 +4,14 @@ const path = require('path');
 const SUPABASE_URL = 'https://noqdpjlbmyjqzlmstfvx.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_ER6yqBMYCoQ561qXao-sBg_CrEv7BQ6';
 const SITE_ORIGIN = 'https://www.decerne.it';
-const DEFAULT_OG_IMAGE = `${SITE_ORIGIN}/og-image.png`;
+// Domini da cui questa pagina può essere servita. Finché www.decerne.it non è collegato
+// al progetto, i link condivisi usano il dominio vercel.app da cui arriva la richiesta.
+const ALLOWED_HOSTS = ['www.decerne.it', 'decerne.it', 'decerne.vercel.app'];
+
+function getOrigin(req) {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim().toLowerCase();
+  return ALLOWED_HOSTS.includes(host) ? `https://${host}` : SITE_ORIGIN;
+}
 
 function escapeAttr(str) {
   return String(str || '')
@@ -55,8 +62,12 @@ module.exports = async (req, res) => {
       // I crawler dei social non renderizzano un data: URI come og:image: se il
       // negozio non ha caricato una foto reale, img_url è il placeholder SVG
       // interno, quindi in quel caso usiamo l'immagine di default del sito.
-      const image = (offer.img_url && offer.img_url.startsWith('http')) ? offer.img_url : DEFAULT_OG_IMAGE;
-      const canonicalUrl = `${SITE_ORIGIN}/prodotto/${id}`;
+      const origin = getOrigin(req);
+      // La foto del prodotto passa da /api/prodotto-img: così i social la leggono dal nostro
+      // dominio anche se il sito del negozio blocca i link diretti.
+      const hasProductImage = !!offer.img_url && offer.img_url.startsWith('https://');
+      const image = hasProductImage ? `${origin}/api/prodotto-img/${id}` : `${origin}/og-image.png`;
+      const canonicalUrl = `${origin}/prodotto/${id}`;
 
       html = html
       .replace(/<title>.*?<\/title>/, () => `<title>${escapeAttr(productTitle)}</title>`)
@@ -68,6 +79,14 @@ module.exports = async (req, res) => {
         .replace(/<meta name="twitter:title" content=".*?">/, () => `<meta name="twitter:title" content="${escapeAttr(productTitle)}">`)
         .replace(/<meta name="twitter:description" content=".*?">/, () => `<meta name="twitter:description" content="${escapeAttr(description)}">`)
         .replace(/<meta name="twitter:image" content=".*?">/, () => `<meta name="twitter:image" content="${escapeAttr(image)}">`);
+
+      // 1200x630 vale solo per l'immagine di default del sito: con la foto del prodotto le
+      // dimensioni sono diverse, e dichiararle sbagliate fa scartare l'immagine a qualche social
+      if (hasProductImage) {
+        html = html
+          .replace(/<meta property="og:image:width" content=".*?">\s*/, '')
+          .replace(/<meta property="og:image:height" content=".*?">\s*/, '');
+      }
     }
   } catch (e) {
     console.error('Errore generazione OG prodotto:', e);
