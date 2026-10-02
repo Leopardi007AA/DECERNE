@@ -5019,6 +5019,9 @@ let cartWrongDirectionCount = 0;
 let cartWrongDirectionAnnounced = false;
 let cartOffRouteCount = 0;
 let cartOnRouteStreak = 0;
+let cartDevStart = null;
+let cartWrongDirStart = null;
+let cartRerouting = false;
 let cartUturnAnnounced = false;
 let cartUturnCheckInFlight = false;
 let cartPassedManeuvers = [];
@@ -6133,18 +6136,113 @@ function handleWakeLockVisibilityChange() {
 // Trova il punto più vicino sul tracciato disegnato e restituisce la distanza (metri).
 // Come effetto collaterale "mangia" il tratto già percorso, così la linea blu
 // si accorcia dietro l'utente man mano che avanza, come nei navigatori veri.
+// Proietta il punto sul segmento e restituisce distanza (metri) e posizione
+// lungo il segmento (t da 0 a 1). Approssimazione piana, adeguata per un tratto.
+function projectOnSegmentMeters(lat, lng, lat1, lng1, lat2, lng2) {
+  const mPerDegLat = 111320;
+  const mPerDegLng = 111320 * Math.cos(lat1 * Math.PI / 180);
+  const px = (lng - lng1) * mPerDegLng, py = (lat - lat1) * mPerDegLat;
+  const bx = (lng2 - lng1) * mPerDegLng, by = (lat2 - lat1) * mPerDegLat;
+  const lenSq = bx * bx + by * by;
+  const t = lenSq > 0 ? Math.max(0, Math.min(1, (px * bx + py * by) / lenSq)) : 0;
+  const dx = px - t * bx, dy = py - t * by;
+  return { dist: Math.sqrt(dx * dx + dy * dy), t };
+}
+
+// Trova il punto più vicino sul tracciato disegnato e restituisce la distanza (metri).
+// Misura la distanza dal segmento, non dal vertice: sui rettilinei i vertici sono
+// radi e il vertice più vicino può stare a centinaia di metri anche stando
+// perfettamente in strada. Come effetto collaterale "mangia" il tratto già
+// percorso, così la linea blu si accorcia dietro l'utente come nei navigatori veri.
 function updateRouteProgress(lat, lng) {
-  if (!cartMultiRoute || !cartMultiRoute.coords || cartMultiRoute.coords.length < 2) return 0;
-  let nearestIdx = 0, nearestDist = Infinity;
-  cartMultiRoute.coords.forEach(([clat, clng], i) => {
-    const d = distanceMeters(lat, lng, clat, clng);
-    if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
-  });
-  if (nearestIdx > 0) {
-    cartMultiRoute.coords = cartMultiRoute.coords.slice(nearestIdx);
-    drawRoutePolyline(cartMultiRoute.coords);
+  const c = cartMultiRoute && cartMultiRoute.coords;
+  if (!c || c.length < 2) return 0;
+  // Si cerca solo nel primo chilometro e mezzo davanti all'auto, per non
+  // agganciarsi a un ramo del percorso che ripassa lontano più avanti.
+  const scan = (maxMeters) => {
+    let best = { i: 0, dist: Infinity, t: 0 }, walked = 0;
+    for (let i = 0; i < c.length - 1; i++) {
+      const p = projectOnSegmentMeters(lat, lng, c[i][0], c[i][1], c[i + 1][0], c[i + 1][1]);
+      if (p.dist < best.dist) best = { i, dist: p.dist, t: p.t };
+      walked += distanceMeters(c[i][0], c[i][1], c[i + 1][0], c[i + 1][1]);
+      if (walked > maxMeters) break;
+    }
+    return best;
+  };
+  let best = scan(1500);
+  if (best.dist > 150) best = scan(Infinity);
+  const a = c[best.i], b = c[best.i + 1];
+  const proj = [a[0] + (b[0] - a[0]) * best.t, a[1] + (b[1] - a[1]) * best.t];
+  const rest = c.slice(best.i + 1);
+  cartMultiRoute.coords = (best.t >= 0.999 && rest.length >= 2) ? rest : [proj, ...rest];
+  drawRoutePolyline(cartMultiRoute.coords);
+  return best.dist;
+}
+
+// Quanto la direzione di marcia si scosta dal percorso davanti all'auto (0-180).
+// Confronta con il tratto a 25 m e a 60 m e prende il migliore: in curva e
+// nelle rotatorie la direzione cambia, e così non si scambia per errore.
+function angleToRoute(heading) {
+  const c = cartMultiRoute && cartMultiRoute.coords;
+  if (!c || c.length < 2 || heading == null || isNaN(heading)) return null;
+  const bearings = [];
+  const targets = [25, 60];
+  let walked = 0, ti = 0;
+  for (let i = 1; i < c.length && ti < targets.length; i++) {
+    walked += distanceMeters(c[i - 1][0], c[i - 1][1], c[i][0], c[i][1]);
+    if (walked >= targets[ti]) {
+      bearings.push(calculateBearing(c[0][0], c[0][1], c[i][0], c[i][1]));
+      ti++;
+    }
   }
-  return nearestDist;
+  if (!bearings.length) {
+    const last = c[c.length - 1];
+    if (distanceMeters(c[0][0], c[0][1], last[0], last[1]) < 5) return null;
+    bearings.push(calculateBearing(c[0][0], c[0][1], last[0], last[1]));
+  }
+  return Math.min(...bearings.map(b => angleDiff(heading, b)));
+}
+
+// Decide se l'utente è davvero uscito dal percorso, come fanno i navigatori:
+// non basta essere un po' fuori dal tracciato, conta anche la direzione e per
+// quanto tempo dura. Cambio di corsia, strada larga o piccola deriva GPS con
+// direzione giusta non fanno ricalcolare; allontanarsi in un'altra direzione sì.
+function evaluateRouteDeviation(distFromRoute, accuracy, heading, speedMs, lat, lng, now) {
+  const acc = accuracy || 30;
+  const soft = Math.max(45, acc + 25);   // tolleranza se si va nel verso giusto
+  const hard = Math.max(120, acc * 2 + 70); // oltre questa distanza non ci sono dubbi
+  // Da fermi la direzione del GPS è rumore: la si ignora sotto i 2 m/s.
+  const moving = speedMs == null || speedMs >= 2;
+  const angle = moving ? angleToRoute(heading) : null;
+
+  // Senso contrario: si conferma dopo almeno 3 secondi e 30 m percorsi.
+  const wrongNow = angle !== null && angle > 135;
+  let confirmedWrongDirection = false;
+  if (wrongNow) {
+    if (!cartWrongDirStart) cartWrongDirStart = { lat, lng, time: now };
+    confirmedWrongDirection = now - cartWrongDirStart.time >= 3000 &&
+      distanceMeters(cartWrongDirStart.lat, cartWrongDirStart.lng, lat, lng) >= 30;
+  } else if (moving) {
+    cartWrongDirStart = null;
+  }
+
+  // Se la direzione si scosta già dal percorso basta una distanza minore per
+  // accorgersene; se è allineata si tollera di più.
+  const diverging = angle !== null && angle >= 60;
+  const softLimit = diverging ? Math.max(30, acc + 10) : soft;
+  if (distFromRoute <= softLimit) {
+    cartDevStart = null;
+    return { offRoute: false, confirmedWrongDirection, wrongNow };
+  }
+  if (!cartDevStart) cartDevStart = { time: now, lat, lng };
+  const secs = (now - cartDevStart.time) / 1000;
+  const traveled = distanceMeters(cartDevStart.lat, cartDevStart.lng, lat, lng);
+  let offRoute;
+  if (distFromRoute > hard) offRoute = secs >= 3;                       // lontano: bastano pochi secondi
+  else if (angle !== null && angle <= 45) offRoute = secs >= 20;        // stessa direzione: corsia, strada larga, parallela
+  else if (diverging) offRoute = secs >= 3 && traveled >= 20;           // si allontana: svolta mancata
+  else offRoute = secs >= 12;                                           // direzione incerta
+  return { offRoute, confirmedWrongDirection, wrongNow };
 }
 
 function startLiveTracking() {
@@ -6174,7 +6272,7 @@ function startLiveTracking() {
       const currentSpeedMs = cartLastKnownSpeedMs != null ? cartLastKnownSpeedMs : 12; // ~43 km/h: stima prudente finché non abbiamo un dato reale
 
       let heading = pos.coords.heading;
-      if (heading === null || isNaN(heading)) {
+      if (heading === null || isNaN(heading) || (speedMs !== null && speedMs < 1.5)) {
         if (cartLastPos && distanceMeters(cartLastPos.lat, cartLastPos.lng, newLat, newLng) > 8) {
           heading = calculateBearing(cartLastPos.lat, cartLastPos.lng, newLat, newLng);
           cartLastHeading = heading;
@@ -6201,45 +6299,39 @@ function startLiveTracking() {
 
       const distFromRoute = updateRouteProgress(newLat, newLng);
 
-      const routeHeading = expectedRouteHeading();
-      const wrongDirection = heading !== null && !isNaN(heading) && routeHeading !== null &&
-        angleDiff(heading, routeHeading) > 135;
-      if (wrongDirection) {
-        cartWrongDirectionCount++;
-      } else {
-        cartWrongDirectionCount = 0;
-        cartWrongDirectionAnnounced = false;
-      }
-      const confirmedWrongDirection = cartWrongDirectionCount >= 2;
-
       const now = Date.now();
-      // La soglia si allarga con l'imprecisione del GPS dichiarata dal dispositivo:
-      // con un fix impreciso (tra palazzi alti, gallerie) una singola lettura può
-      // cadere oltre i 60m anche restando sulla strada giusta.
-      const offRouteThreshold = Math.max(60, (pos.coords.accuracy || 30) + 30);
-      const rawOffRoute = cartMultiRoute && distFromRoute > offRouteThreshold;
-      // Serve conferma su due letture consecutive: un singolo salto GPS non deve
-      // far scattare ricalcolo e annuncio da solo.
-      if (rawOffRoute) {
-        cartOffRouteCount++;
+      const dev = evaluateRouteDeviation(distFromRoute, pos.coords.accuracy, heading, cartLastKnownSpeedMs, newLat, newLng, now);
+      cartWrongDirectionCount = dev.wrongNow ? cartWrongDirectionCount + 1 : 0;
+      const confirmedWrongDirection = dev.confirmedWrongDirection;
+      const needsRerouteNow = dev.offRoute || confirmedWrongDirection;
+      // Finché il ricalcolo è in corso le manovre vecchie restano zitte.
+      const needsReroute = needsRerouteNow || cartRerouting;
+
+      // L'uscita dal percorso si considera chiusa solo dopo qualche lettura
+      // stabile sul tracciato: così un GPS ballerino non fa riannunciare tutto.
+      if (needsReroute || cartDevStart || cartWrongDirStart) {
         cartOnRouteStreak = 0;
       } else {
-        cartOffRouteCount = 0;
         cartOnRouteStreak++;
-        // L'uscita dal percorso si considera chiusa solo dopo qualche lettura
-        // stabile sul tracciato: così un GPS ballerino non fa riannunciare tutto.
-        if (cartOnRouteStreak >= 4 && !cartRecalcInFlight && !confirmedWrongDirection) {
+        if (cartOnRouteStreak >= 4 && !cartRecalcInFlight) {
           cartOffRouteAnnounced = false;
           cartUturnAnnounced = false;
         }
       }
-      const offRoute = cartOffRouteCount >= 2;
-      const needsReroute = offRoute || confirmedWrongDirection;
-      const recalcWait = needsReroute ? 3000 : 20000;
+
+      const recalcWait = needsRerouteNow ? 6000 : 20000;
       if (cartVisitOrder.length && !cartRecalcInFlight && now - cartLastRouteRecalc > recalcWait) {
         cartLastRouteRecalc = now;
         cartRecalcInFlight = true;
-        recalculateTrip(newLat, newLng, needsReroute).finally(() => { cartRecalcInFlight = false; });
+        if (needsRerouteNow) {
+          cartRerouting = true;
+          cartDevStart = null;
+          cartWrongDirStart = null;
+        }
+        recalculateTrip(newLat, newLng, needsRerouteNow).finally(() => {
+          cartRecalcInFlight = false;
+          cartRerouting = false;
+        });
       }
 
       if (cartVoiceEnabled && needsReroute) {
@@ -6376,6 +6468,9 @@ function stopCartMapTracking() {
   cartOnRouteStreak = 0;
   cartUturnAnnounced = false;
   cartUturnCheckInFlight = false;
+  cartDevStart = null;
+  cartWrongDirStart = null;
+  cartRerouting = false;
   cartPassedManeuvers = [];
   cartLastSpokenText = '';
   cartLastSpokenTime = 0;
