@@ -7,6 +7,11 @@ const SESSION_PARTNER = "decerne_partner_active"; // Sessione del supermercato l
 // pensata apposta per essere visibile pubblicamente nel browser.
 // ============================================================
 const SUPABASE_URL = "https://noqdpjlbmyjqzlmstfvx.supabase.co";
+
+// Colonne di "stores" che il browser può leggere. Manca apposta api_key (l'hash della chiave API):
+// non si usa più select('*') su questa tabella. Se aggiungi una colonna a "stores" e il pannello
+// deve leggerla, aggiungila anche qui.
+const STORE_COLUMNS = "id, auth_user_id, email, name, address, city, cap, logo_url, phone, plan, subscription_status, trial_started_at, created_at, hours, internal_notes, renewal_date, latitude, longitude, membership_card_name, membership_card_image_url, billing_cycle, business_type, website_url, shipping_provinces, delivery_days_by_region, pending_plan, pending_billing_cycle, map_logo_url, api_key_hint";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_ER6yqBMYCoQ561qXao-sBg_CrEv7BQ6";
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
@@ -1360,10 +1365,10 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
     }
 
     const { data: storeRow, error: storeError } = await storeAuthClient
-      .from('stores')
-      .select('*')
-      .eq('auth_user_id', authData.user.id)
-      .single();
+    .from('stores')
+    .select(STORE_COLUMNS)
+    .eq('auth_user_id', authData.user.id)
+    .single();
 
     let teamRow = null;
     let ownerStoreRow = storeRow;
@@ -1372,7 +1377,7 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
       // Non è proprietario di nessun negozio: potrebbe essere un Collaboratore
       const { data: tRow } = await storeAuthClient
         .from('team_members')
-        .select('*, stores(*)')
+        .select(`*, stores(${STORE_COLUMNS})`)
         .eq('auth_user_id', authData.user.id)
         .maybeSingle();
 
@@ -1503,7 +1508,7 @@ window.saveStoreProfile = async (e) => {
         ...(isEcomProfile ? { website_url: newWebsite } : {})
       })
       .eq('id', currentPartner.id)
-      .select()
+      .select(STORE_COLUMNS)
       .single();
 
     if (error) {
@@ -4267,7 +4272,7 @@ async function finalizeStoreRegistration(authUserId, authSession) {
         plan: d.planChoice,
         internal_notes: d.referralNotes
       })
-      .select()
+      .select(STORE_COLUMNS)
       .single();
     if (storeError) throw new Error("Errore creazione negozio: " + storeError.message);
 
@@ -7345,7 +7350,7 @@ async function refreshPartnerSession(storeId) {
   try {
    const { data: storeRow, error } = await storeAuthClient
      .from('stores')
-     .select('*')
+     .select(STORE_COLUMNS)
      .eq('id', storeId)
      .single();
  
@@ -8629,7 +8634,7 @@ async function handleOnboardingSubmit(step) {
           // qui: il database forza sempre Starter/trial in inserimento, per sicurezza.
           // Il piano scelto (se a pagamento) viene attivato subito dopo con activate_store_subscription.
         })
-        .select()
+        .select(STORE_COLUMNS)
         .single();
         if (storeError) throw new Error("Errore creazione negozio: " + storeError.message);
 
