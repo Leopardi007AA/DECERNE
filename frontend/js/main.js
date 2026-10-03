@@ -2912,12 +2912,12 @@ function renderOffersTab() {
         </div>
       </div>
       <div style="display:flex; gap:10px;">
-        <button class="btn outline" onclick="toggleSelectAllOffersFromHeader()">
+        <button class="btn outline" data-onclick="toggleSelectAllOffersFromHeader()">
           <input type="checkbox" id="selectAllOffersCb" style="margin-right:6px;"> Seleziona tutto
         </button>
         <button class="btn ${isLimitReached ? 'disabled' : ''}" 
                 ${isLimitReached ? 'disabled' : ''} 
-                onclick="handleNewOfferClick()">
+                data-onclick="handleNewOfferClick()">
           ${isLimitReached ? 'Limite raggiunto' : '+ Crea Nuova'}
         </button>
       </div>
@@ -2925,20 +2925,20 @@ function renderOffersTab() {
 
     <div id="bulkOffersToolbar" class="card-saas" style="display:none; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:15px; padding:12px 16px;">
       <strong id="bulkOffersCount" style="color:#64748b; font-size:0.85rem;">0 selezionate</strong>
-      <button class="btn outline" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" onclick="bulkSetOfferStatus('active')">Attiva</button>
-      <button class="btn outline" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" onclick="bulkSetOfferStatus('draft')">Bozza</button>
-      <button class="btn outline" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" onclick="bulkSetOfferStatus('paused')">Pausa</button>
+      <button class="btn outline" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" data-onclick="bulkSetOfferStatus('active')">Attiva</button>
+      <button class="btn outline" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" data-onclick="bulkSetOfferStatus('draft')">Bozza</button>
+      <button class="btn outline" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" data-onclick="bulkSetOfferStatus('paused')">Pausa</button>
       <div class="status-pub-dropdown" style="position:relative;">
-        <button class="btn outline" style="padding:8px 18px; min-width:170px;" onclick="toggleStatoPubblicazioneMenu()">${PANEL_ICONS.calendar} Pianifica pubblicazione</button>
+        <button class="btn outline" style="padding:8px 18px; min-width:170px;" data-onclick="toggleStatoPubblicazioneMenu()">${PANEL_ICONS.calendar} Pianifica pubblicazione</button>
         <div id="statoPubblicazioneMenu" style="display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:60; background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:14px; min-width:250px; box-shadow:0 10px 24px rgba(0,0,0,0.12);">
-          <button class="btn outline" style="width:100%;" onclick="toggleBulkScheduleFields()">Pianifica pubblicazione futura</button>
+          <button class="btn outline" style="width:100%;" data-onclick="toggleBulkScheduleFields()">Pianifica pubblicazione futura</button>
           <div id="bulkScheduleFields" style="display:none; flex-direction:column; gap:8px; margin-top:10px;">
             <input type="datetime-local" id="bulkScheduleDateTime" step="300" style="padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:0.85rem;">
-            <button class="btn" style="width:100%;" onclick="bulkSchedulePublish()">Conferma pianificazione</button>
+            <button class="btn" style="width:100%;" data-onclick="bulkSchedulePublish()">Conferma pianificazione</button>
           </div>
         </div>
       </div>
-      <button class="btn danger" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" onclick="bulkDeleteOffers()">${PANEL_ICONS.trash} Rimuovi</button>
+      <button class="btn danger" style="padding:8px 18px; flex:1 1 auto; min-width:110px;" data-onclick="bulkDeleteOffers()">${PANEL_ICONS.trash} Rimuovi</button>
     </div>
 
     <div class="card" id="myOffersCard">
@@ -2968,7 +2968,7 @@ function renderOffersTable(limit = 999) {
 
     return `
       <tr>
-        <td><input type="checkbox" class="offer-select-checkbox" ${isSelected ? 'checked' : ''} onchange="toggleOfferSelection('${o.id}', this.checked)"></td>
+        <td><input type="checkbox" class="offer-select-checkbox" ${isSelected ? 'checked' : ''} data-onchange="toggleOfferSelection('${o.id}', this.checked)"></td>
         <td>
           <img src="${getSafeImageUrl(o.img)}" alt="${esc(o.product)}"
                style="width:40px; height:40px; border-radius:4px; object-fit:contain; background:#f8fafc; border:1px solid #eee;">
@@ -2981,8 +2981,8 @@ function renderOffersTable(limit = 999) {
         <td><strong style="color:var(--primary);">${formatPrice(o.price)}</strong></td>
         <td style="font-size:0.8rem;">${o.endDate}</td>
         <td>
-          <button class="btn outline" style="padding:5px 10px" onclick="editOffer('${o.id}')">${PANEL_ICONS.pencil}</button>
-          <button class="btn danger" style="padding:5px 10px" onclick="deleteOffer('${o.id}')">${PANEL_ICONS.trash}</button>
+          <button class="btn outline" style="padding:5px 10px" data-onclick="editOffer('${o.id}')">${PANEL_ICONS.pencil}</button>
+          <button class="btn danger" style="padding:5px 10px" data-onclick="deleteOffer('${o.id}')">${PANEL_ICONS.trash}</button>
         </td>
       </tr>
     `;
@@ -3035,11 +3035,11 @@ function renderSubTab() {
 
       const canRenewNow = daysToRenewal <= 0;
       const annualSwitchBtn = (sub.billingCycle !== 'annual' && !canRenewNow)
-        ? `<button class="btn outline" onclick="switchToAnnual()">Passa a fatturazione annuale</button>`
+        ? `<button class="btn outline" data-onclick="switchToAnnual()">Passa a fatturazione annuale</button>`
         : '';
       actionButtons = `
-        <button class="btn" style="background: #6929c4;" ${canRenewNow ? `onclick="activatePlan('Professional', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Professional</button>
-        <button class="btn outline" onclick="goToStoreStep('pricing', '${sub.billingCycle || 'monthly'}')">Gestisci Piani</button>
+        <button class="btn" style="background: #6929c4;" ${canRenewNow ? `data-onclick="activatePlan('Professional', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Professional</button>
+        <button class="btn outline" data-onclick="goToStoreStep('pricing', '${sub.billingCycle || 'monthly'}')">Gestisci Piani</button>
         ${annualSwitchBtn}`;
   }
 
@@ -3062,9 +3062,9 @@ function renderSubTab() {
       </div>`;
       const canRenewNow = daysToRenewal <= 0;
       const annualSwitchBtn = (sub.billingCycle !== 'annual' && !canRenewNow)
-        ? `<button class="btn outline" onclick="switchToAnnual()">Passa a fatturazione annuale</button>`
+        ? `<button class="btn outline" data-onclick="switchToAnnual()">Passa a fatturazione annuale</button>`
         : '';
-      actionButtons = `<button class="btn" ${canRenewNow ? `onclick="activatePlan('Standard', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Ora</button> ${annualSwitchBtn}`;
+      actionButtons = `<button class="btn" ${canRenewNow ? `data-onclick="activatePlan('Standard', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Ora</button> ${annualSwitchBtn}`;
   }
 
   else if (plan === 'Enterprise' && status === 'active') {
@@ -3092,9 +3092,9 @@ function renderSubTab() {
 
       const canRenewNow = daysToRenewal <= 0;
       const annualSwitchBtn = (sub.billingCycle !== 'annual' && !canRenewNow)
-        ? `<button class="btn outline" onclick="switchToAnnual()">Passa a fatturazione annuale</button>`
+        ? `<button class="btn outline" data-onclick="switchToAnnual()">Passa a fatturazione annuale</button>`
         : '';
-      actionButtons = `<button class="btn" style="background: #1e40af;" ${canRenewNow ? `onclick="activatePlan('Enterprise', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Enterprise</button> ${annualSwitchBtn}`;
+      actionButtons = `<button class="btn" style="background: #1e40af;" ${canRenewNow ? `data-onclick="activatePlan('Enterprise', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Enterprise</button> ${annualSwitchBtn}`;
   }
 
   else if (plan === 'Professional' && status === 'expired') {
@@ -3104,7 +3104,7 @@ function renderSubTab() {
         <h3 style="margin-top: 10px;">Piano Professional</h3>
         <p>Il rinnovo non è stato ancora effettuato: le tue offerte sono in pausa.</p>
       </div>`;
-    actionButtons = `<button class="btn" style="background: #6929c4;" onclick="activatePlan('Professional', '${sub.billingCycle || 'monthly'}')">Rinnova Professional</button>`;
+    actionButtons = `<button class="btn" style="background: #6929c4;" data-onclick="activatePlan('Professional', '${sub.billingCycle || 'monthly'}')">Rinnova Professional</button>`;
   }
 
   else if (plan === 'Standard' && status === 'expired') {
@@ -3114,7 +3114,7 @@ function renderSubTab() {
         <h3>Piano Standard</h3>
         <p>Il rinnovo non è stato ancora effettuato: le tue offerte sono in pausa.</p>
       </div>`;
-    actionButtons = `<button class="btn" onclick="activatePlan('Standard', '${sub.billingCycle || 'monthly'}')">Rinnova Ora</button>`;
+    actionButtons = `<button class="btn" data-onclick="activatePlan('Standard', '${sub.billingCycle || 'monthly'}')">Rinnova Ora</button>`;
   }
 
   else if (plan === 'Enterprise' && status === 'expired') {
@@ -3124,7 +3124,7 @@ function renderSubTab() {
         <h3 style="margin-top: 10px;">Piano Enterprise</h3>
         <p>Il rinnovo non è stato ancora effettuato: le tue offerte sono in pausa.</p>
       </div>`;
-    actionButtons = `<button class="btn" style="background: #1e40af;" onclick="activatePlan('Enterprise', '${sub.billingCycle || 'monthly'}')">Rinnova Enterprise</button>`;
+    actionButtons = `<button class="btn" style="background: #1e40af;" data-onclick="activatePlan('Enterprise', '${sub.billingCycle || 'monthly'}')">Rinnova Enterprise</button>`;
   }
 
   else if (status === 'trial' || status === 'expired') {
@@ -3137,8 +3137,8 @@ function renderSubTab() {
         <p>${isExpired ? 'Le tue offerte sono state messe in pausa.' : `Hai ancora <strong>${sub.daysLeft} giorni</strong> di prova.`}</p>
       </div>`;
     actionButtons = isExpired
-      ? `<button class="btn" onclick="goToStoreStep('pricing')">Riattiva ora</button>`
-      : (nextPlan ? `<button class="btn" onclick="goToStoreStep('pricing')">Upgrade a ${nextPlan}</button>` : '');
+      ? `<button class="btn" data-onclick="goToStoreStep('pricing')">Riattiva ora</button>`
+      : (nextPlan ? `<button class="btn" data-onclick="goToStoreStep('pricing')">Upgrade a ${nextPlan}</button>` : '');
   }
 
   else {
@@ -3150,7 +3150,7 @@ function renderSubTab() {
         <p>${plan === 'Starter' ? 'Limiti: 10 offerte attive. Nessuna funzione avanzata.' : ''}</p>
       </div>`;
     actionButtons = nextPlan
-      ? `<button class="btn outline" onclick="goToStoreStep('pricing')">Passa a ${nextPlan}</button>`
+      ? `<button class="btn outline" data-onclick="goToStoreStep('pricing')">Passa a ${nextPlan}</button>`
       : '';
   }
 
@@ -3186,7 +3186,7 @@ function renderProfileTab() {
     </header>
     
     <div class="card-saas">
-      <form class="auth-form" id="storeSettingsForm" onsubmit="saveStoreProfile(event)">
+      <form class="auth-form" id="storeSettingsForm" data-onsubmit="saveStoreProfile(event)">
         
         <div style="margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0;">
           <h4 style="color: #64748b; font-size: 0.8rem; text-transform: uppercase;">Dati Societari (Sola Lettura)</h4>
@@ -3328,7 +3328,7 @@ window.addNewLocationField = () => {
       <input type="text" class="loc-name" placeholder="Nome sede" style="margin-bottom:5px; font-weight:700;">
       <input type="text" class="loc-addr" placeholder="Indirizzo completo">
     </div>
-    <button type="button" class="btn danger" onclick="removeParentElement(this)" style="padding: 5px 10px;">&times;</button>
+    <button type="button" class="btn danger" data-onclick="removeParentElement(this)" style="padding: 5px 10px;">&times;</button>
   `;
   container.appendChild(div);
 };
@@ -4191,7 +4191,7 @@ function renderOtpVerificationScreen(email) {
       <br>
       <button class="btn" id="verifyOtpBtn" style="width:180px;">Verifica</button>
       <p style="margin-top:20px; font-size:0.9rem;">
-        Non hai ricevuto il codice? <a href="javascript:void(0)" id="resendOtpLink">Invialo di nuovo</a>
+        Non hai ricevuto il codice? <a href="#" id="resendOtpLink">Invialo di nuovo</a>
       </p>
     </div>
   `;
@@ -4511,10 +4511,10 @@ async function renderCartContent() {
   const smartListHeader = `
     <div class="cart-toolbar">
       <span></span>
-      <button class="btn cart-smart-btn" onclick="openSmartShoppingListModal()">
+      <button class="btn cart-smart-btn" data-onclick="openSmartShoppingListModal()">
         ${PANEL_ICONS.basket} Lista della spesa
       </button>
-      <button class="btn outline cart-share-btn" onclick="shareShoppingList()">
+      <button class="btn outline cart-share-btn" data-onclick="shareShoppingList()">
         ${PANEL_ICONS.share} Condividi
       </button>
     </div>
@@ -4528,7 +4528,7 @@ async function renderCartContent() {
         <div class="round-ico">${PANEL_ICONS.basket}</div>
         <h3>${sharedIds ? 'Questa lista è vuota' : 'La tua lista è vuota'}</h3>
         <p>${sharedIds ? 'Le offerte condivise non sono più disponibili.' : 'Aggiungi le offerte che ti interessano per trovarle facilmente in negozio.'}</p>
-        <button class="btn cart-map-btn" onclick="openBrowseStoresMap()">${PANEL_ICONS.pin} Mappa negozi</button>
+        <button class="btn cart-map-btn" data-onclick="openBrowseStoresMap()">${PANEL_ICONS.pin} Mappa negozi</button>
       </div>
     `;
     return;
@@ -4540,7 +4540,7 @@ async function renderCartContent() {
     ${smartListHeader}
     <div class="cart-list">
     ${cart.map(o => `
-      <div class="cart-row" onclick="closeFullPageModal(); openProductDetail('${o.id}')">
+      <div class="cart-row" data-onclick="closeFullPageModal(); openProductDetail('${o.id}')">
         <div class="cart-row-img"><img src="${getSafeImageUrl(o.img_url)}" alt=""></div>
         <div class="cart-row-body">
           <div class="cart-row-info">
@@ -4548,13 +4548,13 @@ async function renderCartContent() {
             <div class="cart-row-product">${esc(o.product)}</div>
             <div class="cart-row-price">${formatPrice(o.price)}</div>
           </div>
-          ${sharedIds ? '' : `<button class="btn danger cart-remove-btn" onclick="event.stopPropagation(); removeFromCart('${o.id}')">Rimuovi</button>`}
+          ${sharedIds ? '' : `<button class="btn danger cart-remove-btn" data-onclick="event.stopPropagation(); removeFromCart('${o.id}')">Rimuovi</button>`}
         </div>
       </div>
     `).join('')}
       ${sharedIds
-        ? `<button class="btn cart-map-btn" onclick="openSharedListMapView(window.__sharedListCart)">${PANEL_ICONS.pin} Vedi i negozi sulla mappa</button>`
-        : `<button class="btn cart-map-btn" onclick="openCartMapView()">${PANEL_ICONS.pin} Segui nella mappa fino ai negozi</button>`}
+        ? `<button class="btn cart-map-btn" data-onclick="openSharedListMapView(window.__sharedListCart)">${PANEL_ICONS.pin} Vedi i negozi sulla mappa</button>`
+        : `<button class="btn cart-map-btn" data-onclick="openCartMapView()">${PANEL_ICONS.pin} Segui nella mappa fino ai negozi</button>`}
     </div>
   `;
 }
@@ -4820,7 +4820,7 @@ async function renderMultiStopMap(cart, overrideStoresById, options = {}) {
   if (cart.length === 0) {
     content.innerHTML = `
       <div style="padding:14px;">
-        <button class="btn outline" onclick="renderCartContent()" style="margin-bottom:14px;">← Torna alla lista</button>
+        <button class="btn outline" data-onclick="renderCartContent()" style="margin-bottom:14px;">← Torna alla lista</button>
         <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:12px 14px; color:#92400e; font-size:0.85rem; display:flex; align-items:flex-start; gap:8px;">
           ${PANEL_ICONS.alert}<span>${onlineOnlyMessage}</span>
         </div>
@@ -4860,8 +4860,8 @@ async function renderMultiStopMap(cart, overrideStoresById, options = {}) {
     content.innerHTML = `<div style="padding:50px; text-align:center; color:#64748b;">
       <h3>${title}</h3>
       <p>${msg}</p>
-      <button class="btn" onclick="openCartMapView()">Riprova</button>
-      <button class="btn outline" onclick="renderCartContent()">Torna alla lista</button>
+      <button class="btn" data-onclick="openCartMapView()">Riprova</button>
+      <button class="btn outline" data-onclick="renderCartContent()">Torna alla lista</button>
     </div>`;
     return;
   }
@@ -4885,9 +4885,9 @@ async function renderMultiStopMap(cart, overrideStoresById, options = {}) {
   content.innerHTML = `
     <div style="padding:10px;">
       <div style="display:flex; gap:8px; margin-bottom:10px;">
-        <button class="btn outline" onclick="stopCartMapTracking()">← Torna alla lista</button>
-        <button class="btn outline" id="voiceGuideBtn" onclick="toggleCartVoice()">${PANEL_ICONS.headset} Voce</button>
-        <button class="btn outline" id="followMeBtn" onclick="toggleFollowMe()" style="margin-left:auto;">${PANEL_ICONS.target} Seguimi</button>
+        <button class="btn outline" data-onclick="stopCartMapTracking()">← Torna alla lista</button>
+        <button class="btn outline" id="voiceGuideBtn" data-onclick="toggleCartVoice()">${PANEL_ICONS.headset} Voce</button>
+        <button class="btn outline" id="followMeBtn" data-onclick="toggleFollowMe()" style="margin-left:auto;">${PANEL_ICONS.target} Seguimi</button>
       </div>
       <p style="font-size:0.8rem; color:#94a3b8; margin-bottom:8px;">Tocca un negozio sulla mappa per tracciare subito il percorso.</p>
       ${onlineOnlyItems.length > 0 ? `
@@ -4908,7 +4908,7 @@ async function renderMultiStopMap(cart, overrideStoresById, options = {}) {
         <p style="font-size:0.85rem; color:#475569; margin-bottom:8px; display:flex; align-items:center; gap:6px;">${PANEL_ICONS.bulb} Facoltativo: quanto ti costa il carburante per ogni chilometro? Ti diciamo se conviene un prezzo più alto ma più vicino.</p>
         <div style="display:flex; gap:8px;">
           <input type="number" id="costPerKmInput" placeholder="Es: 0.15" step="0.01" min="0" style="flex:1; padding:8px; border-radius:8px; border:1px solid #cbd5e1;">
-          <button class="btn" onclick="evaluateSmartSavings()">Valuta risparmio</button>
+          <button class="btn" data-onclick="evaluateSmartSavings()">Valuta risparmio</button>
         </div>
         <div id="smartSavingsPanel" style="margin-top:10px;"></div>
       </div>
@@ -5319,7 +5319,7 @@ async function openBrowseStoresMap() {
   const content = $("#modalContent");
   content.innerHTML = `
     <div style="padding:16px;">
-      <button class="btn outline" style="margin-bottom:12px;" onclick="renderCartContent()">← Torna alla lista</button>
+      <button class="btn outline" style="margin-bottom:12px;" data-onclick="renderCartContent()">← Torna alla lista</button>
       <div id="cartMapContainer" style="width:100%; height:65vh; border-radius:12px; overflow:hidden;"></div>
     </div>
   `;
@@ -5582,7 +5582,7 @@ window.openSmartShoppingListModal = () => {
   const content = $("#modalContent");
   content.innerHTML = `
     <div style="padding:14px;">
-      <button class="btn outline" onclick="renderCartContent()" style="margin-bottom:14px;">← Torna al carrello</button>
+      <button class="btn outline" data-onclick="renderCartContent()" style="margin-bottom:14px;">← Torna al carrello</button>
       <div class="smart-list-card">
         <h3>${PANEL_ICONS.basket} La tua lista della spesa</h3>
         <p class="smart-list-subtitle">Scrivi un prodotto per campo: cerchiamo tra tutte le offerte attive il negozio più conveniente per ognuno.</p>
@@ -5602,15 +5602,15 @@ window.openSmartShoppingListModal = () => {
 
         <label class="smart-list-label">Prodotti da cercare</label>
         <div id="smartListFieldsContainer" class="smart-list-fields">
-          <div class="smart-list-field-row"><input type="text" class="smart-list-item-input" placeholder="Prodotto 1 (es: latte)" oninput="handleSmartListFieldInput(this)"></div>
+          <div class="smart-list-field-row"><input type="text" class="smart-list-item-input" placeholder="Prodotto 1 (es: latte)" data-oninput="handleSmartListFieldInput(this)"></div>
         </div>
       </div>
 
-      <button class="btn full-width smart-list-find-btn" onclick="searchSmartShoppingList()">${PANEL_ICONS.search} Trova Offerte</button>
+      <button class="btn full-width smart-list-find-btn" data-onclick="searchSmartShoppingList()">${PANEL_ICONS.search} Trova Offerte</button>
 
       <div id="smartListResults" class="smart-list-results"></div>
 
-            <button id="traceSmartListBtn" class="btn smart-list-trace-btn" onclick="traceSmartListOnMap()">${PANEL_ICONS.route} Traccia la lista sulla mappa</button>
+            <button id="traceSmartListBtn" class="btn smart-list-trace-btn" data-onclick="traceSmartListOnMap()">${PANEL_ICONS.route} Traccia la lista sulla mappa</button>
     </div>
   `;
 };
@@ -5624,7 +5624,7 @@ window.handleSmartListFieldInput = (el) => {
   if (isLast && el.value.trim() !== '') {
     const row = document.createElement('div');
     row.className = 'smart-list-field-row';
-    row.innerHTML = `<input type="text" class="smart-list-item-input" placeholder="Prodotto ${inputs.length + 1} (es: pane)" oninput="handleSmartListFieldInput(this)">`;
+    row.innerHTML = `<input type="text" class="smart-list-item-input" placeholder="Prodotto ${inputs.length + 1} (es: pane)" data-oninput="handleSmartListFieldInput(this)">`;
     container.appendChild(row);
   }
 };
@@ -5819,7 +5819,7 @@ window.searchSmartShoppingList = async () => {
         <input type="number" class="smart-list-qty-input" min="0" step="0.1"
                placeholder="Lascia vuoto per il prezzo più conveniente al ${unit}"
                value="${window.smartListQuantities[key] || ''}"
-               onchange="updateSmartListQuantityFromInput(this)" data-key="${esc(key)}">
+               data-onchange="updateSmartListQuantityFromInput(this)" data-key="${esc(key)}">
       </div>` : '';
 
     return `
@@ -6556,24 +6556,24 @@ function renderLoginForm() {
         <button type="submit" class="btn">Accedi</button>
       </form>
       <p style="text-align:center; margin-top:10px;">
-        <a href="javascript:void(0)" onclick="renderForgotPasswordForm()" style="font-size:0.85rem; color:#64748b;">Password dimenticata?</a>
+        <a href="#" data-onclick="renderForgotPasswordForm()" style="font-size:0.85rem; color:#64748b;">Password dimenticata?</a>
       </p>
       <div class="social-divider"><span>oppure</span></div>
-      <button type="button" class="btn-social btn-google" onclick="signInWithProvider('google','login')">
+      <button type="button" class="btn-social btn-google" data-onclick="signInWithProvider('google','login')">
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><g fill-rule="evenodd"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z" fill="#EA4335"/></g></svg>
         Continua con Google
       </button>
-      <button type="button" class="btn-social btn-facebook" onclick="signInWithProvider('facebook','login')">
+      <button type="button" class="btn-social btn-facebook" data-onclick="signInWithProvider('facebook','login')">
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
         Continua con Facebook
       </button>
-      <button type="button" class="btn-social btn-github" onclick="signInWithProvider('github','login')">
+      <button type="button" class="btn-social btn-github" data-onclick="signInWithProvider('github','login')">
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
          <path fill="#24292e" fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
         </svg>
        Continua con GitHub
       </button>
-      <p class="auth-switch">Non sei registrato? <a href="javascript:void(0)" onclick="showRegisterForm()">Registrati</a></p>
+      <p class="auth-switch">Non sei registrato? <a href="#" data-onclick="showRegisterForm()">Registrati</a></p>
     </div>
   `;
   syncUrlFromAction(ROUTES.accedi);
@@ -6615,7 +6615,7 @@ function renderForgotPasswordForm() {
         <input type="email" id="forgotEmail" placeholder="Email" autocomplete="email" required>
         <button type="submit" class="btn">Invia link di recupero</button>
       </form>
-      <p class="auth-switch"><a href="javascript:void(0)" onclick="renderLoginForm()">Torna al login</a></p>
+      <p class="auth-switch"><a href="#" data-onclick="renderLoginForm()">Torna al login</a></p>
     </div>
   `;
 
@@ -6714,21 +6714,21 @@ function showRegisterForm() {
         <button type="submit" class="btn">Registrati</button>
       </form>
       <div class="social-divider"><span>oppure</span></div>
-      <button type="button" class="btn-social btn-google" onclick="signInWithProvider('google')">
+      <button type="button" class="btn-social btn-google" data-onclick="signInWithProvider('google')">
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><g fill-rule="evenodd"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z" fill="#EA4335"/></g></svg>
         Continua con Google
       </button>
-      <button type="button" class="btn-social btn-facebook" onclick="signInWithProvider('facebook')">
+      <button type="button" class="btn-social btn-facebook" data-onclick="signInWithProvider('facebook')">
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
         Continua con Facebook
       </button>
-      <button type="button" class="btn-social btn-github" onclick="signInWithProvider('github')">
+      <button type="button" class="btn-social btn-github" data-onclick="signInWithProvider('github')">
        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
         <path fill="#24292e" fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
        </svg>
        Continua con GitHub
       </button>
-      <p class="auth-switch">Hai già un account? <a href="javascript:void(0)" onclick="renderLoginForm()">Accedi</a></p>
+      <p class="auth-switch">Hai già un account? <a href="#" data-onclick="renderLoginForm()">Accedi</a></p>
     </div>
   `;
   syncUrlFromAction(ROUTES.registrati);
@@ -6761,8 +6761,8 @@ function renderProfileInfo() {
         </div>
         <button type="submit" class="btn">Salva Modifiche</button>
         <div style="display: flex; gap: 10px; margin-top: 20px;">
-        <button type="button" class="btn outline" onclick="logoutUser()" style="flex: 1;">Esci dall'account</button>
-        <button type="button" class="btn danger" onclick="promptPasswordThenDeleteAccount()" style="flex: 1;">Elimina Account</button>
+        <button type="button" class="btn outline" data-onclick="logoutUser()" style="flex: 1;">Esci dall'account</button>
+        <button type="button" class="btn danger" data-onclick="promptPasswordThenDeleteAccount()" style="flex: 1;">Elimina Account</button>
         </div>
       </form>
     </div>
@@ -7411,7 +7411,7 @@ window.showOfferPreview = () => {
           </div>
         </div>
         <div class="product-actions">
-          <button class="btn" onclick="event.stopPropagation(); saveOfferFromIdField()">Aggiungi</button>
+          <button class="btn" data-onclick="event.stopPropagation(); saveOfferFromIdField()">Aggiungi</button>
         </div>
       </div>
     </div>
@@ -7890,7 +7890,7 @@ function renderStoreForgotPasswordForm() {
           <button type="submit" class="btn full-width">Invia codice di recupero</button>
         </form>
         <p class="auth-switch" style="text-align:center; margin-top:15px;">
-          <a href="javascript:void(0)" onclick="goToStoreStep('login')">Torna al login</a>
+          <a href="#" data-onclick="goToStoreStep('login')">Torna al login</a>
         </p>
       </div>
     </div>
@@ -7927,7 +7927,7 @@ function renderStoreResetOtpForm(email) {
           <button type="submit" class="btn full-width">Verifica codice</button>
         </form>
         <p class="auth-switch" style="text-align:center; margin-top:15px;">
-          Non hai ricevuto il codice? <a href="javascript:void(0)" id="storeResendResetOtp">Invialo di nuovo</a>
+          Non hai ricevuto il codice? <a href="#" id="storeResendResetOtp">Invialo di nuovo</a>
         </p>
       </div>
     </div>
@@ -8023,7 +8023,7 @@ function renderTeamFirstLoginOtpForm(email) {
           <button type="submit" class="btn full-width">Verifica codice</button>
         </form>
         <p class="auth-switch" style="text-align:center; margin-top:15px;">
-          Non hai ricevuto il codice? <a href="javascript:void(0)" id="teamResendOtp">Invialo di nuovo</a>
+          Non hai ricevuto il codice? <a href="#" id="teamResendOtp">Invialo di nuovo</a>
         </p>
       </div>
     </div>
@@ -8121,7 +8121,7 @@ let backArrow = "";
 if (partner) {
   backArrow = `
     <div class="pricing-back-nav">
-      <button class="icon-btn-back" onclick="goToStoreStep('dashboard')" title="Torna alla Dashboard">
+      <button class="icon-btn-back" data-onclick="goToStoreStep('dashboard')" title="Torna alla Dashboard">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <line x1="19" y1="12" x2="5" y2="12"></line>
           <polyline points="12 19 5 12 12 5"></polyline>
@@ -8142,7 +8142,7 @@ const getPlanButton = (planName, priceText) => {
   // rispettando il ciclo (Mensile/Annuale) che il partner ha selezionato QUI
   // sulla pagina, non quello che aveva sul vecchio abbonamento.
   if (currentPlan === planName && currentSub?.status === 'expired') {
-    return `<button class="btn full-width" onclick="activatePlan('${planName}', '${cycle}')">Rinnova ${planName}</button>`;
+    return `<button class="btn full-width" data-onclick="activatePlan('${planName}', '${cycle}')">Rinnova ${planName}</button>`;
   }
 
   // Il partner è già su questo piano ed è ancora attivo -> non rinnovabile in anticipo
@@ -8155,18 +8155,18 @@ const getPlanButton = (planName, priceText) => {
     if (currentSub?.pendingPlan === planName) {
       return `<button class="btn full-width disabled" disabled title="Partirà automaticamente alla scadenza del piano attuale">Già programmato</button>`;
     }
-    return `<button class="btn full-width" onclick="openUpgradeChoiceModal('${planName}', '${cycle}')">Passa a ${planName}</button>`;
+    return `<button class="btn full-width" data-onclick="openUpgradeChoiceModal('${planName}', '${cycle}')">Passa a ${planName}</button>`;
   }
 
   // Prova gratuita SOLO per Starter mensile. Ogni altra combinazione piano/ciclo
   // (Starter annuale, Standard/Professional/Enterprise sia mensile che annuale) si attiva
   // subito come abbonamento a pagamento, senza periodo di prova.
   if (planName !== 'Starter' || isAnnualView) {
-    return `<button class="btn ${planName === 'Standard' ? '' : 'outline'} full-width" onclick="startPlanDirect('${planName}')">Scegli ${planName}</button>`;
+    return `<button class="btn ${planName === 'Standard' ? '' : 'outline'} full-width" data-onclick="startPlanDirect('${planName}')">Scegli ${planName}</button>`;
   }
 
   // Caso default: Starter, modalità Mensile -> unico caso con prova gratuita
-  return `<button class="btn outline full-width" onclick="startTrial('${planName}')">Prova gratuita</button>`;
+  return `<button class="btn outline full-width" data-onclick="startTrial('${planName}')">Prova gratuita</button>`;
 };
 
 const isAnnual = isAnnualView;
@@ -8175,11 +8175,11 @@ const isAnnual = isAnnualView;
       <div class="pricing-header">
         <span class="badge-partner">AREA PARTNER</span>
         <h2>Scegli il piano perfetto per il tuo business</h2>
-        <p>Hai già un account? <button class="btn" style="padding: 5px 15px; font-size: 0.8rem; margin-left: 10px;" onclick="showStoreLogin()">Accedi qui</button></p>
+        <p>Hai già un account? <button class="btn" style="padding: 5px 15px; font-size: 0.8rem; margin-left: 10px;" data-onclick="showStoreLogin()">Accedi qui</button></p>
 
         <div class="billing-cycle-switch">
-          <button type="button" class="cycle-btn ${!isAnnual ? 'active' : ''}" onclick="setBillingCycle('monthly')">Mensile</button>
-          <button type="button" class="cycle-btn ${isAnnual ? 'active' : ''}" onclick="setBillingCycle('annual')">Annuale</button>
+          <button type="button" class="cycle-btn ${!isAnnual ? 'active' : ''}" data-onclick="setBillingCycle('monthly')">Mensile</button>
+          <button type="button" class="cycle-btn ${isAnnual ? 'active' : ''}" data-onclick="setBillingCycle('annual')">Annuale</button>
         </div>
       </div>
       
@@ -8254,14 +8254,14 @@ const isAnnual = isAnnualView;
             <li>Export dei dati in CSV quando serve</li>
             <li>Account manager dedicato e SLA concordato via contratto</li>
           </ul>
-          <button class="btn outline full-width" onclick="openEmailContact('contact@decerne.it', 'Richiesta informazioni sui piani')">Contattaci</button>
+          <button class="btn outline full-width" data-onclick="openEmailContact('contact@decerne.it', 'Richiesta informazioni sui piani')">Contattaci</button>
         </div>
       </div>
 
       <div class="store-footer-login" style="margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 30px;">
         <p style="color: #64748b; font-size: 1rem;">
           Hai bisogno di assistenza per scegliere il piano? 
-          <a href="mailto:contact@decerne.it" onclick="openEmailContact('contact@decerne.it', 'Richiesta informazioni sui piani'); return false;" style="color: var(--primary); font-weight: 700; text-decoration: none; margin-left: 5px;">Parla con un esperto</a>
+          <a href="mailto:contact@decerne.it" data-onclick="openEmailContact('contact@decerne.it', 'Richiesta informazioni sui piani'); return false;" style="color: var(--primary); font-weight: 700; text-decoration: none; margin-left: 5px;">Parla con un esperto</a>
         </p>
       </div>
     </div>
@@ -8459,7 +8459,7 @@ function renderOnboarding(container) {
           <button type="submit" class="btn full-width">Verifica codice</button>
         </form>
         <p style="margin-top:15px; font-size:0.9rem; text-align:center;">
-          Non hai ricevuto il codice? <a href="javascript:void(0)" onclick="resendOnboardingOtp()">Invialo di nuovo</a>
+          Non hai ricevuto il codice? <a href="#" data-onclick="resendOnboardingOtp()">Invialo di nuovo</a>
         </p>
       ` : step === 3 && isEcom ? `
         <h3>Il tuo Negozio Online</h3>
@@ -9004,33 +9004,33 @@ function renderDashboard(container) {
         <span class="partner-sidebar-handle-grip"></span>
       </button>
       <div class="partner-sidebar-edge" id="partnerSidebarEdge"></div>
-      <div class="partner-sidebar-overlay" id="partnerSidebarOverlay" onclick="closePartnerSidebar()"></div>
+      <div class="partner-sidebar-overlay" id="partnerSidebarOverlay" data-onclick="closePartnerSidebar()"></div>
       <aside class="store-sidebar" id="partnerSidebar">
-        <button class="partner-sidebar-close" onclick="closePartnerSidebar()" aria-label="Chiudi il menu">
+        <button class="partner-sidebar-close" data-onclick="closePartnerSidebar()" aria-label="Chiudi il menu">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
         </button>
         <div class="sidebar-title">PANNELLO PARTNER</div>
         ${collaboratorBadgeHTML}
-        <button id="partnerNavHome" class="store-nav-btn ${storeData.activeTab === 'home' ? 'active' : ''}" onclick="switchStoreTab('home')">${PANEL_ICONS.home} Panoramica</button>
-        <button id="partnerNavOffers" class="store-nav-btn ${storeData.activeTab === 'offers' ? 'active' : ''}" onclick="switchStoreTab('offers')">${PANEL_ICONS.tag} Le mie Offerte</button>
-        ${!isManager ? `<button id="partnerNavLocations" class="store-nav-btn ${storeData.activeTab === 'locations' ? 'active' : ''}" onclick="switchStoreTab('locations')">${PANEL_ICONS.pin} ${partner.businessType === 'E-commerce' ? 'Magazzini' : 'Gestione Sedi'}</button>` : ''}
-        ${!isManager && partner.businessType === 'E-commerce' ? `<button id="partnerNavShipping" class="store-nav-btn ${storeData.activeTab === 'shipping' ? 'active' : ''}" onclick="switchStoreTab('shipping')">${PANEL_ICONS.route} Spedizioni</button>` : ''}
-        <button id="partnerNavTrash" class="store-nav-btn ${storeData.activeTab === 'trash' ? 'active' : ''}" onclick="switchStoreTab('trash')">${PANEL_ICONS.trash} Cestino</button>
+        <button id="partnerNavHome" class="store-nav-btn ${storeData.activeTab === 'home' ? 'active' : ''}" data-onclick="switchStoreTab('home')">${PANEL_ICONS.home} Panoramica</button>
+        <button id="partnerNavOffers" class="store-nav-btn ${storeData.activeTab === 'offers' ? 'active' : ''}" data-onclick="switchStoreTab('offers')">${PANEL_ICONS.tag} Le mie Offerte</button>
+        ${!isManager ? `<button id="partnerNavLocations" class="store-nav-btn ${storeData.activeTab === 'locations' ? 'active' : ''}" data-onclick="switchStoreTab('locations')">${PANEL_ICONS.pin} ${partner.businessType === 'E-commerce' ? 'Magazzini' : 'Gestione Sedi'}</button>` : ''}
+        ${!isManager && partner.businessType === 'E-commerce' ? `<button id="partnerNavShipping" class="store-nav-btn ${storeData.activeTab === 'shipping' ? 'active' : ''}" data-onclick="switchStoreTab('shipping')">${PANEL_ICONS.route} Spedizioni</button>` : ''}
+        <button id="partnerNavTrash" class="store-nav-btn ${storeData.activeTab === 'trash' ? 'active' : ''}" data-onclick="switchStoreTab('trash')">${PANEL_ICONS.trash} Cestino</button>
         ${(() => {
           const p = getCurrentPartner();
           const plan = p?.plan || 'Starter';
           const isPro = plan === 'Professional' || plan === 'Enterprise';
           const isEnt = plan === 'Enterprise';
           return `
-            ${isEnt && !isManager ? `<button id="partnerNavGeneral" class="store-nav-btn ${storeData.activeTab === 'general' ? 'active' : ''}" onclick="switchStoreTab('general')">${PANEL_ICONS.chart} Dashboard Generale</button>` : ''}
-            ${isPro ? `<button id="partnerNavApi" class="store-nav-btn ${storeData.activeTab === 'api' ? 'active' : ''}" onclick="switchStoreTab('api')">${PANEL_ICONS.plug} Integrazione API</button>` : ''}
-            ${isEnt && !isManager ? `<button id="partnerNavTeam" class="store-nav-btn ${storeData.activeTab === 'team' ? 'active' : ''}" onclick="switchStoreTab('team')">${PANEL_ICONS.users} Team</button>` : ''}
+            ${isEnt && !isManager ? `<button id="partnerNavGeneral" class="store-nav-btn ${storeData.activeTab === 'general' ? 'active' : ''}" data-onclick="switchStoreTab('general')">${PANEL_ICONS.chart} Dashboard Generale</button>` : ''}
+            ${isPro ? `<button id="partnerNavApi" class="store-nav-btn ${storeData.activeTab === 'api' ? 'active' : ''}" data-onclick="switchStoreTab('api')">${PANEL_ICONS.plug} Integrazione API</button>` : ''}
+            ${isEnt && !isManager ? `<button id="partnerNavTeam" class="store-nav-btn ${storeData.activeTab === 'team' ? 'active' : ''}" data-onclick="switchStoreTab('team')">${PANEL_ICONS.users} Team</button>` : ''}
           `;
         })()}
-        ${!isManager ? `<button id="partnerNavSub" class="store-nav-btn ${storeData.activeTab === 'sub' ? 'active' : ''}" onclick="switchStoreTab('sub')">${PANEL_ICONS.card} Abbonamento</button>` : ''}
-        ${!isManager ? `<button id="partnerNavProfile" class="store-nav-btn ${storeData.activeTab === 'profile' ? 'active' : ''}" onclick="switchStoreTab('profile')">${PANEL_ICONS.settings} Impostazioni</button>` : ''}
+        ${!isManager ? `<button id="partnerNavSub" class="store-nav-btn ${storeData.activeTab === 'sub' ? 'active' : ''}" data-onclick="switchStoreTab('sub')">${PANEL_ICONS.card} Abbonamento</button>` : ''}
+        ${!isManager ? `<button id="partnerNavProfile" class="store-nav-btn ${storeData.activeTab === 'profile' ? 'active' : ''}" data-onclick="switchStoreTab('profile')">${PANEL_ICONS.settings} Impostazioni</button>` : ''}
         <div class="sidebar-footer">
-          <button class="store-nav-btn" onclick="logoutPartner()" style="color: #ef4444; width: 100%; text-align: left;">${PANEL_ICONS.logout} Esci</button>
+          <button class="store-nav-btn" data-onclick="logoutPartner()" style="color: #ef4444; width: 100%; text-align: left;">${PANEL_ICONS.logout} Esci</button>
         </div>
       </aside>
       <main class="store-content" id="active-tab-content"></main>
@@ -9238,12 +9238,12 @@ function renderHomeTab() {
   const heroStatHTML = `
     <div class="stats-grid-saas">
       <div class="stat-card-saas primary">
-        <div class="label stat-label-info" onclick="showStatInfo(event, 'totalViews')">Visualizzazioni Totali ${PANEL_ICONS.info}</div>
+        <div class="label stat-label-info" data-onclick="showStatInfo(event, 'totalViews')">Visualizzazioni Totali ${PANEL_ICONS.info}</div>
         <div class="value" style="color: var(--primary);">${totalViews}</div>
         <small style="color:#64748b;">Quante volte è comparsa una tua offerta</small>
       </div>
       <div class="stat-card-saas">
-        <div class="label stat-label-info" onclick="showStatInfo(event, 'detailOpens')">Aperture Dettaglio ${PANEL_ICONS.info}</div>
+        <div class="label stat-label-info" data-onclick="showStatInfo(event, 'detailOpens')">Aperture Dettaglio ${PANEL_ICONS.info}</div>
         <div class="value" style="color: #10b981; font-size: 2.6rem;">${totalOpens}</div>
         <small style="color:#64748b;">Quante volte è stato aperto il dettaglio di una tua offerta</small>
       </div>
@@ -9253,16 +9253,16 @@ function renderHomeTab() {
   const advancedStatsHTML = isStandardOrHigher ? `
     <div class="stats-grid-saas" style="margin-top: 16px;">
       <div class="stat-card-saas accent-indigo">
-        <div class="label stat-label-info" onclick="showStatInfo(event, 'avgCtr')">CTR Medio ${PANEL_ICONS.info}</div>
+        <div class="label stat-label-info" data-onclick="showStatInfo(event, 'avgCtr')">CTR Medio ${PANEL_ICONS.info}</div>
         <div class="value" style="color: #6366f1;">${avgCtr}%</div>
       </div>
       <div class="stat-card-saas accent-amber">
-        <div class="label stat-label-info" onclick="showStatInfo(event, 'bestOffer')">${PANEL_ICONS.flame} Migliore Offerta ${PANEL_ICONS.info}</div>
+        <div class="label stat-label-info" data-onclick="showStatInfo(event, 'bestOffer')">${PANEL_ICONS.flame} Migliore Offerta ${PANEL_ICONS.info}</div>
         <div class="value" style="font-size: 1.2rem;">${esc(bestOffer.product)}</div>
         <small style="color: #f59e0b; font-weight: 700;">Sconto: ${bestOffer.val}</small>
       </div>
       <div class="stat-card-saas accent-emerald">
-        <div class="label stat-label-info" onclick="showStatInfo(event, 'mostClicked')">${PANEL_ICONS.cursor} Più cliccata ${PANEL_ICONS.info}</div>
+        <div class="label stat-label-info" data-onclick="showStatInfo(event, 'mostClicked')">${PANEL_ICONS.cursor} Più cliccata ${PANEL_ICONS.info}</div>
         <div class="value" style="font-size: 1.2rem;">${esc(mostClicked.product)}</div>
         <small style="color: #10b981; font-weight: 700;">${mostClicked.val} click</small>
       </div>
@@ -9270,7 +9270,7 @@ function renderHomeTab() {
   ` : `
     <div class="card-saas" style="text-align:center; padding: 30px; margin-top: 16px;">
       <p style="margin-bottom: 12px;">Sblocca CTR, Migliore Offerta e classifica click con il piano Standard o superiore.</p>
-      <button class="btn outline" onclick="switchStoreTab('sub')">Scopri i vantaggi</button>
+      <button class="btn outline" data-onclick="switchStoreTab('sub')">Scopri i vantaggi</button>
     </div>
   `;
 
@@ -9279,11 +9279,11 @@ function renderHomeTab() {
       <div class="card-saas" style="border-left: 4px solid #6929c4;">
         <h3 style="color: #6929c4; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.key} API Key</h3>
         <input type="text" id="apiKeyDisplayHome" value="${esc(partner.apiKeyHint || '')}" placeholder="Nessuna chiave: vai nella sezione API" readonly style="width:100%; padding:8px; margin: 10px 0; border-radius:10px; border:1px solid #ddd; font-family:monospace; font-size:0.8rem;">
-        <button class="btn" style="background:#6929c4; padding:5px 15px;" onclick="switchStoreTab('api')">Gestisci chiave</button>
+        <button class="btn" style="background:#6929c4; padding:5px 15px;" data-onclick="switchStoreTab('api')">Gestisci chiave</button>
       </div>
       <div class="card-saas" style="border-left: 4px solid #10b981; background: #f0fdf4;">
         <h3 style="color: #166534; display:flex; align-items:center; gap:8px;">${PANEL_ICONS.headset} Supporto Prioritario</h3>
-                <p style="font-size: 0.8rem; margin: 10px 0;">Email: <strong><a href="mailto:${plan === 'Enterprise' ? 'enterprise@decerne.it' : 'professional@decerne.it'}" onclick="openEmailContact('${plan === 'Enterprise' ? 'enterprise@decerne.it' : 'professional@decerne.it'}', 'Richiesta supporto prioritario'); return false;" style="color:#166534;">${plan === 'Enterprise' ? 'enterprise@decerne.it' : 'professional@decerne.it'}</a></strong><br>Risposta: <strong>&lt; 24h</strong></p>
+                <p style="font-size: 0.8rem; margin: 10px 0;">Email: <strong><a href="mailto:${plan === 'Enterprise' ? 'enterprise@decerne.it' : 'professional@decerne.it'}" data-onclick="openEmailContact('${plan === 'Enterprise' ? 'enterprise@decerne.it' : 'professional@decerne.it'}', 'Richiesta supporto prioritario'); return false;" style="color:#166534;">${plan === 'Enterprise' ? 'enterprise@decerne.it' : 'professional@decerne.it'}</a></strong><br>Risposta: <strong>&lt; 24h</strong></p>
       </div>
     </div>
   ` : "";
@@ -9295,7 +9295,7 @@ function renderHomeTab() {
         <span class="badge-plan plan-${plan.toLowerCase()}">${plan}</span>
         <h2 style="margin-top:10px">Benvenuto, ${esc(partner.name)}</h2>
       </div>
-      <button class="btn" onclick="handleNewOfferClick()">${myOffers.length === 0 ? '+ Crea prima offerta' : '+ Aggiungi Offerta'}</button>
+      <button class="btn" data-onclick="handleNewOfferClick()">${myOffers.length === 0 ? '+ Crea prima offerta' : '+ Aggiungi Offerta'}</button>
     </header>
 
     ${heroStatHTML}
@@ -9422,7 +9422,7 @@ function renderStatsTab() {
             <div class="lock-icon">${PANEL_ICONS.lock}</div>
             <h3>Statistiche Avanzate</h3>
             <p>Passa al piano <strong>Standard</strong> per monitorare l'efficacia delle tue offerte in tempo reale.</p>
-            <button class="btn" onclick="switchStoreTab('sub')">Sblocca Ora</button>
+            <button class="btn" data-onclick="switchStoreTab('sub')">Sblocca Ora</button>
           </div>
         </div>
       </div>`;
@@ -9492,7 +9492,7 @@ function renderTrashTab() {
           <tr>
             <td><strong>${esc(o.product)}</strong></td>
             <td>${new Date(o.deletedAt).toLocaleString()}</td>
-            <td><button class="btn outline" onclick="restoreOffer('${o.id}')">Ripristina</button></td>
+            <td><button class="btn outline" data-onclick="restoreOffer('${o.id}')">Ripristina</button></td>
           </tr>
         `).join('')}
       </tbody>
@@ -9524,10 +9524,10 @@ function renderStoreLoginForm(container) {
         <button type="submit" class="btn full-width">Accedi alla Dashboard</button>
       </form>
       <p style="text-align:center; margin-top:10px;">
-        <a href="javascript:void(0)" onclick="renderStoreForgotPasswordForm()" style="font-size:0.85rem; color:#64748b;">Password dimenticata?</a>
+        <a href="#" data-onclick="renderStoreForgotPasswordForm()" style="font-size:0.85rem; color:#64748b;">Password dimenticata?</a>
       </p>
       <p style="margin-top:20px; font-size:0.85rem; color:#64748b;">
-        Non hai un account? <a href="javascript:void(0)" onclick="goToStoreStep('pricing')" style="color:var(--primary); font-weight:700;">Vedi i piani</a>
+        Non hai un account? <a href="#" data-onclick="goToStoreStep('pricing')" style="color:var(--primary); font-weight:700;">Vedi i piani</a>
       </p>
     </div>
   `;
@@ -9567,7 +9567,7 @@ function renderStoreLoginForm(container) {
       const expiredCycle = (result.store && result.store.subscription.billingCycle) || 'monthly';
       errBox.innerHTML = `<strong>Accesso negato:</strong> il periodo di prova o l'abbonamento sono terminati.<br><br>
                           <button class="btn outline" style="padding:5px 10px; font-size:0.7rem;" 
-                          onclick="goToStoreStep('pricing', '${expiredCycle}')">Rinnova ora</button>`;
+                          data-onclick="goToStoreStep('pricing', '${expiredCycle}')">Rinnova ora</button>`;
     } else if (result.reason === 'credentials') {
       toast.error("Email o password errati.");
       errBox.innerText = "Email o password non corretti.";
@@ -9575,7 +9575,7 @@ function renderStoreLoginForm(container) {
       toast.error("Email o password non corretti.");
       errBox.innerHTML = `Email o password non corretti.<br><br>
                           <button class="btn outline" style="padding:5px 10px; font-size:0.7rem;" 
-                          onclick="goToStoreStep('pricing')">Non hai ancora un negozio? Registrati</button>`;
+                          data-onclick="goToStoreStep('pricing')">Non hai ancora un negozio? Registrati</button>`;
     } else {
       toast.error("Si è verificato un errore tecnico durante l'accesso.");
       errBox.innerText = "Errore tecnico. Riprova.";
@@ -9662,7 +9662,7 @@ function displayProductInModal(product) {
           <h1 style="margin: 15px 0 10px 0; color: #1e293b; font-size: 2.2rem; line-height: 1.2;">${escapeHtml(product.product)}</h1>
           
           <p style="color: #64748b; font-size: 1rem; margin-bottom: 25px; line-height: 1.5;">
-            <span style="display:inline-flex; vertical-align:middle;">${PANEL_ICONS.store}</span> Punto vendita: <strong class="store-name-link" style="color:#0f62fe; cursor:pointer; text-decoration:underline;" onclick="showStoreInfoPopup(window.__currentOfferStoreInfo)">${escapeHtml(product.storeName || '')}</strong>${verifiedBadge}<br>
+            <span style="display:inline-flex; vertical-align:middle;">${PANEL_ICONS.store}</span> Punto vendita: <strong class="store-name-link" style="color:#0f62fe; cursor:pointer; text-decoration:underline;" data-onclick="showStoreInfoPopup(window.__currentOfferStoreInfo)">${escapeHtml(product.storeName || '')}</strong>${verifiedBadge}<br>
             <span style="display:inline-flex; vertical-align:middle;">${PANEL_ICONS.pin}</span> <span style="font-size: 0.9rem;">${escapeHtml(product.storeAddress || (isEcomProduct ? 'Negozio online' : ''))}</span>
           </p>
           
@@ -9704,19 +9704,19 @@ function displayProductInModal(product) {
             <p style="line-height: 1.6; color: #475569; font-size: 1.05rem;">${escapeHtml(product.description || '') || 'Nessuna descrizione aggiuntiva fornita dal punto vendita.'}</p>
           </div>
           
-          <button class="btn full-width detail-btn-cart" ${isExpired ? 'disabled' : `onclick="saveToShoppingList('${product.id}')"`} style="height: 60px; font-size: 1.2rem; border-radius: 14px; background: ${isExpired ? '#94a3b8' : '#0f62fe'}; box-shadow: 0 4px 14px rgba(15,98,254,0.3); transition: transform 0.2s; display:flex; align-items:center; justify-content:center; gap:10px; ${isExpired ? 'cursor:not-allowed; opacity:0.7;' : ''}">
+          <button class="btn full-width detail-btn-cart" ${isExpired ? 'disabled' : `data-onclick="saveToShoppingList('${product.id}')"`} style="height: 60px; font-size: 1.2rem; border-radius: 14px; background: ${isExpired ? '#94a3b8' : '#0f62fe'}; box-shadow: 0 4px 14px rgba(15,98,254,0.3); transition: transform 0.2s; display:flex; align-items:center; justify-content:center; gap:10px; ${isExpired ? 'cursor:not-allowed; opacity:0.7;' : ''}">
             ${PANEL_ICONS.basket} ${isExpired ? 'Offerta non disponibile' : 'Aggiungi alla lista spesa'}
           </button>
 
           ${isEcomProduct ? `
-          <button class="btn outline full-width" ${(product.productUrl || product.websiteUrl) ? `data-url="${esc(product.productUrl || product.websiteUrl)}" onclick="openDataUrl(this)"` : 'disabled'} style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
+          <button class="btn outline full-width" ${(product.productUrl || product.websiteUrl) ? `data-url="${esc(product.productUrl || product.websiteUrl)}" data-onclick="openDataUrl(this)"` : 'disabled'} style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
             ${PANEL_ICONS.map} Vedi sul sito
           </button>` : `
-          <button class="btn outline full-width" data-addr="${esc(product.storeAddress || product.storeName || '')}" onclick="openStoreInGoogleMaps(this.dataset.addr)" style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
+          <button class="btn outline full-width" data-addr="${esc(product.storeAddress || product.storeName || '')}" data-onclick="openStoreInGoogleMaps(this.dataset.addr)" style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
             ${PANEL_ICONS.map} Vedi su Google Maps
           </button>`}
 
-          <button class="btn outline full-width" onclick="shareOffer()" style="height: 50px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
+          <button class="btn outline full-width" data-onclick="shareOffer()" style="height: 50px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
             ${PANEL_ICONS.share} Condividi
           </button>
         </div>
@@ -9820,7 +9820,7 @@ window.showStoreInfoPopup = (store) => {
         </div>`
       : `${row(PANEL_ICONS.phone, 'Telefono', store.phone)}
     ${row(PANEL_ICONS.clock, 'Orari', store.hours)}`}
-    ${store.id ? `<button class="btn full-width" style="margin-top:14px;" onclick="openStoreProfile('${store.id}')">Vedi Profilo</button>` : ''}
+    ${store.id ? `<button class="btn full-width" style="margin-top:14px;" data-onclick="openStoreProfile('${store.id}')">Vedi Profilo</button>` : ''}
   `;
 
   overlay.classList.add("is-visible");
@@ -10291,7 +10291,7 @@ function showUndoBanner(message, offerId) {
   `;
   banner.innerHTML = `
     <span>${message}</span>
-    <button onclick="restoreOffer('${offerId}', true)" style="background:#0f62fe; color:white; border:none; padding:8px 15px; border-radius:6px; cursor:pointer; font-weight:700;">ANNULLA</button>
+    <button data-onclick="restoreOffer('${offerId}', true)" style="background:#0f62fe; color:white; border:none; padding:8px 15px; border-radius:6px; cursor:pointer; font-weight:700;">ANNULLA</button>
   `;
   document.body.appendChild(banner);
 
@@ -10450,7 +10450,7 @@ function getSubscriptionBanner() {
           <strong>Cambio piano programmato: ${partner.subscription.pendingPlan}</strong>
           <small style="display: block; opacity: 0.8;">Partirà automaticamente il ${pendingRenewalLabel}, alla scadenza del piano attuale.</small>
         </div>
-        <button class="btn outline" onclick="cancelScheduledPlanChange()">Annulla</button>
+        <button class="btn outline" data-onclick="cancelScheduledPlanChange()">Annulla</button>
       </div>`;
   }
 
@@ -10476,7 +10476,7 @@ function getSubscriptionBanner() {
               </p>
             </div>
           </div>
-          <button class="btn" style="background: #ef4444; color: white; white-space: nowrap;" onclick="activatePlan('Enterprise', '${sub.billingCycle || 'monthly'}')">Rinnova Ora</button>
+          <button class="btn" style="background: #ef4444; color: white; white-space: nowrap;" data-onclick="activatePlan('Enterprise', '${sub.billingCycle || 'monthly'}')">Rinnova Ora</button>
         </div>`;
     }
   }
@@ -10489,7 +10489,7 @@ function getSubscriptionBanner() {
             <span class="banner-ico">${PANEL_ICONS.alert}</span>
             <span><strong>Il tuo piano ${plan} è scaduto.</strong><br>Le tue offerte sono state messe in pausa. Rinnova per riprendere la pubblicazione.</span>
           </p>
-          <button class="btn" style="background: #ef4444; color: white; width: fit-content;" onclick="activatePlan('${plan}', '${sub.billingCycle || 'monthly'}')">Rinnova ${plan}</button>
+          <button class="btn" style="background: #ef4444; color: white; width: fit-content;" data-onclick="activatePlan('${plan}', '${sub.billingCycle || 'monthly'}')">Rinnova ${plan}</button>
         </div>`;
     }
     return `
@@ -10498,7 +10498,7 @@ function getSubscriptionBanner() {
           <span class="banner-ico">${PANEL_ICONS.alert}</span>
           <span><strong>Il tuo periodo di prova è terminato.</strong><br>Le tue offerte sono state messe in pausa. Attiva un piano per riprendere la pubblicazione.</span>
         </p>
-        <button class="btn" style="background: #ef4444; color: white; width: fit-content;" onclick="goToStoreStep('pricing')">Vedi Piani</button>
+        <button class="btn" style="background: #ef4444; color: white; width: fit-content;" data-onclick="goToStoreStep('pricing')">Vedi Piani</button>
       </div>`;
   }
 
@@ -10510,7 +10510,7 @@ function getSubscriptionBanner() {
           <strong>Trial ${plan.toUpperCase()}: ${sub.daysLeft} giorni rimanenti</strong>
           <small style="display: block; opacity: 0.8;">Sblocca tutte le funzionalità senza limiti.</small>
         </div>
-        ${nextPlan ? `<button class="btn" style="background: #3b82f6;" onclick="goToStoreStep('pricing')">Passa a ${nextPlan}</button>` : ''}
+        ${nextPlan ? `<button class="btn" style="background: #3b82f6;" data-onclick="goToStoreStep('pricing')">Passa a ${nextPlan}</button>` : ''}
       </div>`;
   }
 
@@ -10523,7 +10523,7 @@ function getSubscriptionBanner() {
             <strong>Fai crescere il tuo negozio con ${nextPlan}</strong>
             <small style="display: block; opacity: 0.8;">Sblocca nuove funzionalità quando vuoi.</small>
           </div>
-          <button class="btn" style="background: #3b82f6;" onclick="openUpgradeChoiceModal('${nextPlan}', '${sub.billingCycle || 'monthly'}')">Passa a ${nextPlan}</button>
+          <button class="btn" style="background: #3b82f6;" data-onclick="openUpgradeChoiceModal('${nextPlan}', '${sub.billingCycle || 'monthly'}')">Passa a ${nextPlan}</button>
         </div>`;
     }
   }
@@ -10830,7 +10830,7 @@ function renderLocationsTab() {
     <header class="tab-header">
       <h2>${PANEL_ICONS.pin} ${isEcom ? 'Gestione Magazzini' : 'Gestione Punti Vendita'}</h2>
       ${canAddLocation ? 
-        `<button class="btn" onclick="openAddLocationModal()">${isEcom ? '+ Aggiungi Magazzino' : '+ Aggiungi Sede'}</button>` : 
+        `<button class="btn" data-onclick="openAddLocationModal()">${isEcom ? '+ Aggiungi Magazzino' : '+ Aggiungi Sede'}</button>` : 
         `<span class="badge-plan plan-starter">${isEcom ? '1 Magazzino incluso nel tuo piano' : 'Piano Starter: 1 Sede inclusa'}</span>`
       }
     </header>
@@ -10861,7 +10861,7 @@ function renderLocationsTab() {
               <input type="text" id="locName_${index}" value="${esc(loc.name || '')}" placeholder="Nome sede" style="flex: 1; font-weight: 800; font-size: 1.05rem; border: none; background: transparent; padding: 4px 0;">
               ${isEcom ? '' : loc.isPrimary ?
                 `<span style="font-size: 0.7rem; font-weight: 800; color: #10b981; background: #dcfce7; padding: 6px 12px; border-radius: 999px; white-space: nowrap;">★ PRINCIPALE</span>` :
-                `<button class="btn outline" style="padding: 6px 14px; font-size: 0.75rem; white-space: nowrap; border-radius: 999px;" onclick="setPrimaryLocation(${index})">Imposta Principale</button>`
+                `<button class="btn outline" style="padding: 6px 14px; font-size: 0.75rem; white-space: nowrap; border-radius: 999px;" data-onclick="setPrimaryLocation(${index})">Imposta Principale</button>`
               }
             </div>
 
@@ -10869,7 +10869,7 @@ ${plan === 'Enterprise' ? `
               <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:6px 10px;">
                 <span style="font-size:0.7rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.4px;">ID Sede (per API)</span>
                 <code style="flex:1; font-size:0.75rem; color:#334155; word-break:break-all;">${loc.id}</code>
-                <button class="btn outline" style="padding:3px 10px; font-size:0.7rem;" onclick="copyLocationId('${loc.id}')">Copia</button>
+                <button class="btn outline" style="padding:3px 10px; font-size:0.7rem;" data-onclick="copyLocationId('${loc.id}')">Copia</button>
               </div>
             ` : ''}
 
@@ -10900,7 +10900,7 @@ ${plan === 'Enterprise' ? `
               ` : `
                 <p style="font-size: 0.78rem; color: #64748b; margin: 10px 0;">
                   Formato come su Google Maps (es. 42°24'55.2"N 12°51'18.8"E).
-                  <a href="javascript:void(0)" onclick="openLocationGoogleMapsHelper(${index})">Trova le coordinate →</a>
+                  <a href="#" data-onclick="openLocationGoogleMapsHelper(${index})">Trova le coordinate →</a>
                 </p>
                 <label style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase;">Latitudine</label>
                 <div class="form-row" style="gap: 12px; margin: 4px 0 10px; align-items: flex-end;">
@@ -10927,14 +10927,14 @@ ${plan === 'Enterprise' ? `
                   </div>
                 </div>
                 <div style="text-align: right;">
-                  <button class="btn outline" style="padding: 7px 16px; font-size: 0.8rem; border-radius: 999px;" onclick="saveLocationCoordinates(${index})">Salva Coordinate</button>
+                  <button class="btn outline" style="padding: 7px 16px; font-size: 0.8rem; border-radius: 999px;" data-onclick="saveLocationCoordinates(${index})">Salva Coordinate</button>
                 </div>
               `}
             </div>
 
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--panel-border-soft);">
-              ${((!loc.isPrimary && locations.length > 1) || isEcom) ? `<button class="btn danger" style="padding: 8px 16px; border-radius: 999px;" onclick="removeLocation(${index})">Rimuovi</button>` : ''}
-              <button class="btn" style="padding: 8px 20px; border-radius: 999px;" onclick="saveLocationEdit(${index})">Salva Sede</button>
+              ${((!loc.isPrimary && locations.length > 1) || isEcom) ? `<button class="btn danger" style="padding: 8px 16px; border-radius: 999px;" data-onclick="removeLocation(${index})">Rimuovi</button>` : ''}
+              <button class="btn" style="padding: 8px 20px; border-radius: 999px;" data-onclick="saveLocationEdit(${index})">Salva Sede</button>
             </div>
           </div>
         `;
@@ -11011,7 +11011,7 @@ async function drawShippingTab() {
       ${Object.keys(byRegion).map(region => `
         <details style="border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px;">
           <summary style="cursor:pointer; display:flex; align-items:center; gap:8px; font-weight:700;">
-            <input type="checkbox" class="ship-region-cb" data-region="${escapeHtml(region)}" onclick="event.stopPropagation()">
+            <input type="checkbox" class="ship-region-cb" data-region="${escapeHtml(region)}" data-onclick="event.stopPropagation()">
             ${escapeHtml(region)} <span class="ship-count" data-region="${escapeHtml(region)}" style="margin-left:auto; font-weight:500; color:#64748b; font-size:0.8rem;"></span>
             <svg class="ship-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="flex-shrink:0; transition:transform .15s ease;"><path d="M9 6l6 6-6 6"/></svg>
           </summary>
@@ -11037,7 +11037,7 @@ async function drawShippingTab() {
         </details>
       `).join('')}
     </div>
-    <button class="btn" style="margin-top:18px; width:100%;" onclick="saveShippingTerritories()">Salva territori</button>
+    <button class="btn" style="margin-top:18px; width:100%;" data-onclick="saveShippingTerritories()">Salva territori</button>
   `;
 
   body.querySelectorAll('.ship-region-override-cb').forEach(cb => {
@@ -11445,8 +11445,8 @@ function renderImportTab() {
  ]' style="width:100%; height:300px; font-family:monospace; font-size:0.85rem; padding:15px; border-radius:12px; border:1px solid #e2e8f0;"></textarea>
 
         <div style="margin-top:20px;">
-          <button class="btn" onclick="handleJSONImport()">Avvia Importazione</button>
-          <button class="btn outline" onclick="downloadTemplateJSON()">Scarica Esempio</button>
+          <button class="btn" data-onclick="handleJSONImport()">Avvia Importazione</button>
+          <button class="btn outline" data-onclick="downloadTemplateJSON()">Scarica Esempio</button>
         </div>
       </div>
 
@@ -11456,7 +11456,7 @@ function renderImportTab() {
             <div class="lock-icon">${PANEL_ICONS.lock}</div>
             <h3>Velocizza il tuo lavoro</h3>
             <p>Il piano <strong>Professional</strong> ti permette di importare centinaia di offerte via codice o file senza caricarle una per una.</p>
-            <button class="btn" onclick="switchStoreTab('sub')">Passa a Professional</button>
+            <button class="btn" data-onclick="switchStoreTab('sub')">Passa a Professional</button>
           </div>
         </div>
       ` : ''}
@@ -11567,8 +11567,8 @@ function renderGeneralDashboardTab() {
     <header class="tab-header">
       <div><h2>${PANEL_ICONS.chart} Dashboard Generale</h2></div>
       <div style="display: flex; gap: 10px;">
-        ${partner.plan === 'Enterprise' ? `<button class="btn outline" onclick="exportOffersToCSV()">${PANEL_ICONS.download} Esporta dati CSV</button>` : ''}
-        <button class="btn" onclick="handleNewOfferClick()">+ Nuova Offerta</button>
+        ${partner.plan === 'Enterprise' ? `<button class="btn outline" data-onclick="exportOffersToCSV()">${PANEL_ICONS.download} Esporta dati CSV</button>` : ''}
+        <button class="btn" data-onclick="handleNewOfferClick()">+ Nuova Offerta</button>
       </div>
     </header>
 
@@ -11589,7 +11589,7 @@ function renderGeneralDashboardTab() {
         <small>Interazioni dirette</small>
       </div>
       <div class="stat-card-saas accent-indigo">
-        <div class="label stat-label-info" onclick="showStatInfo(event, 'avgCtr')">CTR Medio ${PANEL_ICONS.info}</div>
+        <div class="label stat-label-info" data-onclick="showStatInfo(event, 'avgCtr')">CTR Medio ${PANEL_ICONS.info}</div>
         <div class="value">${avgCtr}%</div>
         <small>Efficacia offerte</small>
       </div>
@@ -11602,13 +11602,13 @@ function renderGeneralDashboardTab() {
             <span class="round-ico" style="color:#1e40af;">${PANEL_ICONS.userCircle}</span>
             <h3 style="margin: 0; color: #1e40af; font-size: 1rem;">Account Manager Dedicato</h3>
           </div>
-          <p style="margin: 5px 0; font-size: 0.85rem; color: #1e293b;">Email: <strong><a href="mailto:${isEnterprise ? 'enterprise@decerne.it' : 'professional@decerne.it'}" onclick="openEmailContact('${isEnterprise ? 'enterprise@decerne.it' : 'professional@decerne.it'}', 'Richiesta assistenza Account Manager'); return false;" style="color:#1e40af;">${isEnterprise ? 'enterprise@decerne.it' : 'professional@decerne.it'}</a></strong></p>
+          <p style="margin: 5px 0; font-size: 0.85rem; color: #1e293b;">Email: <strong><a href="mailto:${isEnterprise ? 'enterprise@decerne.it' : 'professional@decerne.it'}" data-onclick="openEmailContact('${isEnterprise ? 'enterprise@decerne.it' : 'professional@decerne.it'}', 'Richiesta assistenza Account Manager'); return false;" style="color:#1e40af;">${isEnterprise ? 'enterprise@decerne.it' : 'professional@decerne.it'}</a></strong></p>
           <div style="display: inline-block; margin-top: 8px; background: #dbeafe; color: #1e40af; padding: 3px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">SLA: Risposta entro 4 ore</div>
         </div>
       ` : ''}
 
       <div class="card-saas" style="padding: 25px;">
-        <h3 class="stat-label-info" style="margin-top: 0; margin-bottom: 20px; font-size: 1rem; color: #475569; display:flex; align-items:center; gap:6px;" onclick="showStatInfo(event, 'trend7d')">Trend Interazioni (Ultimi 7 giorni) ${PANEL_ICONS.info}</h3>
+        <h3 class="stat-label-info" style="margin-top: 0; margin-bottom: 20px; font-size: 1rem; color: #475569; display:flex; align-items:center; gap:6px;" data-onclick="showStatInfo(event, 'trend7d')">Trend Interazioni (Ultimi 7 giorni) ${PANEL_ICONS.info}</h3>
         <div style="width: 100%; height: 250px; position: relative;">
           <canvas id="generalStatsCanvas"></canvas>
           <div id="generalStatsEmpty" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; text-align:center; color:#94a3b8; font-size:0.85rem; padding:0 20px;">Non ci sono ancora dati sufficienti sulle interazioni giornaliere. Il grafico si popolerà man mano che le offerte ricevono visualizzazioni e click.</div>
@@ -11617,7 +11617,7 @@ function renderGeneralDashboardTab() {
 
       <div style="display: flex; flex-direction: column; gap: 20px;">
         <div class="card-saas accent-purple" style="background: #fdfaff; flex: 1; display: flex; flex-direction: column; justify-content: center;">
-          <div class="label stat-label-info" style="color: #6929c4; font-weight: 700; margin-bottom: 10px; display:flex; align-items:center; gap:6px;" onclick="showStatInfo(event, 'bestLocation')">${PANEL_ICONS.trophy} MIGLIOR SEDE ${PANEL_ICONS.info}</div>
+          <div class="label stat-label-info" style="color: #6929c4; font-weight: 700; margin-bottom: 10px; display:flex; align-items:center; gap:6px;" data-onclick="showStatInfo(event, 'bestLocation')">${PANEL_ICONS.trophy} MIGLIOR SEDE ${PANEL_ICONS.info}</div>
           <div style="font-size: 1.2rem; font-weight: 800; color: #1e293b;">${esc(bestLocName)}</div>
           <small style="color: #64748b; margin-top: 5px;">Sedi totali: ${activeLocCount}</small>
         </div>
@@ -12106,14 +12106,14 @@ function renderApiTab() {
         <input type="text" id="apiKeyDisplay" value="${esc(partner.apiKeyHint || '')}" placeholder="Nessuna chiave: clicca Rigenera" readonly
                style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-family: monospace; background: #f8fafc; font-size: 0.9rem;">
         <div class="api-key-actions-inline" style="display: flex; gap: 10px;">
-          <button class="btn" style="background: #ef4444;" onclick="regeneratePartnerApiKey()">Rigenera</button>
+          <button class="btn" style="background: #ef4444;" data-onclick="regeneratePartnerApiKey()">Rigenera</button>
         </div>
         <div class="actions-kebab-wrap">
-          <button class="actions-kebab-btn" onclick="toggleKebabMenu('apiKeyKebabMenu')" aria-label="Altre azioni sulla API Key">
+          <button class="actions-kebab-btn" data-onclick="toggleKebabMenu('apiKeyKebabMenu')" aria-label="Altre azioni sulla API Key">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
           </button>
           <div class="actions-kebab-menu" id="apiKeyKebabMenu">
-            <button onclick="regeneratePartnerApiKey(); toggleKebabMenu('apiKeyKebabMenu')" style="color:#ef4444;">Rigenera chiave</button>
+            <button data-onclick="regeneratePartnerApiKey(); toggleKebabMenu('apiKeyKebabMenu')" style="color:#ef4444;">Rigenera chiave</button>
           </div>
         </div>
       </div>
@@ -12252,7 +12252,7 @@ function renderApiTab() {
             <div style="display:flex; justify-content:center; margin-bottom: 10px; color:#94a3b8;">${PANEL_ICONS.lock}</div>
             <p style="color: #475569; font-size: 0.85rem; font-weight: 600; margin: 0;">Scrittura e sincronizzazione (POST, DELETE, inventory-sync)</p>
             <p style="color: #64748b; font-size: 0.8rem; margin: 5px 0 15px 0;">Creare, aggiornare ed eliminare offerte da codice e sincronizzare il magazzino dal gestionale è riservato ai partner Enterprise.</p>
-            <button class="btn outline" style="font-size: 0.75rem; padding: 6px 12px;" onclick="switchStoreTab('sub')">Upgrade a Enterprise</button>
+            <button class="btn outline" style="font-size: 0.75rem; padding: 6px 12px;" data-onclick="switchStoreTab('sub')">Upgrade a Enterprise</button>
           </div>
         </div>
       `}
@@ -12265,8 +12265,8 @@ function renderApiTab() {
         <p style="color: #64748b; font-size: 0.85rem;">
           Non hai un'integrazione tecnica? Carica direttamente l'export del tuo gestionale. La prima volta ti chiediamo di abbinare le colonne, poi lo ricordiamo per i prossimi import con lo stesso formato.
         </p>
-        <input type="file" id="csvImportInput" accept=".csv" style="display:none;" onchange="handleCsvFileSelect(event)">
-        <button class="btn" style="margin-top: 10px;" onclick="clickElementById('csvImportInput')">Carica file CSV</button>
+        <input type="file" id="csvImportInput" accept=".csv" style="display:none;" data-onchange="handleCsvFileSelect(event)">
+        <button class="btn" style="margin-top: 10px;" data-onclick="clickElementById('csvImportInput')">Carica file CSV</button>
         <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 12px;">
           Massimo 500 righe per file. Una riga senza prezzo originale diventa un annuncio normale, senza badge sconto. La categoria è obbligatoria e deve essere una delle categorie DECERNE (per esempio "Dispensa" o "Altro"). Date in AAAA-MM-GG oppure GG/MM/AAAA.
         </p>
@@ -12358,13 +12358,13 @@ function renderIntegrationStatus() {
           <div style="font-size:0.7rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.03em;">Piattaforma collegata</div>
           <div style="font-size:0.85rem; font-weight:600;">${esc(ECOM_PLATFORM_LABELS[myIntegrationCache.platform] || myIntegrationCache.platform)}</div>
         </div>
-        <button class="btn outline" style="padding:8px 14px; font-size:0.8rem; margin-left:auto;" onclick="disconnectEcommercePlatform()">Disconnetti</button>
+        <button class="btn outline" style="padding:8px 14px; font-size:0.8rem; margin-left:auto;" data-onclick="disconnectEcommercePlatform()">Disconnetti</button>
       ` : `
         <div style="flex:1 1 220px; display:flex; gap:8px; align-items:center;">
           <input type="text" id="integrationProviderInput" value="${esc(myIntegrationCache.provider)}"
                  placeholder="es. Tilby, TeamSystem..."
                  style="flex:1; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:0.85rem;">
-          <button class="btn outline" style="padding:8px 14px; font-size:0.8rem;" onclick="saveIntegrationProvider()">Salva</button>
+          <button class="btn outline" style="padding:8px 14px; font-size:0.8rem;" data-onclick="saveIntegrationProvider()">Salva</button>
         </div>
       `}
     </div>
@@ -12464,7 +12464,7 @@ function renderEcommercePlatformConnect() {
       <p style="color: #64748b; font-size: 0.85rem;">
         In alternativa al gestionale personalizzato, collega direttamente WooCommerce, PrestaShop o Shopify: i prodotti si sincronizzano automaticamente ogni ora.
       </p>
-      <select id="ecomPlatformSelect" onchange="renderEcomCredentialFields()"
+      <select id="ecomPlatformSelect" data-onchange="renderEcomCredentialFields()"
               style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:0.85rem; margin-top:10px;">
         <option value="woocommerce">WooCommerce</option>
         <option value="prestashop">PrestaShop</option>
@@ -12479,7 +12479,7 @@ function renderEcommercePlatformConnect() {
         <input type="text" id="ecomCredB" placeholder="Consumer Secret (cs_...)"
                style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0; font-size:0.85rem; margin-top:8px;">
       </div>
-      <button class="btn" style="margin-top: 12px;" onclick="connectEcommercePlatform()">Connetti</button>
+      <button class="btn" style="margin-top: 12px;" data-onclick="connectEcommercePlatform()">Connetti</button>
     </div>
   `;
 }
@@ -12533,7 +12533,7 @@ async function executeRegeneratePartnerApiKey() {
   if (!partner) return toast.error("Sessione non valida.");
   
   // Feedback visivo sul pulsante durante l'attesa di Supabase
-  const btn = document.querySelector('button[onclick="regeneratePartnerApiKey()"]');
+  const btn = document.querySelector('button[data-onclick="regeneratePartnerApiKey()"]');
   const originalText = btn ? btn.innerText : "Rigenera Chiave";
   if (btn) {
     btn.disabled = true;
@@ -12768,8 +12768,8 @@ function openCsvMappingModal(headers, rows) {
         </p>
         <p style="font-size: 0.75rem; color: #94a3b8;">${rows.length} righe trovate nel file.</p>
         <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:15px;">
-          <button class="btn outline" type="button" onclick="closeCsvModal()">Annulla</button>
-          <button class="btn" type="button" id="csvConfirmBtn" onclick="confirmCsvImport('${storageKey}')">Avvia importazione</button>
+          <button class="btn outline" type="button" data-onclick="closeCsvModal()">Annulla</button>
+          <button class="btn" type="button" id="csvConfirmBtn" data-onclick="confirmCsvImport('${storageKey}')">Avvia importazione</button>
         </div>
       </div>
     </div>
@@ -13035,7 +13035,7 @@ function renderCsvImportResults(results) {
           (${results.offers} offerte con sconto, ${results.annunci} annunci senza sconto)
         </p>
         ${results.errors.length ? `<p style="color:#991b1b; font-size:0.85rem;">${results.errors.length} righe scartate:</p>${errorsHtml}` : ''}
-        <button class="btn" style="margin-top:15px;" onclick="closeCsvModal()">Chiudi</button>
+        <button class="btn" style="margin-top:15px;" data-onclick="closeCsvModal()">Chiudi</button>
       </div>
     </div>
   `;
@@ -13588,12 +13588,12 @@ const pollId = setInterval(() => {
 
     content.innerHTML = `
       <div class="cart-toolbar">
-        <button class="btn cart-smart-btn" onclick="openSmartShoppingListModalIfReady()">
+        <button class="btn cart-smart-btn" data-onclick="openSmartShoppingListModalIfReady()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align:-3px;margin-right:5px;"><path d="M6 2h12l2 7H4z"/><path d="M4 9v10a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1V9"/><circle cx="9" cy="21" r="1"/><circle cx="18" cy="21" r="1"/></svg> Lista della spesa
         </button>
       </div>
       <div class="cart-list">
-        <div class="cart-row" onclick="closeFullPageModal()">
+        <div class="cart-row" data-onclick="closeFullPageModal()">
           <div class="cart-row-img"><img src="${getSafeImageUrl(productImg)}" alt=""></div>
           <div class="cart-row-body">
             <div class="cart-row-info">
@@ -13601,10 +13601,10 @@ const pollId = setInterval(() => {
               <div class="cart-row-product">${esc(productName)}</div>
               <div class="cart-row-price">${productPrice}</div>
             </div>
-            <button class="btn danger cart-remove-btn" onclick="event.stopPropagation(); removeClosest(this, '.cart-row')">Rimuovi</button>
+            <button class="btn danger cart-remove-btn" data-onclick="event.stopPropagation(); removeClosest(this, '.cart-row')">Rimuovi</button>
           </div>
         </div>
-        <button class="btn cart-map-btn" onclick="tourOpenCartMapView()">
+        <button class="btn cart-map-btn" data-onclick="tourOpenCartMapView()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align:-3px;margin-right:5px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> Segui nella mappa fino ai negozi
         </button>
       </div>
