@@ -95,7 +95,7 @@
   </div>
 
   <!-- POPUP INFO NEGOZIO (aperto dal nome del negozio nel dettaglio offerta) -->
-  <div id="storeInfoOverlay" class="store-info-overlay" role="dialog" aria-modal="true" aria-label="Informazioni negozio" tabindex="-1" onclick="if(event.target === this) closeStoreInfoPopup()">
+  <div id="storeInfoOverlay" class="store-info-overlay" role="dialog" aria-modal="true" aria-label="Informazioni negozio" tabindex="-1" onclick="closeStoreInfoPopupOnBackdrop(event, this)">
     <div class="store-info-card">
       <button class="store-info-close" onclick="closeStoreInfoPopup()" aria-label="Chiudi">&times;</button>
       <div id="storeInfoContent"></div>
@@ -556,6 +556,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.7.0/papaparse.min.js"></script>
+  <script src="js/handlers.js"></script>
   <script src="js/main.js"></script>
 
 </body>

@@ -2912,7 +2912,7 @@ function renderOffersTab() {
         </div>
       </div>
       <div style="display:flex; gap:10px;">
-        <button class="btn outline" onclick="toggleSelectAllOffers(document.getElementById('selectAllOffersCb').checked = !document.getElementById('selectAllOffersCb').checked)">
+        <button class="btn outline" onclick="toggleSelectAllOffersFromHeader()">
           <input type="checkbox" id="selectAllOffersCb" style="margin-right:6px;"> Seleziona tutto
         </button>
         <button class="btn ${isLimitReached ? 'disabled' : ''}" 
@@ -3039,7 +3039,7 @@ function renderSubTab() {
         : '';
       actionButtons = `
         <button class="btn" style="background: #6929c4;" ${canRenewNow ? `onclick="activatePlan('Professional', '${sub.billingCycle || 'monthly'}')"` : 'disabled title="Disponibile dal giorno di scadenza"'}>Rinnova Professional</button>
-        <button class="btn outline" onclick="storeData.billingCycle = '${sub.billingCycle || 'monthly'}'; storeData.step='pricing'; renderStoreView();">Gestisci Piani</button>
+        <button class="btn outline" onclick="goToStoreStep('pricing', '${sub.billingCycle || 'monthly'}')">Gestisci Piani</button>
         ${annualSwitchBtn}`;
   }
 
@@ -3137,8 +3137,8 @@ function renderSubTab() {
         <p>${isExpired ? 'Le tue offerte sono state messe in pausa.' : `Hai ancora <strong>${sub.daysLeft} giorni</strong> di prova.`}</p>
       </div>`;
     actionButtons = isExpired
-      ? `<button class="btn" onclick="storeData.step='pricing'; renderStoreView();">Riattiva ora</button>`
-      : (nextPlan ? `<button class="btn" onclick="storeData.step='pricing'; renderStoreView();">Upgrade a ${nextPlan}</button>` : '');
+      ? `<button class="btn" onclick="goToStoreStep('pricing')">Riattiva ora</button>`
+      : (nextPlan ? `<button class="btn" onclick="goToStoreStep('pricing')">Upgrade a ${nextPlan}</button>` : '');
   }
 
   else {
@@ -3150,7 +3150,7 @@ function renderSubTab() {
         <p>${plan === 'Starter' ? 'Limiti: 10 offerte attive. Nessuna funzione avanzata.' : ''}</p>
       </div>`;
     actionButtons = nextPlan
-      ? `<button class="btn outline" onclick="storeData.step='pricing'; renderStoreView();">Passa a ${nextPlan}</button>`
+      ? `<button class="btn outline" onclick="goToStoreStep('pricing')">Passa a ${nextPlan}</button>`
       : '';
   }
 
@@ -3328,7 +3328,7 @@ window.addNewLocationField = () => {
       <input type="text" class="loc-name" placeholder="Nome sede" style="margin-bottom:5px; font-weight:700;">
       <input type="text" class="loc-addr" placeholder="Indirizzo completo">
     </div>
-    <button type="button" class="btn danger" onclick="this.parentElement.remove()" style="padding: 5px 10px;">&times;</button>
+    <button type="button" class="btn danger" onclick="removeParentElement(this)" style="padding: 5px 10px;">&times;</button>
   `;
   container.appendChild(div);
 };
@@ -5819,7 +5819,7 @@ window.searchSmartShoppingList = async () => {
         <input type="number" class="smart-list-qty-input" min="0" step="0.1"
                placeholder="Lascia vuoto per il prezzo più conveniente al ${unit}"
                value="${window.smartListQuantities[key] || ''}"
-               onchange="updateSmartListQuantity('${key.replace(/'/g, "\\'")}', this.value)">
+               onchange="updateSmartListQuantityFromInput(this)" data-key="${esc(key)}">
       </div>` : '';
 
     return `
@@ -7411,7 +7411,7 @@ window.showOfferPreview = () => {
           </div>
         </div>
         <div class="product-actions">
-          <button class="btn" onclick="event.stopPropagation(); saveToShoppingList($('#offerId').value || '')">Aggiungi</button>
+          <button class="btn" onclick="event.stopPropagation(); saveOfferFromIdField()">Aggiungi</button>
         </div>
       </div>
     </div>
@@ -7890,7 +7890,7 @@ function renderStoreForgotPasswordForm() {
           <button type="submit" class="btn full-width">Invia codice di recupero</button>
         </form>
         <p class="auth-switch" style="text-align:center; margin-top:15px;">
-          <a href="javascript:void(0)" onclick="storeData.step='login'; renderStoreView();">Torna al login</a>
+          <a href="javascript:void(0)" onclick="goToStoreStep('login')">Torna al login</a>
         </p>
       </div>
     </div>
@@ -8121,7 +8121,7 @@ let backArrow = "";
 if (partner) {
   backArrow = `
     <div class="pricing-back-nav">
-      <button class="icon-btn-back" onclick="storeData.step='dashboard'; renderStoreView();" title="Torna alla Dashboard">
+      <button class="icon-btn-back" onclick="goToStoreStep('dashboard')" title="Torna alla Dashboard">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <line x1="19" y1="12" x2="5" y2="12"></line>
           <polyline points="12 19 5 12 12 5"></polyline>
@@ -9527,7 +9527,7 @@ function renderStoreLoginForm(container) {
         <a href="javascript:void(0)" onclick="renderStoreForgotPasswordForm()" style="font-size:0.85rem; color:#64748b;">Password dimenticata?</a>
       </p>
       <p style="margin-top:20px; font-size:0.85rem; color:#64748b;">
-        Non hai un account? <a href="javascript:void(0)" onclick="storeData.step='pricing'; renderStoreView();" style="color:var(--primary); font-weight:700;">Vedi i piani</a>
+        Non hai un account? <a href="javascript:void(0)" onclick="goToStoreStep('pricing')" style="color:var(--primary); font-weight:700;">Vedi i piani</a>
       </p>
     </div>
   `;
@@ -9567,7 +9567,7 @@ function renderStoreLoginForm(container) {
       const expiredCycle = (result.store && result.store.subscription.billingCycle) || 'monthly';
       errBox.innerHTML = `<strong>Accesso negato:</strong> il periodo di prova o l'abbonamento sono terminati.<br><br>
                           <button class="btn outline" style="padding:5px 10px; font-size:0.7rem;" 
-                          onclick="storeData.billingCycle = '${expiredCycle}'; storeData.step='pricing'; renderStoreView();">Rinnova ora</button>`;
+                          onclick="goToStoreStep('pricing', '${expiredCycle}')">Rinnova ora</button>`;
     } else if (result.reason === 'credentials') {
       toast.error("Email o password errati.");
       errBox.innerText = "Email o password non corretti.";
@@ -9575,7 +9575,7 @@ function renderStoreLoginForm(container) {
       toast.error("Email o password non corretti.");
       errBox.innerHTML = `Email o password non corretti.<br><br>
                           <button class="btn outline" style="padding:5px 10px; font-size:0.7rem;" 
-                          onclick="storeData.step='pricing'; renderStoreView();">Non hai ancora un negozio? Registrati</button>`;
+                          onclick="goToStoreStep('pricing')">Non hai ancora un negozio? Registrati</button>`;
     } else {
       toast.error("Si è verificato un errore tecnico durante l'accesso.");
       errBox.innerText = "Errore tecnico. Riprova.";
@@ -9709,7 +9709,7 @@ function displayProductInModal(product) {
           </button>
 
           ${isEcomProduct ? `
-          <button class="btn outline full-width" ${(product.productUrl || product.websiteUrl) ? `data-url="${esc(product.productUrl || product.websiteUrl)}" onclick="window.open(this.dataset.url, '_blank', 'noopener')"` : 'disabled'} style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
+          <button class="btn outline full-width" ${(product.productUrl || product.websiteUrl) ? `data-url="${esc(product.productUrl || product.websiteUrl)}" onclick="openDataUrl(this)"` : 'disabled'} style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
             ${PANEL_ICONS.map} Vedi sul sito
           </button>` : `
           <button class="btn outline full-width" data-addr="${esc(product.storeAddress || product.storeName || '')}" onclick="openStoreInGoogleMaps(this.dataset.addr)" style="height: 50px; margin-bottom: 12px; font-size: 1rem; border-radius: 14px; display:flex; align-items:center; justify-content:center; gap:10px;">
@@ -9752,7 +9752,7 @@ function displayProductInModal(product) {
   if (document.body.classList.contains("tour-active") && typeof window.__tourSimulateAddToCart === "function") {
     const cartBtn = content.querySelector(".detail-btn-cart");
     if (cartBtn) {
-      cartBtn.removeAttribute("onclick");
+      cartBtn.removeAttribute("data-onclick");
       cartBtn.onclick = () => window.__tourSimulateAddToCart();
     }
   }
@@ -10498,7 +10498,7 @@ function getSubscriptionBanner() {
           <span class="banner-ico">${PANEL_ICONS.alert}</span>
           <span><strong>Il tuo periodo di prova è terminato.</strong><br>Le tue offerte sono state messe in pausa. Attiva un piano per riprendere la pubblicazione.</span>
         </p>
-        <button class="btn" style="background: #ef4444; color: white; width: fit-content;" onclick="storeData.step='pricing'; renderStoreView();">Vedi Piani</button>
+        <button class="btn" style="background: #ef4444; color: white; width: fit-content;" onclick="goToStoreStep('pricing')">Vedi Piani</button>
       </div>`;
   }
 
@@ -10510,7 +10510,7 @@ function getSubscriptionBanner() {
           <strong>Trial ${plan.toUpperCase()}: ${sub.daysLeft} giorni rimanenti</strong>
           <small style="display: block; opacity: 0.8;">Sblocca tutte le funzionalità senza limiti.</small>
         </div>
-        ${nextPlan ? `<button class="btn" style="background: #3b82f6;" onclick="storeData.step='pricing'; renderStoreView();">Passa a ${nextPlan}</button>` : ''}
+        ${nextPlan ? `<button class="btn" style="background: #3b82f6;" onclick="goToStoreStep('pricing')">Passa a ${nextPlan}</button>` : ''}
       </div>`;
   }
 
@@ -10869,7 +10869,7 @@ ${plan === 'Enterprise' ? `
               <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:6px 10px;">
                 <span style="font-size:0.7rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.4px;">ID Sede (per API)</span>
                 <code style="flex:1; font-size:0.75rem; color:#334155; word-break:break-all;">${loc.id}</code>
-                <button class="btn outline" style="padding:3px 10px; font-size:0.7rem;" onclick="navigator.clipboard.writeText('${loc.id}'); toast.success('ID sede copiato!')">Copia</button>
+                <button class="btn outline" style="padding:3px 10px; font-size:0.7rem;" onclick="copyLocationId('${loc.id}')">Copia</button>
               </div>
             ` : ''}
 
@@ -12266,7 +12266,7 @@ function renderApiTab() {
           Non hai un'integrazione tecnica? Carica direttamente l'export del tuo gestionale. La prima volta ti chiediamo di abbinare le colonne, poi lo ricordiamo per i prossimi import con lo stesso formato.
         </p>
         <input type="file" id="csvImportInput" accept=".csv" style="display:none;" onchange="handleCsvFileSelect(event)">
-        <button class="btn" style="margin-top: 10px;" onclick="document.getElementById('csvImportInput').click()">Carica file CSV</button>
+        <button class="btn" style="margin-top: 10px;" onclick="clickElementById('csvImportInput')">Carica file CSV</button>
         <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 12px;">
           Massimo 500 righe per file. Una riga senza prezzo originale diventa un annuncio normale, senza badge sconto. La categoria è obbligatoria e deve essere una delle categorie DECERNE (per esempio "Dispensa" o "Altro"). Date in AAAA-MM-GG oppure GG/MM/AAAA.
         </p>
@@ -13588,7 +13588,7 @@ const pollId = setInterval(() => {
 
     content.innerHTML = `
       <div class="cart-toolbar">
-        <button class="btn cart-smart-btn" onclick="if(window.openSmartShoppingListModal) openSmartShoppingListModal()">
+        <button class="btn cart-smart-btn" onclick="openSmartShoppingListModalIfReady()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align:-3px;margin-right:5px;"><path d="M6 2h12l2 7H4z"/><path d="M4 9v10a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1V9"/><circle cx="9" cy="21" r="1"/><circle cx="18" cy="21" r="1"/></svg> Lista della spesa
         </button>
       </div>
@@ -13601,7 +13601,7 @@ const pollId = setInterval(() => {
               <div class="cart-row-product">${esc(productName)}</div>
               <div class="cart-row-price">${productPrice}</div>
             </div>
-            <button class="btn danger cart-remove-btn" onclick="event.stopPropagation(); this.closest('.cart-row').remove();">Rimuovi</button>
+            <button class="btn danger cart-remove-btn" onclick="event.stopPropagation(); removeClosest(this, '.cart-row')">Rimuovi</button>
           </div>
         </div>
         <button class="btn cart-map-btn" onclick="tourOpenCartMapView()">
@@ -14407,3 +14407,30 @@ function openEmailContact(email, subject = '') {
     requestAnimationFrame(() => overlay.classList.add('is-visible'));
   });
 }
+
+
+
+// ===== Helper per gli handler data-onclick/data-onchange (vedi js/handlers.js) =====
+window.goToStoreStep = (step, billingCycle) => {
+  if (billingCycle) storeData.billingCycle = billingCycle;
+  storeData.step = step;
+  renderStoreView();
+};
+window.toggleSelectAllOffersFromHeader = () => {
+  const cb = document.getElementById('selectAllOffersCb');
+  if (!cb) return;
+  cb.checked = !cb.checked;
+  toggleSelectAllOffers(cb.checked);
+};
+window.saveOfferFromIdField = () => saveToShoppingList(($('#offerId') && $('#offerId').value) || '');
+window.copyLocationId = (id) => {
+  navigator.clipboard.writeText(id);
+  toast.success('ID sede copiato!');
+};
+window.clickElementById = (id) => { const el = document.getElementById(id); if (el) el.click(); };
+window.openSmartShoppingListModalIfReady = () => { if (window.openSmartShoppingListModal) window.openSmartShoppingListModal(); };
+window.removeClosest = (el, selector) => { const t = el && el.closest(selector); if (t) t.remove(); };
+window.removeParentElement = (el) => { if (el && el.parentElement) el.parentElement.remove(); };
+window.openDataUrl = (el) => window.open(el.dataset.url, '_blank', 'noopener');
+window.closeStoreInfoPopupOnBackdrop = (event, el) => { if (event.target === el) closeStoreInfoPopup(); };
+window.updateSmartListQuantityFromInput = (el) => updateSmartListQuantity(el.dataset.key, el.value);
