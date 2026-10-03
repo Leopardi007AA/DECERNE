@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installa le dipendenze
+        run: npm ci --ignore-scripts
+
+      - name: Audit delle dipendenze (blocca da severità alta)
+        run: npm audit --audit-level=high
+
+      - name: Sintassi JavaScript
+        run: find frontend -name '*.js' -exec node --check {} \;
+
+      - name: vercel.json valido
+        run: node -e "JSON.parse(require('fs').readFileSync('frontend/vercel.json','utf8'))"
+
+      - name: Nessun handler inline (la CSP li blocca)
+        run: |
+          if grep -rnE '(^|[^-a-zA-Z])on(click|change|input|submit)="' frontend --include=*.html --include=main.js --include=legale.js; then
+            echo "Trovati handler inline: usa data-onclick (vedi README)"; exit 1
+          fi
+
+      - name: Nessun segreto nel codice
+        run: |
+          if grep -rnEi 'service_role|BREVO_API_KEY|xkeysib-' frontend; then
+            echo "Possibile segreto nel codice"; exit 1
+          fi

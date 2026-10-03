@@ -263,20 +263,37 @@ const PARTNER_AUTH_KEY = "decerne_partner_auth"; // Per il "Remember Me"
 // Il salvataggio "Ricordami" sopravvive anche a giorni di distanza: le note interne
 // e l'hash della API key non ci finiscono mai, a prescindere da quale delle tante
 // funzioni del pannello stia scrivendo la sessione in quel momento.
-const _rawLocalStorageSetItem = localStorage.setItem.bind(localStorage);
-localStorage.setItem = function(key, value) {
-  if (key === PARTNER_AUTH_KEY) {
+const _rawStorageSetItem = Storage.prototype.setItem;
+Storage.prototype.setItem = function (key, value) {
+  if (this === window.localStorage && key === PARTNER_AUTH_KEY) {
     try {
       const obj = JSON.parse(value);
       if (obj && typeof obj === 'object') {
+        // La copia "Ricordami" serve solo a sapere QUALE negozio ripristinare: il profilo vero
+        // (contatti, sedi, coordinate, piano, ruolo) si rilegge dal DB a ogni avvio.
         obj.internalNotes = '';
         obj.apiKey = '';
+        obj.apiKeyHint = '';
+        obj.phone = '';
+        obj.hours = '';
+        obj.address = '';
+        obj.city = '';
+        obj.cap = '';
+        obj.latitude = null;
+        obj.longitude = null;
+        obj.locations = [];
+        obj.membershipCardName = '';
+        obj.membershipCardImage = '';
+        obj.websiteUrl = '';
+        obj.shippingProvinces = null;
+        obj.deliveryDaysByRegion = null;
         value = JSON.stringify(obj);
       }
     } catch (e) { /* non è JSON valido, lascialo passare così com'è */ }
   }
-  return _rawLocalStorageSetItem(key, value);
+  return _rawStorageSetItem.call(this, key, value);
 };
+try { localStorage.removeItem('setItem'); } catch (e) { /* storage non disponibile */ }
 
 const STORAGE_RATE_LIMIT = "decerne_rate_limits";
 
@@ -7460,6 +7477,25 @@ async function refreshPartnerSession(storeId) {
     .select('*')
     .eq('store_id', storeRow.id);
 
+    // Titolare o collaboratore? Si rilegge dal DB, mai dalla cache del browser.
+    const { data: authSess } = await storeAuthClient.auth.getSession();
+    const authUid = authSess?.session?.user?.id;
+    if (!authUid) return null;
+    let isCollaborator = false;
+    let collaboratorRole = null;
+    if (storeRow.auth_user_id !== authUid) {
+      const { data: tRow } = await storeAuthClient
+        .from('team_members')
+        .select('role, status, must_reset_password')
+        .eq('store_id', storeRow.id)
+        .eq('auth_user_id', authUid)
+        .maybeSingle();
+      // Né titolare né collaboratore attivo: la cache apparteneva a un altro account.
+      if (!tRow || tRow.status !== 'active' || tRow.must_reset_password) return null;
+      isCollaborator = true;
+      collaboratorRole = tRow.role;
+    }
+
     const freshStore = {
       id: storeRow.id,
       email: storeRow.email,
@@ -7497,6 +7533,9 @@ async function refreshPartnerSession(storeId) {
           : 30
       }
   };
+
+  freshStore.isCollaborator = isCollaborator;
+  freshStore.collaboratorRole = collaboratorRole;
 
   const sessionData = JSON.stringify(freshStore);
   sessionStorage.setItem(SESSION_PARTNER, sessionData);
