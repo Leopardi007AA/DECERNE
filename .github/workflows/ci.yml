@@ -25,6 +25,11 @@ jobs:
       - name: Audit delle dipendenze (blocca da severità alta)
         run: npm audit --audit-level=high
 
+      - name: Le librerie in frontend/vendor corrispondono al lockfile
+        run: |
+          npm run vendor
+          git diff --exit-code -- frontend/vendor
+
       - name: Sintassi JavaScript
         run: find frontend -name '*.js' -exec node --check {} \;
 
@@ -39,6 +44,6 @@ jobs:
 
       - name: Nessun segreto nel codice
         run: |
-          if grep -rnEi 'service_role|BREVO_API_KEY|xkeysib-' frontend; then
+          if grep -rnEi --exclude-dir=vendor 'service_role|BREVO_API_KEY|xkeysib-' frontend; then
             echo "Possibile segreto nel codice"; exit 1
           fi
