@@ -8704,9 +8704,13 @@ async function handleOnboardingSubmit(step) {
       let referralNotes = "";
       if (referralInput) {
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(referralInput);
-        const { data: refData, error: refError } = await supabaseClient.rpc('verify_referral_by_email', {
-          p_email: isUuid ? null : referralInput
-        });
+        let refExists = false;
+        let refError = null;
+        if (!isUuid) {
+          const refRes = await supabaseClient.rpc('check_referral_exists', { p_email: referralInput });
+          refExists = refRes.data === true;
+          refError = refRes.error;
+        }
         if (isUuid) {
           const { data: byId } = await supabaseClient.from('public_stores').select('id, name').eq('id', referralInput).single();
           if (!byId) {
@@ -8715,11 +8719,11 @@ async function handleOnboardingSubmit(step) {
           }
           referralNotes = `Presentato da: ${byId.name} (${byId.id})`;
         } else if (referralInput) {
-          if (refError || !refData || refData.length === 0) {
+          if (refError || !refExists) {
             if (btn) btn.disabled = false;
-            return toast.error("Email del presentatore non trovata.");
+            return toast.error(refError ? "Troppi tentativi. Riprova più tardi." : "Email del presentatore non trovata.");
           }
-          referralNotes = `Presentato da: ${refData[0].name} (${refData[0].id})`;
+          referralNotes = `Presentato da: ${referralInput.toLowerCase()}`;
         }
       }
 

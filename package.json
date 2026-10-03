@@ -5,6 +5,9 @@
   "repository": { "type": "git", "url": "git+https://github.com/Leopardi007AA/DECERNE.git" },
   "bugs": { "url": "https://github.com/Leopardi007AA/DECERNE/issues" },
   "homepage": "https://github.com/Leopardi007AA/DECERNE#readme",
+  "scripts": {
+    "vendor": "node scripts/vendor.mjs"
+  },
   "dependencies": {
     "@supabase/supabase-js": "2.117.2",
     "dompurify": "3.4.16",
