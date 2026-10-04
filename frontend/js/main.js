@@ -11,7 +11,7 @@ const SUPABASE_URL = "https://noqdpjlbmyjqzlmstfvx.supabase.co";
 // Colonne di "stores" che il browser può leggere. Manca apposta api_key (l'hash della chiave API):
 // non si usa più select('*') su questa tabella. Se aggiungi una colonna a "stores" e il pannello
 // deve leggerla, aggiungila anche qui.
-const STORE_COLUMNS = "id, auth_user_id, email, name, address, city, cap, logo_url, phone, plan, subscription_status, trial_started_at, created_at, hours, internal_notes, renewal_date, latitude, longitude, membership_card_name, membership_card_image_url, billing_cycle, business_type, website_url, shipping_provinces, delivery_days_by_region, pending_plan, pending_billing_cycle, map_logo_url, api_key_hint";
+const STORE_COLUMNS = "id, auth_user_id, email, name, address, city, cap, logo_url, phone, plan, subscription_status, trial_started_at, created_at, hours, internal_notes, renewal_date, latitude, longitude, membership_card_name, membership_card_image_url, billing_cycle, business_type, website_url, shipping_provinces, delivery_days_by_region, pending_plan, pending_billing_cycle, map_logo_url, api_key_hint, verification_status, verification_note";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_ER6yqBMYCoQ561qXao-sBg_CrEv7BQ6";
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
@@ -1433,6 +1433,8 @@ window.loginPartnerAction = async (email, pass, remember = true) => {
       internalNotes: ownerStoreRow.internal_notes || "",
       apiKey: "",
       apiKeyHint: ownerStoreRow.api_key_hint || "",
+      verificationStatus: ownerStoreRow.verification_status || "",
+      verificationNote: ownerStoreRow.verification_note || "",
       membershipCardName: ownerStoreRow.membership_card_name || "",
       membershipCardImage: ownerStoreRow.membership_card_image_url || "",
       businessType: ownerStoreRow.business_type || "",
@@ -7512,6 +7514,8 @@ async function refreshPartnerSession(storeId) {
       internalNotes: storeRow.internal_notes || "",
       apiKey: "",
       apiKeyHint: storeRow.api_key_hint || "",
+      verificationStatus: storeRow.verification_status || "",
+      verificationNote: storeRow.verification_note || "",
       membershipCardName: storeRow.membership_card_name || "",  // FIX: mancava anche qui
       membershipCardImage: storeRow.membership_card_image_url || "",  // FIX: idem
       businessType: storeRow.business_type || "",
@@ -8695,7 +8699,7 @@ async function handleOnboardingSubmit(step) {
         let refExists = false;
         let refError = null;
         if (!isUuid) {
-          const refRes = await supabaseClient.rpc('check_referral_exists', { p_email: referralInput });
+          const refRes = await storeAuthClient.rpc('check_referral_exists', { p_email: referralInput });
           refExists = refRes.data === true;
           refError = refRes.error;
         }
@@ -8819,6 +8823,8 @@ async function handleOnboardingSubmit(step) {
         internalNotes: storeRow.internal_notes || "",
         apiKey: "",
         apiKeyHint: storeRow.api_key_hint || "",
+        verificationStatus: storeRow.verification_status || "",
+        verificationNote: storeRow.verification_note || "",
         businessType: storeRow.business_type || "",
         websiteUrl: storeRow.website_url || "",
         shippingProvinces: storeRow.shipping_provinces ?? null,
@@ -10471,6 +10477,23 @@ function getSubscriptionBanner() {
   const partner = getCurrentPartner();
   if (!partner || !partner.subscription) return "";
 
+  if (partner.verificationStatus === 'pending' || partner.verificationStatus === 'rejected') {
+    const rejected = partner.verificationStatus === 'rejected';
+    return `
+      <div class="upgrade-banner ${rejected ? 'banner-danger' : 'banner-info'}">
+        <div style="flex: 1; display:flex; align-items:flex-start; gap:12px;">
+          <span class="banner-ico">${PANEL_ICONS.alert}</span>
+          <div>
+            <strong>${rejected ? 'Verifica non superata' : 'Negozio in verifica'}</strong>
+            <p style="margin: 5px 0 0 0; font-size: 0.9rem; line-height: 1.4;">
+              ${rejected ? 'Il negozio non è stato approvato e non è visibile al pubblico.' : 'Controlliamo i dati prima di pubblicare il negozio. Finché non è approvato, il negozio e le sue offerte non compaiono sul sito.'}
+              ${partner.verificationNote ? ' Nota: ' + esc(partner.verificationNote) : ''}
+            </p>
+          </div>
+        </div>
+      </div>`;
+  }
+
   if (partner.subscription.pendingPlan) {
     const pendingRenewalLabel = partner.subscription.renewalDate
       ? new Date(partner.subscription.renewalDate).toLocaleDateString('it-IT')
@@ -10639,36 +10662,13 @@ window.activatePlan = async function(planName, forceCycle) {
         return toast.error("Errore durante l'attivazione del piano.");
       }
   
-      // Storico rinnovi/upgrade (tabella subscription_events su Supabase).
-      // Non deve mai bloccare l'attivazione: se il log fallisce, il piano resta
-      // comunque attivato, si vede solo un warning in console.
-      const previousPlan = partner.plan;
-      const eventType = (PLAN_LEVELS[planName] || 0) > (PLAN_LEVELS[previousPlan] || 0)
-        ? 'upgrade'
-        : (PLAN_LEVELS[planName] || 0) < (PLAN_LEVELS[previousPlan] || 0)
-          ? 'downgrade'
-          : 'renewal';
-  
-      storeAuthClient.from('subscription_events').insert({
-        store_id: partner.id,
-        event_type: eventType,
-        previous_plan: previousPlan,
-        new_plan: storeRow.plan,
-        previous_status: partner.subscription?.status || null,
-        new_status: storeRow.subscription_status,
-        previous_billing_cycle: partner.subscription?.billingCycle || null,
-        new_billing_cycle: storeRow.billing_cycle,
-        previous_renewal_date: partner.subscription?.renewalDate || null,
-        new_renewal_date: storeRow.renewal_date
-      }).then(({ error: logError }) => {
-        if (logError) console.warn("Errore registrazione subscription_events:", logError);
-      });
-  
       const updatedStore = {
       ...partner,
       plan: storeRow.plan,
       apiKey: "",
       apiKeyHint: storeRow.api_key_hint || partner.apiKeyHint || "",
+      verificationStatus: storeRow.verification_status || partner.verificationStatus || "",
+      verificationNote: storeRow.verification_note || partner.verificationNote || "",
       subscription: {
         plan: storeRow.plan,
         status: storeRow.subscription_status,
@@ -10734,21 +10734,6 @@ window.switchToAnnual = async function() {
         console.error("Errore passaggio a fatturazione annuale:", error);
         return toast.error("Errore durante il passaggio alla fatturazione annuale.");
       }
-
-      storeAuthClient.from('subscription_events').insert({
-        store_id: partner.id,
-        event_type: 'billing_cycle_change',
-        previous_plan: partner.plan,
-        new_plan: storeRow.plan,
-        previous_status: sub.status,
-        new_status: storeRow.subscription_status,
-        previous_billing_cycle: 'monthly',
-        new_billing_cycle: storeRow.billing_cycle,
-        previous_renewal_date: sub.renewalDate,
-        new_renewal_date: storeRow.renewal_date
-      }).then(({ error: logError }) => {
-        if (logError) console.warn("Errore registrazione subscription_events:", logError);
-      });
 
       const updatedStore = {
         ...partner,

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Verifica negozi - DECERNE</title>
+  <style>
+    :root { --bg:#f8fafc; --fg:#0f172a; --muted:#64748b; --card:#fff; --line:#e2e8f0; --brand:#0f62fe; --ok:#16a34a; --bad:#dc2626; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#0b1220; --fg:#e5e7eb; --muted:#94a3b8; --card:#111a2e; --line:#243049; } }
+    * { box-sizing:border-box; }
+    body { margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+    main { max-width:860px; margin:0 auto; padding:24px 16px 64px; }
+    h1 { font-size:1.4rem; margin:0 0 4px; }
+    p.sub { color:var(--muted); margin:0 0 20px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    label { display:block; font-weight:600; margin:10px 0 4px; }
+    input, select, textarea { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--fg); font:inherit; }
+    button { padding:9px 14px; border:0; border-radius:8px; font:inherit; font-weight:600; cursor:pointer; background:var(--brand); color:#fff; }
+    button.ok { background:var(--ok); } button.bad { background:var(--bad); } button.ghost { background:transparent; color:var(--fg); border:1px solid var(--line); }
+    button:disabled { opacity:.6; cursor:wait; }
+    .meta { display:grid; grid-template-columns:130px 1fr; gap:4px 12px; margin:10px 0; }
+    .meta dt { color:var(--muted); } .meta dd { margin:0; overflow-wrap:anywhere; }
+    .pill { display:inline-block; padding:2px 10px; border-radius:999px; font-size:.8rem; font-weight:700; border:1px solid var(--line); }
+    .pill.pending { color:#b45309; } .pill.verified { color:var(--ok); } .pill.rejected { color:var(--bad); }
+    #msg { min-height:1.4em; margin:8px 0; color:var(--bad); }
+    .hidden { display:none; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Verifica negozi</h1>
+  <p class="sub">Un negozio compare sul sito (mappa, ricerca, offerte) solo dopo l'approvazione.</p>
+  <div id="msg" role="status"></div>
+
+  <section id="loginBox" class="card">
+    <form id="loginForm">
+      <label for="email">Email admin</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <div class="row" style="margin-top:14px"><button type="submit">Accedi</button></div>
+    </form>
+  </section>
+
+  <section id="appBox" class="hidden">
+    <div class="row" style="margin-bottom:14px">
+      <div style="flex:1;min-width:180px">
+        <label for="filter" style="margin-top:0">Mostra</label>
+        <select id="filter">
+          <option value="pending">Da verificare</option>
+          <option value="verified">Verificati</option>
+          <option value="rejected">Rifiutati</option>
+          <option value="all">Tutti</option>
+        </select>
+      </div>
+      <button id="reload" class="ghost" type="button">Aggiorna</button>
+      <button id="logout" class="ghost" type="button">Esci</button>
+    </div>
+    <div id="list"></div>
+  </section>
+</main>
+<script src="vendor/supabase.js"></script>
+<script src="js/admin-verifica.js"></script>
+</body>
+</html>
