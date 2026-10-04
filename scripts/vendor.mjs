@@ -1,6 +1,6 @@
 // Copia in frontend/vendor i file delle librerie usate dal sito, nelle versioni esatte di package-lock.json.
 // Si lancia con: npm run vendor (dopo npm ci o npm install). Va rilanciato ogni volta che una libreria cambia versione.
-import { cpSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 const nm = 'node_modules';
@@ -22,4 +22,12 @@ for (const [from, to] of files) {
   cpSync(`${nm}/${from}`, `${out}/${to}`);
 }
 cpSync(`${nm}/leaflet/dist/images`, `${out}/leaflet/images`, { recursive: true });
+
+// Fine riga sempre LF: alcuni file npm usano CRLF e Git su Windows li converte,
+// quindi senza questo passaggio il controllo "vendor = lockfile" della CI fallirebbe.
+for (const [, to] of files) {
+  const p = `${out}/${to}`;
+  const text = readFileSync(p, 'utf8');
+  if (text.includes('\r\n')) writeFileSync(p, text.replace(/\r\n/g, '\n'));
+}
 console.log('Librerie copiate in ' + out);
