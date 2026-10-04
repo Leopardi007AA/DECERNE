@@ -1308,7 +1308,7 @@ const RL_CONFIG = {
  */
 async function checkRateLimit(partnerId) {
   try {
-    const { data, error } = await supabaseClient.rpc('check_rate_limit', {
+    const { data, error } = await storeAuthClient.rpc('check_rate_limit', {
       p_store_id: partnerId
     });
 
@@ -8401,18 +8401,6 @@ window.startPlanDirect = function(planName) {
   storeData.step = 'onboarding';
   renderStoreView();
 };
-
-// Funzione di debug per forzare manualmente la scadenza di un abbonamento (utile in test)
-function simulateTrialExpiry(partnerId) {
-  const expiredSub = {
-      plan: 'Starter',
-      status: 'expired',
-      daysLeft: 0,
-      expiredAt: new Date().toISOString()
-  };
-  updatePartnerSubscription(partnerId, expiredSub);
-  renderStoreView(); // Rinfresca la UI per mostrare i blocchi
-}
 
 function renderOnboarding(container) {
   const step = storeData.onboardingStep;

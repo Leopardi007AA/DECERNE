@@ -24,8 +24,10 @@ function isPrivateIp(ip) {
   }
   if (net.isIPv6(ip)) {
     const v = ip.toLowerCase();
-    v.startsWith('64:ff9b:') || v.startsWith('2002:') || v.startsWith('2001:db8') || v.startsWith('fec') || v.startsWith('fed') || v.startsWith('fee') || v.startsWith('fef') ||
-      v.startsWith('fe8') || v.startsWith('fe9') || v.startsWith('fea') || v.startsWith('feb') ||
+    return v === '::1' || v === '::' ||
+      v.startsWith('fc') || v.startsWith('fd') ||
+      /^fe[89a-f]/.test(v) ||
+      v.startsWith('64:ff9b:') || v.startsWith('2002:') || v.startsWith('2001:db8') ||
       v.startsWith('::ffff:');
   }
   return true;
