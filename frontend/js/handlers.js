@@ -52,6 +52,10 @@
       return depth === 0 && q === null;
     }
   
+    var ALLOWED = Object.create(null);
+    ('activatePlan bulkDeleteOffers bulkSchedulePublish bulkSetOfferStatus cancelScheduledPlanChange clickElementById closeCsvModal closeFullPageModal closeOfferModal closePartnerSidebar closePreview closeStoreInfoPopup closeStoreInfoPopupOnBackdrop closeStoreProfile confirmCsvImport connectEcommercePlatform copyLocationId deleteOffer disconnectEcommercePlatform downloadTemplateJSON editOffer evaluateSmartSavings exportOffersToCSV goToStoreStep handleCsvFileSelect handleJSONImport handleNewOfferClick handleSmartListFieldInput logoutPartner logoutUser openAddLocationModal openBrowseStoresMap openCartMapView openDataUrl openEmailContact openLocationGoogleMapsHelper openProductDetail openProfileFromDrawer openRegisterFromDrawer openSharedListMapView openSmartShoppingListModal openSmartShoppingListModalIfReady openStoreInGoogleMaps openStoreProfile openUpgradeChoiceModal promptPasswordThenDeleteAccount regeneratePartnerApiKey removeClosest removeFromCart removeLocation removeParentElement renderCartContent renderEcomCredentialFields renderForgotPasswordForm renderLoginForm renderStoreForgotPasswordForm resendOnboardingOtp restoreOffer saveIntegrationProvider saveLocationCoordinates saveLocationEdit saveOfferFromIdField saveShippingTerritories saveStoreProfile saveToShoppingList searchSmartShoppingList setBillingCycle setMode setOfferStatusPill setPreviewDevice setPrimaryLocation shareOffer shareShoppingList showExpiredStatusInfo showRegisterForm showStatInfo showStoreInfoPopup showStoreLogin signInWithProvider startPlanDirect startTrial stopCartMapTracking switchStoreTab switchToAnnual toggleBulkScheduleFields toggleCartVoice toggleFollowMe toggleKebabMenu toggleOfferSelection toggleSelectAllOffersFromHeader toggleStatoPubblicazioneMenu toggleStoreProfileLocations tourOpenCartMapView traceSmartListOnMap updateSmartListQuantityFromInput')
+      .split(' ').forEach(function (n) { ALLOWED[n] = 1; });
+
     function resolvePath(path, el, ev, win) {
       var parts = path.split('.'), base = parts[0], obj;
       if (base === 'this') obj = el;
@@ -96,6 +100,7 @@
       if (!balanced(m[2])) throw new Error('parentesi non bilanciate: ' + stmt);
       var segs = path.split('.');
       segs.forEach(function (s) { if (BLOCKED[s] === 1) throw new Error('funzione non consentita: ' + s); });
+      if (segs[0] !== 'event' && segs[0] !== 'this' && segs[0] !== 'window' && ALLOWED[segs[0]] !== 1) throw new Error('funzione non in allowlist: ' + segs[0]);
       return function (el, ev, state) {
         var args = argToks.map(function (t) { return parseArg(t, el, ev, win); });
         var thisObj, fn;
