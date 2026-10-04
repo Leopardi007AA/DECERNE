@@ -14474,6 +14474,6 @@ window.clickElementById = (id) => { const el = document.getElementById(id); if (
 window.openSmartShoppingListModalIfReady = () => { if (window.openSmartShoppingListModal) window.openSmartShoppingListModal(); };
 window.removeClosest = (el, selector) => { const t = el && el.closest(selector); if (t) t.remove(); };
 window.removeParentElement = (el) => { if (el && el.parentElement) el.parentElement.remove(); };
-window.openDataUrl = (el) => window.open(el.dataset.url, '_blank', 'noopener');
+window.openDataUrl = (el) => { const u = getSafeLinkUrl(el.dataset.url); if (u) window.open(u, '_blank', 'noopener'); };
 window.closeStoreInfoPopupOnBackdrop = (event, el) => { if (event.target === el) closeStoreInfoPopup(); };
 window.updateSmartListQuantityFromInput = (el) => updateSmartListQuantity(el.dataset.key, el.value);

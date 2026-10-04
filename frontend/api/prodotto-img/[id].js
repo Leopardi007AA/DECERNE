@@ -14,6 +14,7 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 function isPrivateIp(ip) {
   if (net.isIPv4(ip)) {
     const [a, b] = ip.split('.').map(Number);
+    if ((a === 198 && (b === 18 || b === 19 || b === 51)) || (a === 192 && b === 0) || (a === 203 && b === 0)) return true;
     return a === 0 || a === 10 || a === 127 ||
       (a === 169 && b === 254) ||
       (a === 172 && b >= 16 && b <= 31) ||
@@ -23,7 +24,7 @@ function isPrivateIp(ip) {
   }
   if (net.isIPv6(ip)) {
     const v = ip.toLowerCase();
-    return v === '::1' || v === '::' || v.startsWith('fc') || v.startsWith('fd') ||
+    v.startsWith('64:ff9b:') || v.startsWith('2002:') || v.startsWith('2001:db8') || v.startsWith('fec') || v.startsWith('fed') || v.startsWith('fee') || v.startsWith('fef') ||
       v.startsWith('fe8') || v.startsWith('fe9') || v.startsWith('fea') || v.startsWith('feb') ||
       v.startsWith('::ffff:');
   }
@@ -50,7 +51,7 @@ function downloadImage(urlStr, redirectsLeft) {
     const req = https.request({
       method: 'GET',
       hostname: u.hostname,
-      port: u.port || 443,
+      port: 443,
       path: u.pathname + u.search,
       lookup: safeLookup,
       timeout: 6000,
@@ -110,6 +111,7 @@ module.exports = async (req, res) => {
 
     const { type, body } = await downloadImage(imgUrl, MAX_REDIRECTS);
 
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Type', type);
     res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
