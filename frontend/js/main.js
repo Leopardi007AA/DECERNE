@@ -433,6 +433,44 @@ function getPasswordError(pass) {
   return null;
 }
 
+
+// Controlla se la password è già apparsa in violazioni di dati pubbliche (Have I Been Pwned).
+// Al servizio parte solo l'inizio dell'impronta SHA-1 (5 caratteri), mai la password.
+// Se il servizio non risponde, la password viene accettata: non blocchiamo l'utente per un problema di rete.
+async function isPasswordPwned(pass) {
+  try {
+    const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(pass));
+    const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    const prefix = hex.slice(0, 5);
+    const suffix = hex.slice(5);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
+    const res = await fetch('https://api.pwnedpasswords.com/range/' + prefix, {
+      headers: { 'Add-Padding': 'true' },
+      signal: ctrl.signal
+    });
+    clearTimeout(timer);
+    if (!res.ok) return false;
+    const text = await res.text();
+    return text.split('\n').some((line) => {
+      const parts = line.trim().split(':');
+      return parts[0] === suffix && Number(parts[1]) > 0;
+    });
+  } catch (e) {
+    return false;
+  }
+}
+
+// Come getPasswordError, in più rifiuta le password trapelate in violazioni di dati.
+async function getPasswordErrorAsync(pass) {
+  const base = getPasswordError(pass);
+  if (base) return base;
+  if (await isPasswordPwned(pass)) {
+    return "Questa password è apparsa in violazioni di dati pubbliche. Scegline un'altra.";
+  }
+  return null;
+}
+
 /**
  * Mostra un errore in un contenitore specifico o tramite toast
  */
@@ -6676,7 +6714,7 @@ function renderResetPasswordForm() {
     const pass = $("#resetPass").value;
     const confirm = $("#resetPassConfirm").value;
     const err = $("#resetError");
-    const resetPassError = getPasswordError(pass);
+    const resetPassError = await getPasswordErrorAsync(pass);
     if (resetPassError) {
       err.innerText = resetPassError;
       err.classList.remove("hidden");
@@ -7007,7 +7045,7 @@ async function validateRegistration() {
 
   // Validazioni base
   if (!VALIDATION_RULES.email.test(email)) return toast.error("Inserisci un'email valida.");
-  const regPassError = getPasswordError(pass);
+  const regPassError = await getPasswordErrorAsync(pass);
   if (regPassError) return toast.error(regPassError);
   if (pass !== passConf) return toast.error("Le password non coincidono.");
   if (!privacyAccepted) return toast.error("Devi accettare l'informativa sulla privacy per registrarti.");
@@ -8024,7 +8062,7 @@ function renderStoreResetNewPasswordForm() {
     const confirm = $("#storeResetNewPassConfirm").value;
     const err = $("#storeResetNewPassError");
     err.classList.add("hidden");
-    const storeResetPassError = getPasswordError(pass);
+    const storeResetPassError = await getPasswordErrorAsync(pass);
     if (storeResetPassError) {
       err.innerText = storeResetPassError;
       err.classList.remove("hidden");
@@ -8121,7 +8159,7 @@ function renderTeamSetPasswordForm(email) {
     const confirm = $("#teamNewPassConfirm").value;
     const err = $("#teamNewPassError");
     err.classList.add("hidden");
-    const teamPassError = getPasswordError(pass);
+    const teamPassError = await getPasswordErrorAsync(pass);
     if (teamPassError) {
       err.innerText = teamPassError;
       err.classList.remove("hidden");
@@ -8617,7 +8655,7 @@ async function handleOnboardingSubmit(step) {
 
       const pass = document.getElementById("obPass")?.value;
       const confirm = document.getElementById("obPassConfirm")?.value;
-      const obPassError = getPasswordError(pass);
+      const obPassError = await getPasswordErrorAsync(pass);
       if (obPassError) {
         if (btn) btn.disabled = false;
         return toast.error(obPassError);
