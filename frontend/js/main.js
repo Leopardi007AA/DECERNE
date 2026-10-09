@@ -2667,7 +2667,7 @@ if (query.length >= 2) {
   const { data: matchingStores, error: storeSearchError } = await supabaseClient
     .from('public_stores')
     .select('id, name, city, cap, address, plan, logo_url, phone, hours')
-    .ilike('name', `%${query}%`)   // oppure usa un filtro più soft se preferisci
+    .ilike('name', `%${query.replace(/[\\%_]/g, '\\$&')}%`)   // oppure usa un filtro più soft se preferisci
     .limit(5);
 
   if (!storeSearchError && matchingStores?.length) {
