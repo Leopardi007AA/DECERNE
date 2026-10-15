@@ -95,23 +95,39 @@ Deno.serve(async (req: Request) => {
     }
     if (!gl?.allowed) return json({ error: "Servizio occupato. Riprova tra qualche secondo." }, 429);
 
-    const base = (Deno.env.get("OSRM_BASE_URL") || "https://router.project-osrm.org").replace(/\/+$/, "");
+    const DEMO_BASE = "https://router.project-osrm.org";
+    const base = (Deno.env.get("OSRM_BASE_URL") || DEMO_BASE).replace(/\/+$/, "");
     const coords = clean.map(p => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(";");
-    const url = `${base}/route/v1/driving/${coords}?overview=full&geometries=geojson${steps ? "&steps=true" : ""}`;
-
-    const upstreamHeaders: Record<string, string> = {
-      "User-Agent": "DecerneApp/1.0 (support@decerne.it)",
-      "Accept": "application/json"
-    };
+    const path = `/route/v1/driving/${coords}?overview=full&geometries=geojson${steps ? "&steps=true" : ""}`;
     const upstreamKey = Deno.env.get("OSRM_API_KEY");
-    if (upstreamKey) upstreamHeaders["Authorization"] = `Bearer ${upstreamKey}`;
 
-    const upstream = await fetch(url, {
-      headers: upstreamHeaders,
-      signal: AbortSignal.timeout(8000)
-    });
-    if (!upstream.ok) {
-      console.error("OSRM non ok:", upstream.status);
+    const callRouter = (routerBase: string, key?: string) => {
+      const headers: Record<string, string> = {
+        "User-Agent": "DecerneApp/1.0 (support@decerne.it)",
+        "Accept": "application/json"
+      };
+      if (key) headers["Authorization"] = `Bearer ${key}`;
+      return fetch(`${routerBase}${path}`, { headers, signal: AbortSignal.timeout(8000) });
+    };
+
+    let upstream: Response | null = null;
+    try {
+      upstream = await callRouter(base, upstreamKey);
+    } catch (e) {
+      console.error("Routing principale non raggiungibile:", e);
+    }
+    // Quota finita, chiave scaduta o servizio giù: ripiego sul server demo, senza chiave
+    if ((!upstream || !upstream.ok) && base !== DEMO_BASE) {
+      console.error("Routing principale non ok:", upstream ? upstream.status : "nessuna risposta", "- ripiego sul server demo");
+      try {
+        upstream = await callRouter(DEMO_BASE);
+      } catch (e) {
+        console.error("Anche il ripiego è fallito:", e);
+        upstream = null;
+      }
+    }
+    if (!upstream || !upstream.ok) {
+      console.error("OSRM non ok:", upstream ? upstream.status : "nessuna risposta");
       return json({ error: "Routing non disponibile" }, 502);
     }
 

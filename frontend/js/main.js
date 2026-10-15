@@ -4974,6 +4974,7 @@ async function renderMultiStopMap(cart, overrideStoresById, options = {}) {
   `;
 
   setTimeout(() => {
+    destroyCartMap();
     cartMap = L.map('cartMapContainer').setView([userPos.lat, userPos.lng], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
@@ -5092,7 +5093,8 @@ function computeVisitOrder(startLat, startLng, stores) {
   while (remaining.length) {
     let nearestIdx = 0, nearestDist = Infinity;
     remaining.forEach((s, i) => {
-      const d = Math.hypot(s.latitude - curLat, s.longitude - curLng);
+      // A queste latitudini un grado di longitudine è più corto di uno di latitudine
+      const d = Math.hypot(s.latitude - curLat, (s.longitude - curLng) * Math.cos(curLat * Math.PI / 180));
       if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
     });
     const next = remaining.splice(nearestIdx, 1)[0];
@@ -5376,7 +5378,7 @@ async function openBrowseStoresMap() {
   const content = $("#modalContent");
   content.innerHTML = `
     <div style="padding:16px;">
-      <button class="btn outline" style="margin-bottom:12px;" data-onclick="renderCartContent()">← Torna alla lista</button>
+      <button class="btn outline" style="margin-bottom:12px;" data-onclick="stopCartMapTracking()">← Torna alla lista</button>
       <div id="cartMapContainer" style="width:100%; height:65vh; border-radius:12px; overflow:hidden;"></div>
     </div>
   `;
@@ -5391,6 +5393,7 @@ async function openBrowseStoresMap() {
     console.warn("Posizione non disponibile per centrare la mappa negozi:", e);
   }
 
+  destroyCartMap();
   cartMap = L.map('cartMapContainer').setView([center.lat, center.lng], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
@@ -6494,6 +6497,15 @@ function updateFollowBtnLabel() {
     : `${PANEL_ICONS.target} Seguimi`;
 }
 
+// Smonta davvero la mappa Leaflet (listener, tile, marker): mettere solo la variabile a null
+// lascia l'istanza viva in memoria.
+function destroyCartMap() {
+  if (cartMap) {
+    try { cartMap.remove(); } catch (e) { console.warn("Chiusura mappa:", e); }
+    cartMap = null;
+  }
+}
+
 function stopCartMapTracking() {
   releaseWakeLock();
   document.removeEventListener('visibilitychange', handleWakeLockVisibilityChange);
@@ -6501,7 +6513,7 @@ function stopCartMapTracking() {
     navigator.geolocation.clearWatch(cartWatchId);
     cartWatchId = null;
   }
-  cartMap = null;
+  destroyCartMap();
   cartUserMarker = null;
   cartLastPos = null;
   cartStoreMarkers = {};
