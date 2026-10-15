@@ -4992,7 +4992,7 @@ async function renderMultiStopMap(cart, overrideStoresById, options = {}) {
     cartUserPos = userPos;
 
     (async () => {
-      const visitOrder = computeVisitOrder(userPos.lat, userPos.lng, validStores);
+      const visitOrder = await computeVisitOrderSmart(userPos.lat, userPos.lng, validStores);
       cartVisitOrder = visitOrder;
       cartNextStopIndex = 0;
 
@@ -5085,6 +5085,39 @@ let cartUturnCheckInFlight = false;
 let cartPassedManeuvers = [];
 let cartLastSpokenText = '';
 let cartLastSpokenTime = 0;
+
+// Ordine delle tappe sui tempi di guida reali: MapMap /optimise tramite la nostra Edge Function.
+// Con meno di 3 tappe, nel tour guidato o se il servizio non risponde si usa il calcolo in
+// linea d'aria di computeVisitOrder. Se l'ordine arriva da MapMap non va rimescolato in viaggio,
+// altrimenti il primo ricalcolo lo butterebbe via.
+let cartOrderOptimised = false;
+
+async function computeVisitOrderSmart(startLat, startLng, stores) {
+  cartOrderOptimised = false;
+  const inTour = document.body.classList.contains("tour-active");
+  if (stores.length < 3 || inTour) return computeVisitOrder(startLat, startLng, stores);
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/optimise-route`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
+      body: JSON.stringify({
+        start: { lat: startLat, lng: startLng },
+        stops: stores.map(s => ({ lat: s.latitude, lng: s.longitude }))
+      }),
+      signal: AbortSignal.timeout(9000)
+    });
+    if (res.ok) {
+      const { order } = await res.json();
+      if (Array.isArray(order) && order.length === stores.length) {
+        cartOrderOptimised = true;
+        return order.map(i => stores[i]);
+      }
+    }
+  } catch (e) {
+    console.warn("Ordine tappe ottimizzato non disponibile:", e);
+  }
+  return computeVisitOrder(startLat, startLng, stores);
+}
 
 function computeVisitOrder(startLat, startLng, stores) {
   const remaining = [...stores];
@@ -5540,7 +5573,8 @@ async function recalculateTrip(currentLat, currentLng, isReroute = false) {
 
   // Ricalcola anche l'ordine delle tappe non ancora visitate: da dove ti trovi ora
   // il tragitto più breve potrebbe non coincidere più con l'ordine di partenza.
-  const reordered = computeVisitOrder(currentLat, currentLng, remainingStops);
+  // Se l'ordine viene da MapMap non lo rimescoliamo: ricalcoliamo solo il percorso.
+  const reordered = cartOrderOptimised ? remainingStops : computeVisitOrder(currentLat, currentLng, remainingStops);
   cartVisitOrder = [...cartVisitOrder.slice(0, cartNextStopIndex), ...reordered];
   reordered.forEach((store, i) => {
     const marker = cartStoreMarkers[store.id];
@@ -6521,6 +6555,7 @@ function stopCartMapTracking() {
   cartItemsByStoreGlobal = {};
   cartUserPos = null;
   cartVisitOrder = [];
+  cartOrderOptimised = false;
   cartMultiRoute = null;
   cartNextStopIndex = 0;
   cartManeuvers = [];

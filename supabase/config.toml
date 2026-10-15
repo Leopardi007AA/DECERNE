@@ -434,6 +434,8 @@ verify_jwt = false
 verify_jwt = false
 [functions.route]
 verify_jwt = false
+[functions.optimise-route]
+verify_jwt = false
 [functions.road-oneway]
 verify_jwt = false
 [functions.geocode-public]
