@@ -4,8 +4,9 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // Proxy per il calcolo dei percorsi (OSRM). Il browser non contatta più il server OSRM:
 // il fornitore vede solo l'IP del server, non quello dell'utente. Funzione pubblica
 // (verify_jwt disattivo) perché il percorso si usa anche senza account.
-// Per passare a un provider con contratto o a un OSRM proprio basta impostare il secret
-// OSRM_BASE_URL (es. https://mio-osrm.example.com), senza toccare il sito.
+// Per passare a un provider con contratto o a un OSRM proprio bastano i secret OSRM_BASE_URL
+// (es. https://api.mapmap.ai) e, se il provider vuole una chiave, OSRM_API_KEY (inviata come
+// Authorization: Bearer). Il sito non cambia.
 // NB: il server demo router.project-osrm.org non è pensato per un uso in produzione.
 
 const ALLOWED_ORIGINS = [
@@ -98,8 +99,15 @@ Deno.serve(async (req: Request) => {
     const coords = clean.map(p => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(";");
     const url = `${base}/route/v1/driving/${coords}?overview=full&geometries=geojson${steps ? "&steps=true" : ""}`;
 
+    const upstreamHeaders: Record<string, string> = {
+      "User-Agent": "DecerneApp/1.0 (support@decerne.it)",
+      "Accept": "application/json"
+    };
+    const upstreamKey = Deno.env.get("OSRM_API_KEY");
+    if (upstreamKey) upstreamHeaders["Authorization"] = `Bearer ${upstreamKey}`;
+
     const upstream = await fetch(url, {
-      headers: { "User-Agent": "DecerneApp/1.0 (support@decerne.it)", "Accept": "application/json" },
+      headers: upstreamHeaders,
       signal: AbortSignal.timeout(8000)
     });
     if (!upstream.ok) {
