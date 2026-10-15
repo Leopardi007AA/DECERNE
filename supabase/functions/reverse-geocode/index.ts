@@ -7,9 +7,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // non registrati; il limite di frequenza è per IP e la risposta contiene solo i tre campi utili.
 //
 // MapMap (GET /geocode/reverse, chiave nel secret MAPMAP_API_KEY) è il primo tentativo.
-// Non restituisce il CAP: se manca lo si cerca su Photon (Komoot, basato su OpenStreetMap) con
-// un tempo breve. Se MapMap non risponde si passa a Photon e, per ultimo, a Nominatim, che però
-// di solito risponde 403 agli IP dei server cloud condivisi. I log dicono quale provider ha risposto.
+// Il reverse non restituisce il CAP: lo si ricava con una seconda chiamata a GET /geocode. Se
+// MapMap non risponde si passa a Photon (Komoot, basato su OpenStreetMap) e, per ultimo, a
+// Nominatim, che però di solito risponde 403 agli IP dei server cloud condivisi. I log dicono
+// quale provider ha risposto.
 
 const ALLOWED_ORIGINS = [
   "https://decerne.vercel.app",
@@ -19,7 +20,7 @@ const ALLOWED_ORIGINS = [
 
 const UA = "DecerneApp/1.0 (support@decerne.it)";
 
-type Addr = { road: string; postcode: string; city: string };
+type Addr = { road: string; postcode: string; city: string; number?: string };
 
 function corsHeadersFor(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") || "";
@@ -77,8 +78,32 @@ async function viaMapMap(lat: number, lon: number): Promise<Addr | null> {
   return {
     road: String(p.street || ""),
     postcode: String(p.postcode || ""),
-    city: String(p.city || p.locality || p.district || "")
+    city: String(p.city || p.locality || p.district || ""),
+    number: String(p.housenumber || "")
   };
+}
+
+// Il reverse di MapMap non dà il CAP, il geocoding diretto sì: si cerca lo stesso indirizzo e si
+// accetta il risultato solo se cade a poche centinaia di metri dal punto di partenza.
+async function capViaMapMap(a: Addr, lat: number, lon: number): Promise<string> {
+  const key = Deno.env.get("MAPMAP_API_KEY");
+  if (!key || !a.road || !a.city) return "";
+  const q = encodeURIComponent(`${a.number ? a.number + " " : ""}${a.road}, ${a.city}`);
+  const res = await fetch(`https://api.mapmap.ai/geocode?q=${q}&limit=5`, {
+    headers: { "User-Agent": UA, "Authorization": `Bearer ${key}` },
+    signal: AbortSignal.timeout(3000)
+  });
+  if (!res.ok) {
+    console.error("MapMap geocode non ok:", res.status);
+    return "";
+  }
+  const features = (await res.json())?.features ?? [];
+  for (const f of features) {
+    const [fLon, fLat] = f?.geometry?.coordinates ?? [];
+    const cap = String(f?.properties?.postcode || "");
+    if (cap && Math.abs(fLat - lat) < 0.01 && Math.abs(fLon - lon) < 0.012) return cap;
+  }
+  return "";
 }
 
 async function viaPhoton(lat: number, lon: number, timeoutMs = 6000): Promise<Addr | null> {
@@ -150,13 +175,13 @@ Deno.serve(async (req: Request) => {
     let addr: Addr | null = null;
     let source = "mapmap";
     try { addr = await viaMapMap(lat, lon); } catch (e) { console.error("MapMap errore:", String(e)); }
-    // MapMap non restituisce il CAP, che serve a filtrare le offerte: lo cerchiamo su Photon
-    // con un tempo breve. Se Photon non risponde teniamo la sola città.
+    // Il reverse di MapMap non dà il CAP, che serve a filtrare le offerte: lo ricaviamo con una
+    // seconda chiamata di geocoding diretto. Se manca teniamo la sola città.
     if (addr && addr.city && !addr.postcode) {
       try {
-        const extra = await viaPhoton(lat, lon, 3000);
-        if (extra?.postcode) { addr.postcode = extra.postcode; source = "mapmap+photon"; }
-      } catch (e) { console.error("Photon (solo CAP) errore:", String(e)); }
+        const cap = await capViaMapMap(addr, lat, lon);
+        if (cap) { addr.postcode = cap; source = "mapmap+cap"; }
+      } catch (e) { console.error("MapMap (solo CAP) errore:", String(e)); }
     }
     if (!addr || (!addr.postcode && !addr.city)) {
       source = "photon";
