@@ -6,9 +6,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // solo l'IP del server. Funzione pubblica (verify_jwt disattivo) perché la usano anche i visitatori
 // non registrati; il limite di frequenza è per IP e la risposta contiene solo i tre campi utili.
 //
-// Nominatim (server pubblico di OpenStreetMap) risponde 403 agli IP dei server cloud condivisi,
-// quindi è il primo tentativo ma non l'unico: se fallisce si passa a Photon (Komoot, anch'esso
-// basato su OpenStreetMap). Nei log di funzione resta scritto quale dei due ha risposto.
+// MapMap (GET /geocode/reverse, chiave nel secret MAPMAP_API_KEY) è il primo tentativo.
+// Non restituisce il CAP: se manca lo si cerca su Photon (Komoot, basato su OpenStreetMap) con
+// un tempo breve. Se MapMap non risponde si passa a Photon e, per ultimo, a Nominatim, che però
+// di solito risponde 403 agli IP dei server cloud condivisi. I log dicono quale provider ha risposto.
 
 const ALLOWED_ORIGINS = [
   "https://decerne.vercel.app",
@@ -59,10 +60,31 @@ async function viaNominatim(lat: number, lon: number): Promise<Addr | null> {
   };
 }
 
-async function viaPhoton(lat: number, lon: number): Promise<Addr | null> {
+async function viaMapMap(lat: number, lon: number): Promise<Addr | null> {
+  const key = Deno.env.get("MAPMAP_API_KEY");
+  if (!key) return null; // senza chiave si salta e si passa ai provider pubblici
+  const res = await fetch(
+    `https://api.mapmap.ai/geocode/reverse?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`,
+    { headers: { "User-Agent": UA, "Authorization": `Bearer ${key}` }, signal: AbortSignal.timeout(4000) }
+  );
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    console.error("MapMap non ok:", res.status, t.slice(0, 120));
+    return null;
+  }
+  const p = (await res.json())?.features?.[0]?.properties;
+  if (!p) { console.error("MapMap senza risultati"); return null; }
+  return {
+    road: String(p.street || ""),
+    postcode: String(p.postcode || ""),
+    city: String(p.city || p.locality || p.district || "")
+  };
+}
+
+async function viaPhoton(lat: number, lon: number, timeoutMs = 6000): Promise<Addr | null> {
   const res = await fetch(
     `https://photon.komoot.io/reverse?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}&limit=1`,
-    { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(6000) }
+    { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(timeoutMs) }
   );
   if (!res.ok) {
     const t = await res.text().catch(() => "");
@@ -126,11 +148,23 @@ Deno.serve(async (req: Request) => {
     if (!gl?.allowed) return json({ error: "Servizio occupato. Riprova tra qualche secondo." }, 429);
 
     let addr: Addr | null = null;
-    let source = "nominatim";
-    try { addr = await viaNominatim(lat, lon); } catch (e) { console.error("Nominatim errore:", String(e)); }
+    let source = "mapmap";
+    try { addr = await viaMapMap(lat, lon); } catch (e) { console.error("MapMap errore:", String(e)); }
+    // MapMap non restituisce il CAP, che serve a filtrare le offerte: lo cerchiamo su Photon
+    // con un tempo breve. Se Photon non risponde teniamo la sola città.
+    if (addr && addr.city && !addr.postcode) {
+      try {
+        const extra = await viaPhoton(lat, lon, 3000);
+        if (extra?.postcode) { addr.postcode = extra.postcode; source = "mapmap+photon"; }
+      } catch (e) { console.error("Photon (solo CAP) errore:", String(e)); }
+    }
     if (!addr || (!addr.postcode && !addr.city)) {
       source = "photon";
       try { addr = await viaPhoton(lat, lon); } catch (e) { console.error("Photon errore:", String(e)); addr = null; }
+    }
+    if (!addr || (!addr.postcode && !addr.city)) {
+      source = "nominatim";
+      try { addr = await viaNominatim(lat, lon); } catch (e) { console.error("Nominatim errore:", String(e)); addr = null; }
     }
     if (!addr || (!addr.postcode && !addr.city)) {
       console.error("Reverse geocode: nessun provider ha risposto");
