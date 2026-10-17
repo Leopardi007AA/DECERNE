@@ -9,7 +9,7 @@
     "vendor": "node scripts/vendor.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.117.2",
+    "@supabase/supabase-js": "2.117.3",
     "dompurify": "3.4.16",
     "papaparse": "5.7.0",
     "leaflet": "1.9.4",
