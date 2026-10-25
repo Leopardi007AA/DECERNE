@@ -5006,6 +5006,7 @@ async function renderMultiStopMap(cart, overrideStoresById, options = {}) {
         drawRoutePolyline(multiRoute.coords);
       }
 
+      let arrivalMin = 0; // minuti di guida accumulati fino a ogni tappa, per l'avviso sugli orari
       visitOrder.forEach((store, idx) => {
         const productList = cartItemsByStore[store.id].map(p => `• ${esc(p.product)} (${formatPrice(p.price)})`).join('<br>');
         const marker = L.marker([store.latitude, store.longitude], { icon: makeNumberedIcon(idx + 1, store.approximateLocation) }).addTo(cartMap);
@@ -5013,12 +5014,14 @@ async function renderMultiStopMap(cart, overrideStoresById, options = {}) {
         bounds.push([store.latitude, store.longitude]);
 
         const legInfo = multiRoute?.legs?.[idx];
+        arrivalMin += legInfo?.durationMin || 0;
         const approxNote = store.approximateLocation
           ? `<div style="margin-top:6px; font-size:0.75rem; color:#b45309; display:flex; align-items:center; gap:4px;">${PANEL_ICONS.alert} Posizione approssimativa: l'indirizzo esatto non è nel database delle mappe gratuite.</div>` : '';
         marker.bindPopup(`
           <strong>Tappa ${idx + 1}: ${esc(store.name)}</strong><br>${productList}
           ${legInfo ? `<div style="margin-top:8px; font-size:0.85rem; color:#475569; display:flex; align-items:center; gap:6px;">${PANEL_ICONS.road} ${legInfo.distanceKm.toFixed(1)} km da qui &nbsp;·&nbsp; ${PANEL_ICONS.clock} ${formatDuration(legInfo.durationMin)}</div>` : ''}
           ${approxNote}
+          ${buildArrivalHoursNote(store.hours, arrivalMin)}
         `);
       });
 
@@ -5453,6 +5456,87 @@ async function openSharedListMapView(cart) {
     return;
   }
   await renderMultiStopMap(cart, null, { showFuelCost: false });
+}
+
+// ============ ORARI DI APERTURA ALL'ARRIVO ============
+// Gli orari dei negozi sono testo libero scritto dal partner. Leggiamo solo i formati chiari
+// ("Lun-Sab 08:30-20:00", "Lunedì-Domenica, 7:30-19:30", "8-13 / 16-20", più gruppi separati da ";").
+// Se il testo non è chiaro non diciamo nulla: meglio nessun avviso che un avviso sbagliato.
+const OPENING_DAYS = { dom: 0, lun: 1, mar: 2, mer: 3, gio: 4, ven: 5, sab: 6 };
+
+function parseOpeningHours(text) {
+  const raw = String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  if (!raw) return null;
+  const dayRe = '(dom|lun|mar|mer|gio|ven|sab)[a-z]*';
+  const timeRe = '(\\d{1,2})(?:[:.](\\d{2}))?';
+  const dayPartRe = new RegExp(`^(?:dal\\s+)?${dayRe}(?:\\s*(?:-|–|—|al)\\s*${dayRe})?`);
+  const segments = [];
+  for (const part of raw.split(/[;\n|]+|,\s*(?=(?:dom|lun|mar|mer|gio|ven|sab))/)) {
+    let rest = part.trim();
+    if (!rest) continue;
+    let days = [0, 1, 2, 3, 4, 5, 6];
+    const dm = rest.match(dayPartRe);
+    if (dm) {
+      const first = OPENING_DAYS[dm[1]];
+      if (dm[2]) {
+        const last = OPENING_DAYS[dm[2]];
+        days = [];
+        for (let d = first; ; d = (d + 1) % 7) { days.push(d); if (d === last) break; }
+      } else {
+        days = [first];
+      }
+      rest = rest.slice(dm[0].length);
+    } else {
+      rest = rest.replace(/^(?:tutti i giorni|ogni giorno)/, '');
+    }
+    const rangeRe = new RegExp(`${timeRe}\\s*(?:-|–|—|alle)\\s*${timeRe}`, 'g');
+    const ranges = [];
+    for (const m of rest.matchAll(rangeRe)) {
+      const h1 = +m[1], m1 = +(m[2] || 0), h2 = +m[3], m2 = +(m[4] || 0);
+      if (h1 > 24 || h2 > 24 || m1 > 59 || m2 > 59) return null;
+      const start = h1 * 60 + m1, end = h2 * 60 + m2;
+      if (end <= start || end > 1440) return null;
+      ranges.push([start, end]);
+    }
+    const leftover = rest.replace(rangeRe, '').replace(/\be\b/g, '').replace(/[\s,/&.:;|\-–—]+/g, '');
+    if (!ranges.length || leftover) return null;
+    segments.push({ days, ranges });
+  }
+  return segments.length ? segments : null;
+}
+
+// Dato il testo degli orari e l'istante di arrivo dice se il negozio è aperto; null se non si capisce.
+function openingStateAt(text, when) {
+  const segments = parseOpeningHours(text);
+  if (!segments) return null;
+  const dow = when.getDay();
+  const min = when.getHours() * 60 + when.getMinutes();
+  const today = segments.filter(s => s.days.includes(dow)).flatMap(s => s.ranges).sort((a, b) => a[0] - b[0]);
+  if (!today.length) return { open: false, closedToday: true };
+  const current = today.find(([s, e]) => min >= s && min < e);
+  if (current) return { open: true, closesAt: current[1], minLeft: current[1] - min };
+  const next = today.find(([s]) => s > min);
+  return next ? { open: false, opensAt: next[0] } : { open: false };
+}
+
+function formatClockMinutes(min) {
+  return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
+}
+
+// Avviso da mettere nel popup della tappa, calcolato sull'orario stimato di arrivo
+// (adesso più i minuti di guida fino a lì). Vuoto se il negozio sarà aperto o se gli orari non sono chiari.
+function buildArrivalHoursNote(hoursText, minutesFromNow) {
+  const arrival = new Date(Date.now() + (minutesFromNow || 0) * 60000);
+  const st = openingStateAt(hoursText, arrival);
+  if (!st) return '';
+  const style = 'margin-top:6px; font-size:0.75rem; color:#b45309; display:flex; align-items:center; gap:4px;';
+  const note = (msg) => `<div style="${style}">${PANEL_ICONS.alert} ${msg}</div>`;
+  if (st.open) {
+    return st.minLeft <= 30 ? note(`Chiude alle ${formatClockMinutes(st.closesAt)}: ci arrivi poco prima.`) : '';
+  }
+  if (st.opensAt != null) return note(`Probabilmente chiuso al tuo arrivo, apre alle ${formatClockMinutes(st.opensAt)}.`);
+  if (st.closedToday) return note('Secondo gli orari indicati oggi è chiuso.');
+  return note('Probabilmente chiuso al tuo arrivo.');
 }
 
 function makeNumberedIcon(number, approximate) {
