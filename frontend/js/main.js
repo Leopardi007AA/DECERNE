@@ -5304,6 +5304,8 @@ function buildManeuverList(legs) {
       const type = step.maneuver.type;
       if (type === 'depart' || type === 'arrive') continue;
       if (type === 'exit roundabout' || type === 'exit rotary') continue;
+      // "new name" e "continue" dritto sono solo cambi di nome della strada, senza svolta: non si annunciano
+      if (type === 'new name' || (type === 'continue' && (!step.maneuver.modifier || step.maneuver.modifier === 'straight'))) continue;
 
       let text;
       let followStep = step;
