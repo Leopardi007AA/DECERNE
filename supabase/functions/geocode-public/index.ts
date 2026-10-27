@@ -5,6 +5,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // Pubblica (verify_jwt disattivo) perché il tour lo vedono anche i visitatori senza account.
 // Non salva nulla e non accetta indirizzi completi: serve solo un punto approssimativo.
 // Usa Photon (Komoot, basato su OpenStreetMap): Nominatim rifiuta gli IP dei server cloud.
+// Se Photon non risponde ripiega su MapMap (secret MAPMAP_API_KEY).
 // Risposta: { lat, lng } oppure { lat: null, lng: null }.
 
 const ALLOWED_ORIGINS = [
@@ -77,21 +78,50 @@ Deno.serve(async (req: Request) => {
     }
     if (!gl?.allowed) return json(empty, 429);
 
-    // bbox = riquadro dell'Italia (ovest,sud,est,nord)
-    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1&lang=it&bbox=6.6,35.4,18.6,47.2`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": "DecerneApp/1.0 (support@decerne.it)" },
-      signal: AbortSignal.timeout(6000)
-    });
-    if (!res.ok) {
-      console.error("Photon non ok:", res.status);
-      return json(empty);
+    const inItaly = (la: number, ln: number) =>
+      Number.isFinite(la) && Number.isFinite(ln) && la >= 35 && la <= 47.5 && ln >= 6 && ln <= 19;
+    let lat = NaN;
+    let lng = NaN;
+
+    // Photon è gratuito, quindi va per primo; MapMap subentra solo se Photon non risponde.
+    try {
+      // bbox = riquadro dell'Italia (ovest,sud,est,nord)
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1&lang=it&bbox=6.6,35.4,18.6,47.2`;
+      const res = await fetch(url, {
+        headers: { "User-Agent": "DecerneApp/1.0 (support@decerne.it)" },
+        signal: AbortSignal.timeout(4000)
+      });
+      if (res.ok) {
+        const coords = (await res.json())?.features?.[0]?.geometry?.coordinates;
+        lng = Number(coords?.[0]);
+        lat = Number(coords?.[1]);
+      } else {
+        console.error("Photon non ok:", res.status);
+      }
+    } catch (e) {
+      console.error("Photon errore:", String(e));
     }
 
-    const coords = (await res.json())?.features?.[0]?.geometry?.coordinates;
-    const lng = Number(coords?.[0]);
-    const lat = Number(coords?.[1]);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return json(empty);
+    const mapmapKey = Deno.env.get("MAPMAP_API_KEY");
+    if (!inItaly(lat, lng) && mapmapKey) {
+      try {
+        const mmRes = await fetch(
+          `https://api.mapmap.ai/geocode?q=${encodeURIComponent(q)}&limit=1`,
+          { headers: { "User-Agent": "DecerneApp/1.0 (support@decerne.it)", "Authorization": `Bearer ${mapmapKey}` }, signal: AbortSignal.timeout(4000) }
+        );
+        if (mmRes.ok) {
+          const c = (await mmRes.json())?.features?.[0]?.geometry?.coordinates;
+          lng = Number(c?.[0]);
+          lat = Number(c?.[1]);
+        } else {
+          console.error("MapMap geocode non ok:", mmRes.status);
+        }
+      } catch (e) {
+        console.error("MapMap geocode errore:", String(e));
+      }
+    }
+
+    if (!inItaly(lat, lng)) return json(empty);
     return json({ lat, lng });
   } catch (e) {
     console.error("Errore geocode-public:", String(e));

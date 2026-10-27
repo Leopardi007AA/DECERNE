@@ -109,26 +109,59 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Servizio occupato. Riprova tra qualche secondo." }, 429);
     }
 
-    // 2. Cache miss: interroga Nominatim (User-Agent obbligatorio per la sua usage policy)
-    const nomRes = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=it&q=${encodeURIComponent(normalizedQuery)}`,
-      { headers: { "User-Agent": "DecerneApp/1.0 (support@decerne.it)", "Accept-Language": "it" }, signal: AbortSignal.timeout(6000) }
-    );
-
-    if (!nomRes.ok) {
-      return json({ lat: null, lng: null });
+    // 2. Cache miss. Con una sessione valida si prova prima MapMap (Nominatim rifiuta spesso gli
+    // IP dei server cloud); per i visitatori anonimi, o se MapMap non trova nulla, si passa a
+    // Nominatim come prima (User-Agent obbligatorio per la sua usage policy).
+    let lat = NaN;
+    let lng = NaN;
+    let source = "nominatim";
+    const mapmapKey = Deno.env.get("MAPMAP_API_KEY");
+    if (userData?.user && mapmapKey) {
+      try {
+        const mmRes = await fetch(
+          `https://api.mapmap.ai/geocode?q=${encodeURIComponent(normalizedQuery)}&limit=1`,
+          { headers: { "User-Agent": "DecerneApp/1.0 (support@decerne.it)", "Authorization": `Bearer ${mapmapKey}` }, signal: AbortSignal.timeout(4000) }
+        );
+        if (mmRes.ok) {
+          const c = (await mmRes.json())?.features?.[0]?.geometry?.coordinates;
+          const mmLng = Number(c?.[0]);
+          const mmLat = Number(c?.[1]);
+          // Solo punti in Italia: una via omonima all'estero non deve finire in cache
+          if (Number.isFinite(mmLat) && Number.isFinite(mmLng) && mmLat >= 35 && mmLat <= 47.5 && mmLng >= 6 && mmLng <= 19) {
+            lat = mmLat;
+            lng = mmLng;
+            source = "mapmap";
+          }
+        } else {
+          console.error("MapMap geocode non ok:", mmRes.status);
+        }
+      } catch (e) {
+        console.error("MapMap geocode errore:", String(e));
+      }
     }
 
-    const results = await nomRes.json();
-    if (!results || !results[0]) {
-      return json({ lat: null, lng: null });
-    }
-
-    const lat = parseFloat(results[0].lat);
-    const lng = parseFloat(results[0].lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return json({ lat: null, lng: null });
+      const nomRes = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=it&q=${encodeURIComponent(normalizedQuery)}`,
+        { headers: { "User-Agent": "DecerneApp/1.0 (support@decerne.it)", "Accept-Language": "it" }, signal: AbortSignal.timeout(6000) }
+      );
+
+      if (!nomRes.ok) {
+        return json({ lat: null, lng: null });
+      }
+
+      const results = await nomRes.json();
+      if (!results || !results[0]) {
+        return json({ lat: null, lng: null });
+      }
+
+      lat = parseFloat(results[0].lat);
+      lng = parseFloat(results[0].lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return json({ lat: null, lng: null });
+      }
     }
+    console.log("Geocode ok via", source);
 
     // 3. Salva in cache per le prossime richieste sulla stessa query
     await supabaseAdmin
