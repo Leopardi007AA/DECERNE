@@ -6354,9 +6354,26 @@ function updateRouteProgress(lat, lng) {
   const a = c[best.i], b = c[best.i + 1];
   const proj = [a[0] + (b[0] - a[0]) * best.t, a[1] + (b[1] - a[1]) * best.t];
   const rest = c.slice(best.i + 1);
+  // Si tiene a mente il tratto appena "mangiato" (gli ultimi 150 m): se un singolo salto del GPS
+  // fa scorrere il tracciato troppo avanti, le letture successive restano comunque vicine a
+  // quel tratto e non sembrano fuori strada.
+  const eaten = [...c.slice(0, best.i + 1), proj];
+  const tail = (cartMultiRoute.tail || []).concat(eaten);
+  const kept = [tail[tail.length - 1]];
+  let tailLen = 0;
+  for (let i = tail.length - 1; i > 0 && tailLen < 150; i--) {
+    tailLen += distanceMeters(tail[i][0], tail[i][1], tail[i - 1][0], tail[i - 1][1]);
+    kept.unshift(tail[i - 1]);
+  }
+  cartMultiRoute.tail = kept;
+  let distTail = Infinity;
+  for (let i = 0; i < kept.length - 1; i++) {
+    const p = projectOnSegmentMeters(lat, lng, kept[i][0], kept[i][1], kept[i + 1][0], kept[i + 1][1]);
+    if (p.dist < distTail) distTail = p.dist;
+  }
   cartMultiRoute.coords = (best.t >= 0.999 && rest.length >= 2) ? rest : [proj, ...rest];
   drawRoutePolyline(cartMultiRoute.coords);
-  return best.dist;
+  return Math.min(best.dist, distTail);
 }
 
 // Quanto la direzione di marcia si scosta dal percorso davanti all'auto (0-180).
